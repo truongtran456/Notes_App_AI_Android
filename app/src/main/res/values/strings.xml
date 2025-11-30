@@ -64,6 +64,14 @@
     <string name="change_color_message">Pick a color or create a new one.\nYou can also edit a Color by long pressing it.</string>
     <string name="change_note">Change Note</string>
     <string name="check_all_items">Check all items</string>
+    <string name="text_format">Text format</string>
+    <string name="visibility">Visibility</string>
+    <string name="draw_size">Size</string>
+    <string name="draw_opacity">Opacity</string>
+    <string name="draw_stream_line">Streamline</string>
+    <string name="draw_color">Color</string>
+    <string name="draw_color_palette">Color palette</string>
+    <string name="zoom">Zoom</string>
     <string name="choose_another_folder">Choose another folder</string>
     <string name="choose_folder">Choose folder</string>
     <string name="choose_other_app">Choose which app to import from</string>
@@ -241,6 +249,7 @@
     <string name="record_audio">Record audio</string>
     <string name="recording">Recording…</string>
     <string name="redo">Redo</string>
+    <string name="draw">Draw</string>
     <string name="reminder_no_repetition">No repetition</string>
     <string name="reminders">Reminders</string>
     <string name="remove_link">Remove Link</string>
@@ -317,4 +326,5 @@
     <string name="yearly">Yearly</string>
     <string name="years">Years</string>
     <string name="your_notes_associated">Your notes attached to this label will not be deleted</string>
+    <string name="done">done</string>
 </resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:theme="@style/Theme.Main">
+        <activity
+            android:name=".ui.passcode.InputPasscodeActivity"
+            android:exported="false" />
+
+        <activity android:name=".ui.appcrop.AppCropActivity"/>
+
+        <activity android:name=".ui.appcamera.AppCameraActivity"/>
+    </application>
+</manifest>

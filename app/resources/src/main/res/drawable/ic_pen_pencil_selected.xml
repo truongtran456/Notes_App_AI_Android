@@ -1,0 +1,4 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/ic_pen_pencil_tip_selected"/>
+    <item android:drawable="@drawable/ic_pen_pencil_body_selected" />
+</layer-list>

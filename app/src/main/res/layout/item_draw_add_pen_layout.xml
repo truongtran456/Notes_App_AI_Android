@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <import type="com.philkes.notallyx.common.model.DrawToolBrush" />
+        <variable
+            name="drawToolBrush"
+            type="DrawToolBrush" />
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:foreground="?attr/selectableItemBackgroundBorderless"
+        android:padding="6dp">
+
+        <com.philkes.notallyx.presentation.activity.note.drawtool.PenView
+            android:id="@+id/addPenView"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:padding="8dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:drawToolBrush="@{drawToolBrush}" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ivAdd"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/draw_tool_action_button"
+            android:padding="4dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/add"
+            app:layout_constraintBottom_toBottomOf="@id/addPenView"
+            app:layout_constraintEnd_toEndOf="@id/addPenView"
+            app:layout_constraintStart_toStartOf="@id/addPenView"
+            app:layout_constraintTop_toTopOf="@id/addPenView" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>
+

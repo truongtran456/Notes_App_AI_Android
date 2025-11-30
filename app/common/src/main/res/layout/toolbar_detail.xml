@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbarHeight">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/backButton"
+            style="@style/Theme.Main.Toolbar.Back"
+            android:layout_marginStart="@dimen/dp_16"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="@dimen/dp_0"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/dp_8"
+            android:autoSizeMaxTextSize="@dimen/sp_16"
+            android:autoSizeMinTextSize="@dimen/sp_14"
+            android:autoSizeTextType="uniform"
+            android:ellipsize="end"
+            android:fontFamily="?attr/fontSemiBold"
+            android:gravity="center"
+            android:lines="1"
+            android:text="@string/app_name"
+            android:textColor="?attr/titleTextColor"
+            android:textSize="@dimen/sp_16"
+            android:transitionName="title"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/ivPremium"
+            app:layout_constraintStart_toEndOf="@+id/backButton"
+            app:layout_constraintTop_toTopOf="parent" />
+
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ivPremium"
+            android:layout_width="@dimen/dp_32"
+            android:layout_height="@dimen/dp_32"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            android:layout_marginEnd="@dimen/dp_12"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:layout_marginStart="@dimen/dp_12"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/rightButton"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/rightButton"
+            android:layout_width="@dimen/dp_32"
+            android:layout_height="@dimen/dp_32"
+            android:layout_marginEnd="@dimen/dp_16"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:padding="@dimen/dp_2"
+            android:src="@drawable/ic_close"
+            android:tint="?attr/titleTextColor"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

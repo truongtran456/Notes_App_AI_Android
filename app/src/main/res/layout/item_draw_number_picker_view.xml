@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/transparent">
+
+                <com.shawnlin.numberpicker.NumberPicker
+                    android:id="@+id/numberPicker"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    app:np_min="1"
+                    app:np_max="500"
+                    app:np_wrapSelectorWheel="false"
+                    app:np_wheelItemCount="7"
+                    app:np_itemSpacing="@dimen/dp_4"
+                    app:np_fadingEdgeEnabled="true"
+                    app:np_fadingEdgeStrength="0.3"
+
+                    app:np_dividerDistance="@dimen/dp_34"
+                    app:np_dividerThickness="@dimen/dp_1"
+                    app:np_dividerColor="?attr/primaryColor"
+                    app:np_selectedTextColor="?attr/titleTextColor"
+                    app:np_selectedTextSize="@dimen/sp_16"
+
+                    app:np_textColor="#B7B7B6"
+                    app:np_textSize="@dimen/sp_14"
+
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"/>
+
+                <!--        <androidx.constraintlayout.widget.ConstraintLayout-->
+                <!--            android:id="@+id/clContainer"-->
+                <!--            android:layout_width="@dimen/dp_300"-->
+                <!--            android:layout_height="wrap_content"-->
+                <!--            android:layout_marginBottom="@dimen/dp_16"-->
+                <!--            android:background="@drawable/bg_corner_20"-->
+                <!--            android:backgroundTint="@color/white"-->
+                <!--            android:paddingVertical="@dimen/dp_12"-->
+                <!--            app:layout_constraintBottom_toBottomOf="parent"-->
+                <!--            app:layout_constraintEnd_toEndOf="parent"-->
+                <!--            app:layout_constraintStart_toStartOf="parent">-->
+
+                <!--            <androidx.appcompat.widget.LinearLayoutCompat-->
+                <!--                android:id="@+id/llContainer"-->
+                <!--                android:layout_width="match_parent"-->
+                <!--                android:layout_height="wrap_content"-->
+                <!--                android:layout_marginHorizontal="@dimen/dp_12"-->
+                <!--                android:orientation="horizontal"-->
+                <!--                app:layout_constraintStart_toStartOf="parent"-->
+                <!--                app:layout_constraintTop_toTopOf="parent">-->
+
+                <!--                <TextView-->
+                <!--                    android:id="@+id/tvSize"-->
+                <!--                    android:layout_width="0dp"-->
+                <!--                    android:layout_height="wrap_content"-->
+                <!--                    android:layout_weight="1"-->
+                <!--                    android:fontFamily="@font/inter_medium"-->
+                <!--                    android:text="@string/size"-->
+                <!--                    android:textColor="@color/black"-->
+                <!--                    android:textSize="@dimen/sp_14" />-->
+
+                <!--                <TextView-->
+                <!--                    android:id="@+id/tvNumberSize"-->
+                <!--                    android:layout_width="wrap_content"-->
+                <!--                    android:layout_height="wrap_content"-->
+                <!--                    android:fontFamily="@font/inter_medium"-->
+                <!--                    android:gravity="end"-->
+                <!--                    android:textColor="@color/black"-->
+                <!--                    android:textSize="@dimen/sp_14"-->
+                <!--                    app:layout_constraintBottom_toBottomOf="parent"-->
+                <!--                    app:layout_constraintEnd_toEndOf="parent"-->
+                <!--                    app:layout_constraintTop_toTopOf="parent"-->
+                <!--                    tools:text="1" />-->
+
+                <!--            </androidx.appcompat.widget.LinearLayoutCompat>-->
+
+                <!--            <SeekBar-->
+                <!--                android:id="@+id/sbSize"-->
+                <!--                android:layout_width="0dp"-->
+                <!--                android:layout_height="wrap_content"-->
+                <!--                android:layout_marginTop="@dimen/dp_6"-->
+                <!--                android:backgroundTint="?attr/primaryColor"-->
+                <!--                android:max="500"-->
+                <!--                android:min="1"-->
+                <!--                android:progressBackgroundTint="@color/gray4F4F4F"-->
+                <!--                android:progressTint="?attr/primaryColor"-->
+                <!--                android:thumbTint="?attr/primaryColor"-->
+                <!--                app:layout_constraintBottom_toBottomOf="parent"-->
+                <!--                app:layout_constraintEnd_toEndOf="parent"-->
+                <!--                app:layout_constraintStart_toStartOf="parent"-->
+                <!--                app:layout_constraintTop_toBottomOf="@id/llContainer"-->
+                <!--                tools:progress="30" />-->
+
+                <!--        </androidx.constraintlayout.widget.ConstraintLayout>-->
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

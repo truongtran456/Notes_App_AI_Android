@@ -9,4 +9,44 @@
     <attr name="colorOnSurface" format="reference" />
     <attr name="colorSurfaceInverse" format="reference" />
     <attr name="textColor" format="reference" />
+    <attr format="string" name="fontFamily"/>
+    <attr format="color" name="gridColor"/>
+    <attr format="dimension" name="lineWidth"/>
+    <attr format="dimension" name="textSize"/>
+    <attr format="color" name="titleTextColor"/>
+    <declare-styleable name="ColorTheme">
+        <attr format="color" name="detailTextColor"/>
+        <attr format="color" name="secondaryDetailTextColor"/>
+        <attr format="color" name="primaryColor"/>
+        <attr format="color" name="secondPrimaryColor"/>
+        <attr format="color" name="primaryAlphaColor"/>
+        <attr format="color" name="primaryBackgroundColor"/>
+        <attr format="color" name="secondaryBackgroundColor"/>
+        <attr format="color" name="separatorColor"/>
+        <attr format="color" name="lineColor"/>
+        <attr format="color" name="shadowColor"/>
+        <attr format="color" name="placeHolderColor"/>
+        <attr format="dimension" name="elevation"/>
+        <attr format="dimension" name="connerRadius"/>
+        <attr format="color" name="tabBackgroundColor"/>
+        <attr format="color" name="activeTabBackgroundColor"/>
+        <attr format="color" name="deActiveTabBackgroundColor"/>
+        <attr format="color" name="bottomNavBackgroundColor"/>
+        <attr format="reference" name="fontRegular"/>
+        <attr format="reference" name="fontBold"/>
+        <attr format="reference" name="fontMedium"/>
+        <attr format="reference" name="fontSemiBold"/>
+    </declare-styleable>
+    <declare-styleable name="EmptyDataView">
+        <attr format="string" name="empty_message"/>
+        <attr format="string" name="button_title"/>
+        <attr format="reference" name="empty_icon"/>
+    </declare-styleable>
+    <declare-styleable name="Theme.Core.DefaultDialog">
+        <attr format="color" name="positiveTitleColor"/>
+        <attr format="color" name="positiveBackgroundColor"/>
+        <attr format="color" name="negativeTitleColor"/>
+        <attr format="color" name="negativeBackgroundColor"/>
+        <attr format="color" name="messageTextColor"/>
+    </declare-styleable>
 </resources>

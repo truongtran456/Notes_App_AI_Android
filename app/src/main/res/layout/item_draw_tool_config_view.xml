@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <import type="com.philkes.notallyx.common.model.DrawToolBrush" />
+
+        <variable
+            name="brushes"
+            type="java.util.List&lt;DrawToolBrush>" />
+    </data>
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/transparent"
+        app:cardCornerRadius="@dimen/dp_12"
+        app:cardElevation="@dimen/dp_0">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_background"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <include
+                android:id="@+id/toolbar"
+                layout="@layout/toolbar_draw_edit" />
+
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/clPreview"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/dp_120"
+                android:layout_marginHorizontal="@dimen/dp_12"
+                android:layout_marginTop="@dimen/dp_12"
+                android:background="@drawable/bg_corner_12"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvDone">
+
+                <com.philkes.notallyx.draw.ui.newdraw.view.drawtoolconfig.preview.DrawToolPreviewView
+                    android:id="@+id/drawToolPreview"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintWidth_percent="0.9" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <androidx.core.widget.NestedScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/dp_12"
+                android:layout_marginVertical="@dimen/dp_12"
+                tools:ignore="ScrollViewCount">
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:id="@+id/clBrush"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginBottom="@dimen/dp_12"
+                        android:background="@drawable/bg_corner_12">
+
+                        <com.philkes.notallyx.draw.ui.newdraw.view.drawtoolconfig.drawtool.DrawToolBrushGalleryView
+                            android:id="@+id/drawToolBrushGallery"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            app:brushes="@{brushes}"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent" />
+
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cardBackgroundColor="?attr/secondaryBackgroundColor"
+                        app:cardCornerRadius="@dimen/dp_12"
+                        app:cardElevation="0dp">
+
+                        <androidx.appcompat.widget.LinearLayoutCompat
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="@dimen/dp_10"
+                            android:layout_marginVertical="@dimen/dp_8"
+                            android:orientation="vertical"
+                            app:layout_constraintBottom_toBottomOf="parent"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent">
+
+                            <TextView
+                                android:id="@+id/tvSize"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/dp_2"
+                                android:fontFamily="?attr/fontBold"
+                                android:text="@string/draw_size"
+                                android:textColor="@color/color3D2A00"
+                                android:textSize="@dimen/sp_12"
+                                app:layout_constraintEnd_toEndOf="parent"
+                                app:layout_constraintStart_toStartOf="parent" />
+
+                            <androidx.appcompat.widget.LinearLayoutCompat
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:layout_marginBottom="@dimen/dp_2"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <com.philkes.notallyx.common.ui.view.sliderview.SliderView
+                                    android:id="@+id/sliderSizeView"
+                                    android:layout_width="0dp"
+                                    android:layout_height="@dimen/dp_20"
+                                    android:layout_marginHorizontal="@dimen/dp_8"
+                                    android:layout_weight="3"
+                                    app:cardCornerRadius="@dimen/dp_10" />
+
+                                <androidx.appcompat.widget.AppCompatTextView
+                                    android:id="@+id/etSize"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="@dimen/dp_12"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_draw_corner_6"
+                                    android:fontFamily="?attr/fontSemiBold"
+                                    android:gravity="center"
+                                    android:inputType="numberSigned"
+                                    android:maxWidth="@dimen/dp_50"
+                                    android:maxLength="50"
+                                    android:maxLines="1"
+                                    android:padding="@dimen/dp_8"
+                                    android:textColor="?attr/titleTextColor"
+                                    android:textSize="@dimen/sp_12" />
+                            </androidx.appcompat.widget.LinearLayoutCompat>
+
+                            <androidx.appcompat.widget.LinearLayoutCompat
+                                android:id="@+id/llOtherBrush"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginBottom="@dimen/dp_8"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvOpacity"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="@dimen/dp_2"
+                                    android:fontFamily="?attr/fontBold"
+                                    android:text="@string/draw_opacity"
+                                    android:textColor="@color/color3D2A00"
+                                    android:textSize="@dimen/sp_12"
+                                    app:layout_constraintEnd_toEndOf="parent"
+                                    app:layout_constraintStart_toStartOf="parent" />
+
+                                <androidx.appcompat.widget.LinearLayoutCompat
+                                    android:id="@+id/lnOpacity"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="center"
+                                    android:layout_marginBottom="@dimen/dp_10"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <com.philkes.notallyx.common.ui.view.sliderview.SliderView
+                                        android:id="@+id/sliderOpacityView"
+                                        android:layout_width="0dp"
+                                        android:layout_height="@dimen/dp_20"
+                                        android:layout_marginHorizontal="@dimen/dp_8"
+                                        android:layout_weight="3"
+                                        app:cardCornerRadius="@dimen/dp_10" />
+
+                                    <androidx.appcompat.widget.AppCompatTextView
+                                        android:id="@+id/etOpacity"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="@dimen/dp_12"
+                                        android:layout_weight="1"
+                                        android:background="@drawable/bg_draw_corner_6"
+                                        android:fontFamily="?attr/fontSemiBold"
+                                        android:gravity="center"
+                                        android:inputType="numberSigned"
+                                        android:maxWidth="@dimen/dp_50"
+                                        android:maxLength="50"
+                                        android:maxLines="1"
+                                        android:padding="@dimen/dp_8"
+                                        android:textColor="?attr/titleTextColor"
+                                        android:textSize="@dimen/sp_12" />
+                                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                                <TextView
+                                    android:id="@+id/tvStreamLine"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="@dimen/dp_2"
+                                    android:fontFamily="?attr/fontBold"
+                                    android:text="@string/draw_stream_line"
+                                    android:textColor="@color/color3D2A00"
+                                    android:textSize="@dimen/sp_12"
+                                    app:layout_constraintEnd_toEndOf="parent"
+                                    app:layout_constraintStart_toStartOf="parent" />
+
+                                <androidx.appcompat.widget.LinearLayoutCompat
+                                    android:id="@+id/lnStreamLine"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="center"
+                                    android:layout_marginBottom="@dimen/dp_2"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <com.philkes.notallyx.common.ui.view.sliderview.SliderView
+                                        android:id="@+id/sliderStreamLineView"
+                                        android:layout_width="0dp"
+                                        android:layout_height="@dimen/dp_20"
+                                        android:layout_marginHorizontal="@dimen/dp_8"
+                                        android:layout_weight="3"
+                                        app:cardCornerRadius="@dimen/dp_10" />
+
+                                    <androidx.appcompat.widget.AppCompatTextView
+                                        android:id="@+id/etStreamLine"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="@dimen/dp_12"
+                                        android:layout_weight="1"
+                                        android:background="@drawable/bg_draw_corner_6"
+                                        android:fontFamily="?attr/fontSemiBold"
+                                        android:gravity="center"
+                                        android:inputType="numberSigned"
+                                        android:maxWidth="@dimen/dp_50"
+                                        android:maxLength="50"
+                                        android:maxLines="1"
+                                        android:padding="@dimen/dp_8"
+                                        android:textColor="?attr/titleTextColor"
+                                        android:textSize="@dimen/sp_12" />
+                                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                                <androidx.constraintlayout.widget.ConstraintLayout
+                                    android:id="@+id/clColor"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="@dimen/dp_2">
+
+                                    <TextView
+                                        android:id="@+id/tvColor"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:fontFamily="?attr/fontBold"
+                                        android:text="@string/draw_color"
+                                        android:textColor="@color/color3D2A00"
+                                        android:textSize="@dimen/sp_12"
+                                        app:layout_constraintBottom_toBottomOf="parent"
+                                        app:layout_constraintStart_toStartOf="parent"
+                                        app:layout_constraintTop_toTopOf="parent" />
+
+                                    <androidx.appcompat.widget.AppCompatImageView
+                                        android:id="@+id/ivEditColor"
+                                        android:layout_width="@dimen/dp_30"
+                                        android:layout_height="@dimen/dp_30"
+                                        android:layout_marginStart="@dimen/dp_16"
+                                        android:padding="4dp"
+                                        android:scaleType="centerInside"
+                                        android:src="@drawable/ic_draw_edit_color_pen"
+                                        app:layout_constraintBottom_toBottomOf="parent"
+                                        app:layout_constraintEnd_toEndOf="parent"
+                                        app:layout_constraintTop_toTopOf="parent" />
+                                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                                <com.philkes.notallyx.draw.ui.newdraw.view.drawtoolconfig.colorpicker.ColorPaletteView
+                                    android:id="@+id/colorView"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="@dimen/dp_12"
+                                    app:layout_constraintBottom_toBottomOf="parent"
+                                    app:layout_constraintEnd_toEndOf="parent"
+                                    app:layout_constraintStart_toStartOf="parent"
+                                    app:layout_constraintTop_toTopOf="parent"
+                                    app:layout_constraintWidth_max="@dimen/dp_500" />
+
+                                <View
+                                    android:id="@+id/view"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="@dimen/dp_2"
+                                    android:layout_marginBottom="@dimen/dp_12"
+                                    android:background="@drawable/bg_draw_line" />
+
+                                <TextView
+                                    android:id="@+id/tvColorPalette"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginBottom="@dimen/dp_4"
+                                    android:fontFamily="?attr/fontBold"
+                                    android:text="@string/draw_color_palette"
+                                    android:textColor="@color/color3D2A00"
+                                    android:textSize="@dimen/sp_12"
+                                    app:layout_constraintEnd_toEndOf="parent"
+                                    app:layout_constraintStart_toStartOf="parent" />
+
+                                <androidx.appcompat.widget.LinearLayoutCompat
+                                    android:id="@+id/lnColorPalette"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="center"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal">
+
+                                    <com.philkes.notallyx.draw.ui.newdraw.view.drawtoolconfig.colorpicker.ColorPaletteView
+                                        android:id="@+id/colorPalette"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="7"
+                                        app:layout_constraintBottom_toBottomOf="parent"
+                                        app:layout_constraintEnd_toEndOf="parent"
+                                        app:layout_constraintStart_toStartOf="parent"
+                                        app:layout_constraintTop_toTopOf="parent" />
+
+                                    <androidx.appcompat.widget.AppCompatImageView
+                                        android:id="@+id/ivBack"
+                                        android:layout_width="0dp"
+                                        android:layout_height="@dimen/dp_30"
+                                        android:layout_weight="1"
+                                        android:padding="4dp"
+                                        android:scaleType="centerInside"
+                                        android:src="@drawable/ic_draw_continute"
+                                        app:layout_constraintBottom_toBottomOf="parent"
+                                        app:layout_constraintStart_toStartOf="parent"
+                                        app:layout_constraintTop_toTopOf="parent" />
+
+                                </androidx.appcompat.widget.LinearLayoutCompat>
+
+                            </androidx.appcompat.widget.LinearLayoutCompat>
+                        </androidx.appcompat.widget.LinearLayoutCompat>
+                    </androidx.cardview.widget.CardView>
+
+                    <TextView
+                        android:id="@+id/tvClear"
+                        style="@style/Theme.Main.Text.Default"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:layout_marginVertical="@dimen/dp_16"
+                        android:height="@dimen/dp_32"
+                        android:background="@drawable/bg_corner_12"
+                        android:backgroundTint="?attr/secondaryBackgroundColor"
+                        android:gravity="center"
+                        android:paddingHorizontal="24dp"
+                        android:text="Clear All"
+                        android:textColor="?attr/primaryColor" />
+                </androidx.appcompat.widget.LinearLayoutCompat>
+            </androidx.core.widget.NestedScrollView>
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </androidx.cardview.widget.CardView>
+
+</layout>

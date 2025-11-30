@@ -1,7 +1,40 @@
 <resources>
-
+    <style name="Theme.Core.PopupMenu" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:itemBackground">@android:color/white</item>
+    </style>
     <style name="AppTheme" parent="Theme.Material3.Light.NoActionBar">
-        <item name="colorPrimary">@color/md_theme_primary</item>
+        <item name="android:textAllCaps">false</item>
+
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryDark">@color/primary</item>
+        <item name="colorAccent">@color/black</item>
+        <item name="titleTextColor">@color/black</item>
+        <item name="detailTextColor">@color/grayBDBDBD</item>
+        <item name="secondaryDetailTextColor">@color/grayBDBDBD</item>
+        <item name="primaryBackgroundColor">@color/white</item>
+        <item name="secondaryBackgroundColor">@color/white</item>
+        <item name="secondPrimaryColor">@color/secondaryPrimary</item>
+        <item name="lineColor">@color/gray26B9B0B4</item>
+        <item name="shadowColor">@color/gray828282</item>
+        <item name="primaryAlphaColor">@color/primary</item>
+        <item name="primaryColor">@color/primary</item>
+        <item name="placeHolderColor">@color/grayAEAEB2</item>
+
+
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+
+
+        <item name="messageTextColor">?attr/titleTextColor</item>
+        <item name="negativeBackgroundColor">@color/grayF2F2F7</item>
+        <item name="negativeTitleColor">?attr/detailTextColor</item>
+        <item name="positiveBackgroundColor">?attr/primaryColor</item>
+        <item name="positiveTitleColor">@color/white</item>
+
+        <item name="tabBackgroundColor">?attr/secondaryBackgroundColor</item>
+        <item name="activeTabBackgroundColor">?attr/primaryColor</item>
+        <item name="deActiveTabBackgroundColor">@color/grayEFEEEC</item>
         <item name="colorOnPrimary">@color/md_theme_onPrimary</item>
         <item name="colorPrimaryContainer">@color/md_theme_primaryContainer</item>
         <item name="colorOnPrimaryContainer">@color/md_theme_onPrimaryContainer</item>
@@ -90,6 +123,16 @@
         <item name="android:focusable">true</item>
     </style>
 
+    <!-- Clickable icon style used by draw toolbar -->
+    <style name="Theme.Main.ClickableView" parent="Widget.AppCompat.ImageButton">
+        <item name="android:layout_width">@dimen/dp_24</item>
+        <item name="android:layout_height">@dimen/dp_24</item>
+        <item name="android:padding">@dimen/dp_2</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackgroundBorderless</item>
+    </style>
+
 
     <style name="FilterChip" parent="Widget.Material3.Chip.Filter">
         <item name="checkedIcon">@null</item>
@@ -147,6 +190,12 @@
 
     <style name="RoundedCorners">
         <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- Text style used by draw config bottom button -->
+    <style name="Theme.Main.Text.Default" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:fontFamily">?attr/fontRegular</item>
+        <item name="android:textColor">?attr/titleTextColor</item>
     </style>
 
 </resources>

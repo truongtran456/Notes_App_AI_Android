@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item>
+        <shape>
+            <corners android:radius="@dimen/dp_24" />
+            <gradient
+                android:angle="90"
+                android:endColor="@color/colorFFC340"
+                android:startColor="@color/colorFF8400" />
+        </shape>
+    </item>
+
+    <item
+        android:drawable="@drawable/ic_bong"
+        android:gravity="start|top"
+        android:start="@dimen/dp_2"
+        android:top="@dimen/dp_2" />
+</layer-list>

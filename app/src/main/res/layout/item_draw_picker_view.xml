@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <import type="com.philkes.notallyx.common.model.DrawToolBrush" />
+
+        <variable
+            name="tools"
+            type="java.util.ArrayList&lt;DrawToolBrush>" />
+    </data>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_tool"
+        android:orientation="vertical"
+        android:padding="@dimen/dp_1">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/topToolRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/dp_16"
+            android:layout_marginVertical="@dimen/dp_12"
+            android:layout_marginBottom="@dimen/dp_12"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivDone"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_width="@dimen/dp_30"
+                android:layout_height="@dimen/dp_30"
+                android:background="@drawable/bg_layer"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="@dimen/dp_5"
+                android:src="@drawable/ic_close"
+                android:contentDescription="@string/done" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivEdit"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_width="@dimen/dp_30"
+                android:layout_height="@dimen/dp_30"
+                android:layout_marginStart="@dimen/dp_12"
+                android:background="@drawable/bg_layer"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="@dimen/dp_5"
+                android:src="@drawable/ic_ruler_cross_pen" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivEyedropper"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_width="@dimen/dp_30"
+                android:layout_height="@dimen/dp_30"
+                android:layout_marginEnd="@dimen/dp_12"
+                android:background="@drawable/bg_back"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="@dimen/dp_5"
+                android:src="@drawable/ic_eyedropper" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivSize"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_width="@dimen/dp_30"
+                android:layout_height="@dimen/dp_30"
+                android:layout_marginEnd="@dimen/dp_12"
+                android:background="@drawable/bg_grid"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="@dimen/dp_5"
+                android:src="@drawable/ic_equalizer" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivOpacity"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_width="@dimen/dp_30"
+                android:layout_height="@dimen/dp_30"
+                android:layout_marginEnd="@dimen/dp_12"
+                android:background="@drawable/bg_undo"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="@dimen/dp_5"
+                android:src="@drawable/ic_saturation" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivZoom"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_width="@dimen/dp_30"
+                android:layout_height="@dimen/dp_30"
+                android:background="@drawable/bg_more"
+                android:foreground="?attr/selectableItemBackground"
+                android:padding="@dimen/dp_5"
+                android:src="@drawable/ic_zoom" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/dp_74"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/drawToolPickerView"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_tool_draw"
+                android:paddingHorizontal="@dimen/dp_12" />
+
+            <com.philkes.notallyx.presentation.activity.note.drawtool.PenView
+                android:id="@+id/eraserView"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center_horizontal|bottom"
+                android:layout_marginHorizontal="@dimen/dp_12"
+                android:gravity="bottom|center_horizontal" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivPalette"
+                android:layout_width="@dimen/dp_24"
+                android:layout_height="@dimen/dp_24"
+                android:layout_gravity="bottom"
+                android:layout_marginEnd="@dimen/dp_16"
+                android:layout_marginBottom="@dimen/dp_12"
+                android:foreground="?attr/selectableItemBackground"
+                android:src="@drawable/ic_palate" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</layout>
+

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <variable
+            name="viewModel"
+            type="com.starnest.core.base.viewmodel.BaseViewModel" />
+    </data>
+
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/primaryBackgroundColor"
+        tools:orientation="vertical">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/bg_background" />
+
+        <include
+            android:id="@+id/toolbar"
+            layout="@layout/toolbar_detail" />
+
+        <com.canhub.cropper.CropImageView
+            android:id="@+id/imageView"
+            android:layout_width="@dimen/dp_0"
+            android:layout_height="@dimen/dp_0"
+            android:layout_marginVertical="@dimen/dp_24"
+            android:scaleType="centerInside"
+            app:layout_constraintBottom_toTopOf="@id/llAction"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/toolbar" />
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/llAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/dp_24"
+            android:layout_marginBottom="@dimen/dp_16"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/llRetake"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:clipToOutline="true"
+                android:elevation="@dimen/dp_24"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:gravity="center"
+                android:orientation="vertical"
+                tools:ignore="UnusedAttribute">
+
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="@dimen/dp_44"
+                    android:layout_height="@dimen/dp_44"
+                    android:src="@drawable/ic_retake" />
+
+                <TextView
+                    style="@style/Theme.Main.Text.Default"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="?attr/fontMedium"
+                    android:gravity="center"
+                    android:text="@string/retake"
+                    android:textColor="?attr/titleTextColor"
+                    android:textSize="@dimen/sp_14"
+                    tools:ignore="UnusedAttribute" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/llSolve"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:clipToOutline="true"
+                android:elevation="@dimen/dp_24"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:gravity="center"
+                android:orientation="vertical"
+                tools:ignore="UnusedAttribute">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="@dimen/dp_64"
+                    android:layout_height="@dimen/dp_64"
+                    android:src="@drawable/ic_solve" />
+
+                <TextView
+                    android:id="@+id/tvCrop"
+                    style="@style/Theme.Main.Text.Default"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="?attr/fontMedium"
+                    android:gravity="center"
+                    android:text="@string/solve"
+                    android:textColor="?attr/titleTextColor"
+                    android:textSize="@dimen/sp_14"
+                    tools:ignore="UnusedAttribute" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+            <androidx.appcompat.widget.LinearLayoutCompat
+                android:id="@+id/llRotate"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:clipToOutline="true"
+                android:elevation="@dimen/dp_24"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:gravity="center"
+                android:orientation="vertical"
+                tools:ignore="UnusedAttribute">
+
+                <androidx.appcompat.widget.AppCompatImageView
+                    android:layout_width="@dimen/dp_44"
+                    android:layout_height="@dimen/dp_44"
+                    android:src="@drawable/ic_rotate" />
+
+                <TextView
+                    style="@style/Theme.Main.Text.Default"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="?attr/fontMedium"
+                    android:gravity="center"
+                    android:text="@string/rotate"
+                    android:textColor="?attr/titleTextColor"
+                    android:textSize="@dimen/sp_14"
+                    tools:ignore="UnusedAttribute" />
+
+            </androidx.appcompat.widget.LinearLayoutCompat>
+
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

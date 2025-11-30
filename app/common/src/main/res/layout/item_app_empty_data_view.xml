@@ -1,0 +1,58 @@
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:gravity="center_vertical|center_horizontal"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivEmpty"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/dp_180"
+                android:contentDescription="@null"
+                android:src="@drawable/bg_empty_chat" />
+
+            <TextView
+                android:id="@+id/tvEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/dp_8"
+                android:gravity="center"
+                android:textColor="?attr/titleTextColor"
+                android:textSize="@dimen/sp_14"
+                tools:text="12312" />
+
+            <TextView
+                android:id="@+id/tvStart"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/dp_40"
+                android:background="@drawable/bg_button"
+                android:clickable="true"
+                android:clipToOutline="true"
+                android:focusable="true"
+                android:fontFamily="?attr/fontMedium"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:gravity="center"
+                android:paddingHorizontal="@dimen/dp_24"
+                android:textColor="@color/white"
+                android:textSize="@dimen/sp_14"
+                tools:targetApi="s"
+                tools:text="123" />
+
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

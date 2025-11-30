@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/dp_36"
+        android:background="@drawable/bg_tool_size_pen"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/dp_4"
+            android:layout_marginVertical="@dimen/dp_6"
+            android:layout_gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.philkes.notallyx.common.ui.view.sliderview.SliderView
+                android:id="@+id/sliderSizeView"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/dp_20"
+                android:layout_gravity="center"
+                android:layout_weight="4"
+                android:layout_marginHorizontal="@dimen/dp_8"/>
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/tvSize"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_corner_20"
+                android:fontFamily="?attr/fontSemiBold"
+                android:gravity="center"
+                android:layout_gravity="center_vertical"
+                android:maxWidth="@dimen/dp_60"
+                android:maxLines="1"
+                android:textColor="?attr/titleTextColor"
+                android:textSize="@dimen/sp_13"
+                tools:text="100 px"/>
+        </androidx.appcompat.widget.LinearLayoutCompat>
+    </FrameLayout>
+
+</layout>
+

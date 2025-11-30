@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="outlineAttrs">
+        <attr name="outlineColor" format="color"/>
+        <attr name="outlineWidth" format="float"/>
+    </declare-styleable>
+
+    <declare-styleable name="SettingItem">
+        <attr name="setting_title" format="string" />
+        <attr name="setting_icon" format="reference" />
+        <attr name="setting_toggleEnabled" format="boolean" />
+        <attr name="setting_detail" format="string" />
+        <attr name="setting_arrowEnabled" format="boolean" />
+        <attr name="setting_showLine" format="boolean" />
+        <attr name="setting_title_all_cap" format="boolean" />
+        <attr name="setting_show_origin_icon" format="boolean" />
+        <attr name="setting_isApplyTint" format="boolean"/>
+    </declare-styleable>
+
+    <declare-styleable name="ShadowView">
+        <attr name="sv_mask" format="reference" />
+        <attr name="sv_color" format="reference" />
+        <attr name="sv_dx" format="reference" />
+        <attr name="sv_dy" format="reference" />
+    </declare-styleable>
+
+
+
+    <declare-styleable name="ColorTheme">
+        <attr name="thirdBackgroundColor" format="color" />
+        <attr name="navTitleColor" format="color" />
+        <attr name="disableColor" format="color" />
+        <attr name="gradientColors" format="reference" />
+        <attr format="reference" name="secondFontBold"/>
+        <attr format="reference" name="fontExtraBold"/>
+        <attr format="color" name="positiveTitleColor"/>
+    </declare-styleable>
+</resources>

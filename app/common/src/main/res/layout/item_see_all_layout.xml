@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/llSeeAll"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="true"
+        android:clipToOutline="true"
+        android:focusable="true"
+        android:foreground="?android:attr/selectableItemBackground"
+        android:gravity="center"
+        tools:targetApi="31">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="@dimen/dp_2"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:lines="1"
+            android:text="@string/see_all"
+            android:textColor="?attr/titleTextColor"
+            android:textSize="@dimen/sp_14" />
+
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_width="@dimen/dp_20"
+            android:layout_height="@dimen/dp_20"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_next_double"
+            app:tint="?attr/primaryColor" />
+
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</layout>

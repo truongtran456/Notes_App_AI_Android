@@ -55,6 +55,9 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke
 
 typealias BackupFile = Pair<String?, File>
 
@@ -62,6 +65,9 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
 
     private val database = NotallyDatabase.getDatabase(app)
     private lateinit var baseNoteDao: BaseNoteDao
+    
+    private val gson = Gson()
+    private val strokesType = object : TypeToken<List<DrawingStroke>>() {}.type
 
     val preferences = NotallyXPreferences.getInstance(app)
     val textSize = preferences.textSize.value
@@ -88,6 +94,9 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
     val files = NotNullLiveData<List<FileAttachment>>(emptyList())
     val audios = NotNullLiveData<List<Audio>>(emptyList())
     val reminders = NotNullLiveData<List<Reminder>>(emptyList())
+    
+    // Drawing strokes để lưu drawing
+    var drawingStrokes = ArrayList<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>()
 
     val addingFiles = MutableLiveData<Progress>()
     val eventBus = MutableLiveData<Event<List<FileError>>>()
@@ -246,6 +255,20 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
                 files.value = baseNote.files
                 audios.value = baseNote.audios
                 reminders.value = baseNote.reminders
+                
+                // Load drawing strokes từ JSON
+                drawingStrokes.clear()
+                if (!baseNote.drawingStrokesJson.isNullOrEmpty()) {
+                    try {
+                        val strokes = gson.fromJson<List<DrawingStroke>>(baseNote.drawingStrokesJson, strokesType)
+                        if (strokes != null) {
+                            drawingStrokes.addAll(strokes)
+                        }
+                    } catch (e: Exception) {
+                        // Nếu parse lỗi, bỏ qua
+                        e.printStackTrace()
+                    }
+                }
             } else {
                 originalNote = createBaseNote()
                 app.showToast(R.string.cant_find_note)
@@ -319,6 +342,19 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
         val spans = getFilteredSpans(body)
         val body = this.body.toString()
         val nonEmptyItems = this.items.filter { item -> item.body.isNotEmpty() }
+        
+        // Serialize drawing strokes thành JSON
+        val drawingStrokesJson = if (drawingStrokes.isNotEmpty()) {
+            try {
+                gson.toJson(drawingStrokes)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null
+            }
+        } else {
+            null
+        }
+        
         return BaseNote(
             id,
             type,
@@ -336,6 +372,7 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
             files.value,
             audios.value,
             reminders.value,
+            drawingStrokesJson,
         )
     }
 

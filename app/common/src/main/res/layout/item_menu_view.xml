@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <import type="com.starnest.common.ui.view.menuview.MenuOption" />
+
+        <variable
+            name="menus"
+            type="java.util.ArrayList&lt;MenuOption&gt;" />
+
+    </data>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_popup_window"
+        tools:layout_height="@dimen/dp_100">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/menuRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:items="@{menus}" />
+
+    </FrameLayout>
+</layout>

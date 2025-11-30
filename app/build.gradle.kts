@@ -7,10 +7,12 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.parcelize")
+    kotlin("kapt")
     id("com.google.devtools.ksp")
     id("com.ncorti.ktfmt.gradle") version "0.20.1"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.0"
     id("io.github.philkes.android-translations-converter") version "1.0.4"
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -101,6 +103,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        dataBinding = true
     }
 
     packaging {
@@ -191,6 +194,7 @@ dependencies {
     implementation("cat.ereza:customactivityoncrash:2.4.0")
     implementation("com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0")
     implementation("com.github.bumptech.glide:glide:4.15.1")
+    implementation("io.github.ShawnLin013:number-picker:2.4.13")
     implementation("cn.Leaqi:SwipeDrawer:1.6")
     implementation("com.github.skydoves:colorpickerview:2.3.0")
     implementation("com.google.android.material:material:1.12.0")
@@ -199,6 +203,7 @@ dependencies {
     implementation("net.lingala.zip4j:zip4j:2.11.5")
     implementation("net.zetetic:android-database-sqlcipher:4.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.jsoup:jsoup:1.18.1")
     implementation("org.ocpsoft.prettytime:prettytime:4.0.6.Final")
     implementation("org.simpleframework:simple-xml:2.7.1") {
@@ -217,4 +222,6 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testImplementation("org.mockito:mockito-core:5.13.0")
     testImplementation("org.robolectric:robolectric:4.13")
+    implementation("com.google.dagger:hilt-android:2.51")
+    kapt("com.google.dagger:hilt-android-compiler:2.51")
 }

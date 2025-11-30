@@ -1,0 +1,39 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="69dp"
+    android:viewportWidth="22"
+    android:viewportHeight="69">
+  <group>
+    <clip-path
+        android:pathData="M0,0h22v69h-22z"/>
+    <group>
+      <clip-path
+          android:pathData="M1.801,0h18.391v85h-18.391z"/>
+      <path
+          android:pathData="M18.856,13.753H3.094V50.245H18.856V13.753Z"
+          android:fillColor="#FFB14A"/>
+      <path
+          android:pathData="M16.199,47.145C16.514,47.838 17.49,47.838 17.593,46.178C17.697,44.519 18.215,25.486 16.868,26.362C15.52,27.237 15.576,45.301 16.199,47.145Z"
+          android:strokeAlpha="0.62"
+          android:fillColor="#FFD49C"
+          android:fillAlpha="0.62"/>
+      <path
+          android:pathData="M16.201,22.399C16.229,22.787 16.321,23.225 16.529,23.507C16.748,23.804 17.066,23.783 17.309,23.553C17.583,23.292 17.691,22.846 17.726,22.413C17.758,22.023 17.751,21.624 17.707,21.235C17.707,21.094 17.7,20.953 17.688,20.816C17.664,20.508 17.58,20.153 17.4,19.949C17.178,19.7 16.881,19.762 16.665,19.993C16.401,20.275 16.319,20.715 16.263,21.145C16.208,21.558 16.171,21.981 16.2,22.4L16.201,22.399Z"
+          android:strokeAlpha="0.62"
+          android:fillColor="#FFD49C"
+          android:fillAlpha="0.62"/>
+      <path
+          android:pathData="M19.592,50.245H2.359V82.187H19.592V50.245Z"
+          android:fillColor="#FFB14A"/>
+      <path
+          android:pathData="M18,14H4C4,14 7.55,5.806 7.741,5.345C7.931,4.885 14.062,4.885 14.258,5.345C14.455,5.806 15.509,8.239 15.509,8.239L18,14Z"
+          android:fillColor="#FFD9AA"/>
+      <path
+          android:pathData="M19.766,50.245H2.182C1.971,50.245 1.801,50.416 1.801,50.626V53.241C1.801,53.452 1.971,53.622 2.182,53.622H19.766C19.976,53.622 20.147,53.452 20.147,53.241V50.626C20.147,50.416 19.976,50.245 19.766,50.245Z"
+          android:fillColor="#FFEE54"/>
+      <path
+          android:pathData="M18.827,13.753H3.123C2.913,13.753 2.742,13.924 2.742,14.134V16.749C2.742,16.96 2.913,17.13 3.123,17.13H18.827C19.037,17.13 19.208,16.96 19.208,16.749V14.134C19.208,13.924 19.037,13.753 18.827,13.753Z"
+          android:fillColor="#FFEE54"/>
+    </group>
+  </group>
+</vector>

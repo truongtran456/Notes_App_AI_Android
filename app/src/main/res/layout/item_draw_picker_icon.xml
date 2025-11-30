@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <import type="com.philkes.notallyx.common.model.DrawToolBrush" />
+        <variable
+            name="drawToolBrush"
+            type="DrawToolBrush" />
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.philkes.notallyx.presentation.activity.note.drawtool.PenView
+            android:id="@+id/penView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clickable="true"
+            android:focusable="true"
+            app:drawToolBrush="@{drawToolBrush}" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ivDelete"
+            android:layout_width="@dimen/dp_20"
+            android:layout_height="@dimen/dp_20"
+            android:visibility="gone"
+            android:background="@drawable/bg_ic_draw_delete_brush"
+            android:padding="@dimen/dp_4"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_draw_delete_brush"
+            app:layout_constraintBottom_toBottomOf="@id/penView"
+            app:layout_constraintEnd_toEndOf="@id/penView"
+            app:layout_constraintStart_toStartOf="@id/penView"
+            app:layout_constraintTop_toTopOf="@id/penView"
+            app:layout_constraintHorizontal_bias="0.3"
+            app:layout_constraintVertical_bias="0.4" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>

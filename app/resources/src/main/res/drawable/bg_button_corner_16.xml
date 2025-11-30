@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <solid android:color="@color/colorF37E02" />
+        </shape>
+    </item>
+
+    <item android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <gradient
+                android:angle="270"
+                android:startColor="@color/colorFFC340"
+                android:endColor="@color/colorFF8400"
+                android:type="linear"/>
+        </shape>
+    </item>
+
+    <item
+        android:drawable="@drawable/ic_bong"
+        android:gravity="start|top"
+        android:start="@dimen/dp_2"
+        android:top="@dimen/dp_2" />
+
+</layer-list>

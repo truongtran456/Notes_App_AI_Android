@@ -25,6 +25,7 @@ data class BaseNote(
     val files: List<FileAttachment>,
     val audios: List<Audio>,
     val reminders: List<Reminder>,
+    val drawingStrokesJson: String? = null, // JSON string của drawing strokes
 ) : Item {
 
     companion object {
@@ -42,5 +43,6 @@ fun BaseNote.deepCopy(): BaseNote {
         files = files.map { it.copy() }.toMutableList(),
         audios = audios.map { it.copy() }.toMutableList(),
         reminders = reminders.map { it.copy() }.toMutableList(),
+        drawingStrokesJson = drawingStrokesJson, // Copy drawing strokes JSON
     )
 }

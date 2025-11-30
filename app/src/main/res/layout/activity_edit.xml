@@ -162,6 +162,26 @@
                     android:paddingEnd="4dp"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
+                <!-- Divider line for drawing area -->
+                <View
+                    android:id="@+id/DrawingDivider"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginEnd="24dp"
+                    android:background="?android:attr/listDivider"
+                    android:visibility="gone" />
+
+                <!-- Canvas view for drawing -->
+                <com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
+                    android:id="@+id/DrawingCanvas"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="400dp"
+                    android:background="@android:color/white"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/AddItem"
                     style="@style/TextView.Clickable"
@@ -258,5 +278,13 @@
         </androidx.constraintlayout.widget.ConstraintLayout>
 
     </com.google.android.material.bottomappbar.BottomAppBar>
+
+    <!-- DrawToolPickerView - hiển thị cố định ở bottom -->
+    <com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolPickerView
+        android:id="@+id/DrawToolPickerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:visibility="gone" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

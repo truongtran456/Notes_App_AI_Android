@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+
+    <data>
+
+        <variable
+            name="viewModel"
+            type="com.starnest.core.base.viewmodel.BaseViewModel" />
+    </data>
+
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/primaryBackgroundColor">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/bg_background"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/guideline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.45" />
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum1"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toStartOf="@id/shadowNum2"
+            app:layout_constraintTop_toTopOf="@id/shadowNum2">
+
+            <TextView
+                android:id="@+id/tvNum1"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="@dimen/dp_30"
+                android:background="@drawable/ic_lock_number"
+                android:fontFamily="?attr/fontBold"
+                android:gravity="center"
+                android:text="1"
+                tools:ignore="HardcodedText" />
+        </com.starnest.common.ui.view.ShadowView>
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum2"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/guideline">
+
+            <TextView
+                android:id="@+id/tvNum2"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:fontFamily="?attr/fontBold"
+                android:gravity="center"
+                android:text="2"
+                tools:ignore="HardcodedText" />
+        </com.starnest.common.ui.view.ShadowView>
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum3"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_30"
+            app:layout_constraintStart_toEndOf="@id/shadowNum2"
+            app:layout_constraintTop_toTopOf="@id/shadowNum2">
+
+            <TextView
+                android:id="@+id/tvNum3"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="3"
+                tools:ignore="HardcodedText" />
+        </com.starnest.common.ui.view.ShadowView>
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum4"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_30"
+            android:layout_marginEnd="@dimen/dp_30"
+            app:layout_constraintEnd_toStartOf="@id/shadowNum5"
+            app:layout_constraintTop_toTopOf="@id/shadowNum5">
+
+            <TextView
+                android:id="@+id/tvNum4"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="4"
+                tools:ignore="HardcodedText" />
+        </com.starnest.common.ui.view.ShadowView>
+
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum5"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/dp_20"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/shadowNum2">
+
+            <TextView
+                android:id="@+id/tvNum5"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="5"
+                tools:ignore="HardcodedText" />
+
+        </com.starnest.common.ui.view.ShadowView>
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum6"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_30"
+            app:layout_constraintStart_toEndOf="@id/shadowNum2"
+            app:layout_constraintTop_toTopOf="@id/shadowNum5">
+
+            <TextView
+                android:id="@+id/tvNum6"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="6"
+                tools:ignore="HardcodedText" />
+
+        </com.starnest.common.ui.view.ShadowView>
+
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum7"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_30"
+            android:layout_marginEnd="@dimen/dp_30"
+            app:layout_constraintEnd_toStartOf="@id/shadowNum5"
+            app:layout_constraintTop_toTopOf="@id/shadowNum8">
+
+
+            <TextView
+                android:id="@+id/tvNum7"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="7"
+                tools:ignore="HardcodedText" />
+        </com.starnest.common.ui.view.ShadowView>
+
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum8"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/dp_20"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/shadowNum5">
+
+            <TextView
+                android:id="@+id/tvNum8"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="8"
+                tools:ignore="HardcodedText" />
+
+        </com.starnest.common.ui.view.ShadowView>
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum9"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_30"
+            app:layout_constraintStart_toEndOf="@id/shadowNum2"
+            app:layout_constraintTop_toTopOf="@id/shadowNum8">
+
+            <TextView
+                android:id="@+id/tvNum9"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="9"
+                tools:ignore="HardcodedText" />
+
+        </com.starnest.common.ui.view.ShadowView>
+
+
+        <com.starnest.common.ui.view.ShadowView
+            android:id="@+id/shadowNum0"
+            style="@style/Theme.Learn.Shadow.Default"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/dp_20"
+            app:layout_constraintStart_toStartOf="@id/shadowNum8"
+            app:layout_constraintTop_toBottomOf="@id/shadowNum8">
+
+            <TextView
+                android:id="@+id/tvNum0"
+                style="@style/Theme.Main.Lock.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ic_lock_number"
+                android:gravity="center"
+                android:text="0"
+                tools:ignore="HardcodedText" />
+        </com.starnest.common.ui.view.ShadowView>
+
+        <TextView
+            android:id="@+id/tvCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="?attr/fontBold"
+            android:text="@string/cancel"
+            android:textColor="#7F5700"
+            android:textSize="@dimen/sp_18"
+            app:layout_constraintBottom_toBottomOf="@id/shadowNum0"
+            app:layout_constraintEnd_toEndOf="@id/shadowNum7"
+            app:layout_constraintStart_toStartOf="@id/shadowNum7"
+            app:layout_constraintTop_toTopOf="@id/shadowNum0" />
+
+        <TextView
+            android:id="@+id/tvDelete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="?attr/fontBold"
+            android:text="@string/delete"
+            android:textColor="#7F5700"
+            android:textSize="@dimen/sp_18"
+            app:layout_constraintBottom_toBottomOf="@id/shadowNum0"
+            app:layout_constraintEnd_toEndOf="@id/shadowNum9"
+            app:layout_constraintStart_toStartOf="@id/shadowNum9"
+            app:layout_constraintTop_toTopOf="@id/shadowNum0" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ivImage"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginVertical="@dimen/dp_12"
+            android:src="@drawable/bg_passcode"
+            app:layout_constraintBottom_toTopOf="@id/tvTitle"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/ivFaceID"
+            app:layout_constraintWidth_percent="0.8" />
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/dp_16"
+            android:fontFamily="?attr/secondFontBold"
+            android:text="@string/create_your_passcode"
+            android:textColor="#7F5700"
+            android:textSize="@dimen/sp_24"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/ivImage" />
+
+        <TextView
+            android:id="@+id/tvError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/dp_16"
+            android:fontFamily="?attr/fontMedium"
+            android:text="@string/wrong_pin"
+            android:textAlignment="center"
+            android:textColor="@color/colorRed"
+            android:textSize="@dimen/sp_16"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/shadowNum0" />
+
+
+        <LinearLayout
+            android:id="@+id/llPin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/dp_16"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toTopOf="@id/guideline"
+            app:layout_constraintEnd_toEndOf="@id/tvTitle"
+            app:layout_constraintStart_toStartOf="@id/tvTitle"
+            app:layout_constraintTop_toBottomOf="@id/tvTitle"
+            app:layout_constraintVertical_bias="0">
+
+            <ImageView
+                android:id="@+id/ivPin1"
+                android:layout_width="14dp"
+                android:layout_height="@dimen/dp_14"
+                android:layout_marginEnd="@dimen/dp_10"
+                android:background="@drawable/ic_lock_circle_rounded"
+                android:contentDescription="@null" />
+
+            <ImageView
+                android:id="@+id/ivPin2"
+                android:layout_width="@dimen/dp_14"
+                android:layout_height="@dimen/dp_14"
+                android:layout_marginEnd="@dimen/dp_10"
+                android:background="@drawable/ic_lock_circle_rounded"
+                android:contentDescription="@null" />
+
+            <ImageView
+                android:id="@+id/ivPin3"
+                android:layout_width="@dimen/dp_14"
+                android:layout_height="@dimen/dp_14"
+                android:layout_marginEnd="@dimen/dp_10"
+                android:background="@drawable/ic_lock_circle_rounded"
+                android:contentDescription="@null" />
+
+            <ImageView
+                android:id="@+id/ivPin4"
+                android:layout_width="@dimen/dp_14"
+                android:layout_height="@dimen/dp_14"
+                android:background="@drawable/ic_lock_circle_rounded"
+                android:contentDescription="@null" />
+        </LinearLayout>
+
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ivFaceID"
+            android:layout_width="@dimen/dp_52"
+            android:layout_height="@dimen/dp_52"
+            android:layout_marginTop="@dimen/dp_12"
+            android:padding="@dimen/dp_12"
+            android:tint="?attr/primaryColor"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</layout>

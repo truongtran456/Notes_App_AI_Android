@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <variable
+            name="menu"
+            type="com.starnest.common.ui.view.menuview.MenuOption" />
+    </data>
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/llContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:clipToOutline="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:gravity="center"
+            android:padding="@dimen/dp_12"
+            tools:targetApi="s">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/ivIcon"
+                android:layout_width="@dimen/dp_24"
+                android:layout_height="@dimen/dp_24"
+                android:adjustViewBounds="true"
+                android:src="@{menu.iconResId}"
+                android:tint="?attr/primaryColor"
+                android:visibility="@{!menu.toggleEnabled}" />
+
+            <com.starnest.core.ui.widget.AppSwitch
+                android:id="@+id/sc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/dp_4"
+                android:background="@null"
+                android:checked="@{menu.isChecked}"
+                android:theme="@style/Theme.SwitchTheme"
+                android:thumb="@drawable/thumb_selector_medium"
+                android:trackTint="@drawable/track_tint"
+                android:visibility="@{menu.toggleEnabled}"
+                app:thumbTint="@null"
+                app:track="@drawable/track_selector_small"
+                app:trackTint="@null"
+                tools:ignore="UseSwitchCompatOrMaterialXml" />
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/dp_8"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:fontFamily="?attr/fontMedium"
+                android:maxLines="1"
+                android:text="@{menu.nameResId}"
+                android:textColor="?attr/titleTextColor"
+                android:textSize="@dimen/sp_14"
+                tools:text="Abc" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+</layout>

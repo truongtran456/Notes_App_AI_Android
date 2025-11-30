@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <variable
+            name="viewModel"
+            type="com.starnest.core.base.viewmodel.BaseViewModel" />
+    </data>
+
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/transparent">
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardContainer"
+            android:layout_width="@dimen/dp_0"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="@dimen/dp_16"
+            app:cardUseCompatPadding="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintWidth_max="@dimen/dp_350">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dialog_app">
+
+                <TextView
+                    android:id="@+id/tvTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/dp_24"
+                    android:layout_marginTop="@dimen/dp_24"
+                    android:fontFamily="?attr/fontSemiBold"
+                    android:gravity="center_horizontal|center_vertical"
+                    android:paddingHorizontal="@dimen/dp_4"
+                    android:textColor="?attr/titleTextColor"
+                    android:textSize="@dimen/sp_20"
+                    android:visibility="gone"
+                    app:layout_constraintBottom_toTopOf="@id/tvMessage"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    tools:text="Notice"
+                    tools:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/tvMessage"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/dp_24"
+                    android:layout_marginTop="@dimen/dp_4"
+                    android:autoSizeMaxTextSize="@dimen/sp_16"
+                    android:autoSizeTextType="uniform"
+                    android:fontFamily="?attr/fontMedium"
+                    android:gravity="center_horizontal|center_vertical"
+                    android:maxLines="5"
+                    android:minLines="2"
+                    android:paddingHorizontal="@dimen/dp_4"
+                    android:textColor="?attr/titleTextColor"
+                    android:textSize="@dimen/sp_16"
+                    android:visibility="gone"
+                    app:layout_constraintBottom_toTopOf="@id/llAction"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/tvTitle"
+                    tools:text="Set a PIN code to project notes. Note that if you forget this password, there is no way to recover access to the locked notes. Therefore, to ensure you do not lose access to your data, please save your password securely"
+                    tools:visibility="visible" />
+
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:id="@+id/llAction"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="@dimen/dp_24"
+                    android:layout_marginTop="@dimen/dp_12"
+                    android:layout_marginBottom="@dimen/dp_24"
+                    android:orientation="horizontal"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toBottomOf="@id/tvMessage">
+
+                    <TextView
+                        android:id="@+id/tvNegative"
+                        android:layout_width="0dp"
+                        android:layout_height="@dimen/dp_38"
+                        android:layout_marginEnd="@dimen/dp_16"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_cancel"
+                        android:clipToOutline="true"
+                        android:fontFamily="@font/nunito_extra_bold"
+                        android:foreground="?android:attr/selectableItemBackground"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:textColor="?attr/negativeTitleColor"
+                        android:textSize="@dimen/sp_16"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/tvPositive"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toBottomOf="@id/tvMessage"
+                        tools:targetApi="s"
+                        tools:text="@string/cancel"
+                        tools:visibility="visible" />
+
+                    <TextView
+                        android:id="@+id/tvPositive"
+                        android:layout_width="0dp"
+                        android:layout_height="@dimen/dp_38"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_button_restore"
+                        android:clipToOutline="true"
+                        android:fontFamily="@font/nunito_extra_bold"
+                        android:foreground="?android:attr/selectableItemBackground"
+                        android:gravity="center_vertical|center_horizontal"
+                        android:textColor="?attr/positiveTitleColor"
+                        android:textSize="@dimen/sp_16"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/tvNegative"
+                        app:layout_constraintTop_toBottomOf="@id/tvMessage"
+                        tools:targetApi="s"
+                        tools:text="@string/ok" />
+
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </androidx.cardview.widget.CardView>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>
