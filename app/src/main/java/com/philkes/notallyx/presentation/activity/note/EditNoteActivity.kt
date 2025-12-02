@@ -11,6 +11,7 @@ import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
 import android.text.style.URLSpan
 import android.text.style.UnderlineSpan
+import android.util.Log
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
@@ -23,6 +24,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.model.Type
@@ -30,8 +33,12 @@ import com.philkes.notallyx.data.model.createNoteUrl
 import com.philkes.notallyx.data.model.getNoteIdFromUrl
 import com.philkes.notallyx.data.model.getNoteTypeFromUrl
 import com.philkes.notallyx.data.model.isNoteUrl
+import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.databinding.BottomTextFormattingMenuBinding
 import com.philkes.notallyx.databinding.RecyclerToggleBinding
+import com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
+import com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity
+import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_EXCLUDE_NOTE_ID
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_ID
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_TITLE
@@ -46,10 +53,13 @@ import com.philkes.notallyx.presentation.showToast
 import com.philkes.notallyx.presentation.view.note.TextFormattingAdapter
 import com.philkes.notallyx.presentation.view.note.action.AddNoteActions
 import com.philkes.notallyx.presentation.view.note.action.AddNoteBottomSheet
+import com.philkes.notallyx.presentation.view.note.action.MoreNoteBottomSheet
 import com.philkes.notallyx.utils.LinkMovementMethod
 import com.philkes.notallyx.utils.copyToClipBoard
 import com.philkes.notallyx.utils.findAllOccurrences
+import com.philkes.notallyx.utils.getUriForFile
 import com.philkes.notallyx.utils.wrapWithChooser
+import java.io.File
 
 class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
 
@@ -295,22 +305,224 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     override fun initBottomMenu() {
-        super.initBottomMenu()
-        binding.BottomAppBarCenter.visibility = VISIBLE
         binding.BottomAppBarLeft.apply {
             removeAllViews()
+
             addIconButton(R.string.add_item, R.drawable.add, marginStart = 0) {
                 AddNoteBottomSheet(this@EditNoteActivity, colorInt)
                     .show(supportFragmentManager, AddNoteBottomSheet.TAG)
             }
+
+            undo =
+                addIconButton(R.string.undo, R.drawable.undo, marginStart = 2) {
+                        try {
+                            changeHistory.undo()
+                        } catch (
+                            e:
+                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
+                            Log.e(TAG, "ChangeHistory error", e)
+                        }
+                    }
+                    .apply { isEnabled = changeHistory.canUndo.value }
+
             updateLayoutParams<ConstraintLayout.LayoutParams> { endToStart = -1 }
+
             textFormatMenu =
                 addIconButton(R.string.edit, R.drawable.text_format) {
                         initBottomTextFormattingMenu()
                     }
                     .apply { isEnabled = binding.EnterBody.isActionModeOn }
         }
+
+        // CENTER: AI (run)
+        binding.BottomAppBarCenter.apply {
+            visibility = VISIBLE
+            removeAllViews()
+        }
+        ensureAICenterButton()
+
+        // RIGHT: Redo + More
+        binding.BottomAppBarRight.apply {
+            removeAllViews()
+
+            redo =
+                addIconButton(R.string.redo, R.drawable.redo, marginStart = 0) {
+                        try {
+                            changeHistory.redo()
+                        } catch (
+                            e:
+                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
+                            Log.e(TAG, "ChangeHistory error", e)
+                        }
+                    }
+                    .apply { isEnabled = changeHistory.canRedo.value }
+
+            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
+                MoreNoteBottomSheet(this@EditNoteActivity, createFolderActions(), colorInt)
+                    .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
+            }
+        }
+
         setBottomAppBarColor(colorInt)
+    }
+
+    private fun ensureAICenterButton() {
+        if (binding.BottomAppBarCenter.childCount > 0) return
+        val button =
+            MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle)
+                .apply {
+                    text = getString(R.string.ai_summarize_note)
+                    icon = getDrawable(R.drawable.ai_sparkle)
+                    iconPadding = 16.dp
+                    setOnClickListener { openAIActionsMenu() }
+                }
+        binding.BottomAppBarCenter.addView(button)
+    }
+
+    private fun openAIActionsMenu() {
+        val noteText = binding.EnterBody.text?.toString().orEmpty()
+        val attachmentUris = getAttachedFileUris()
+        val dialog = BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
+
+        sheetView.findViewById<View>(R.id.ActionSummary).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = AISummaryActivity.AISection.SUMMARY,
+                )
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.SUMMARY)
+            }
+        }
+
+        sheetView.findViewById<View>(R.id.ActionBullet).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = AISummaryActivity.AISection.BULLET_POINTS,
+                )
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.BULLET_POINTS)
+            }
+        }
+
+        sheetView.findViewById<View>(R.id.ActionQuestions).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = AISummaryActivity.AISection.QUESTIONS,
+                )
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.QUESTIONS)
+            }
+        }
+
+        sheetView.findViewById<View>(R.id.ActionMCQ).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = AISummaryActivity.AISection.MCQ,
+                )
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.MCQ)
+            }
+        }
+
+        sheetView.findViewById<View>(R.id.ActionFile).setOnClickListener {
+            dialog.dismiss()
+            AIFileProcessActivity.start(
+                context = this,
+                noteText = noteText,
+                noteId = notallyModel.id,
+            )
+        }
+
+        sheetView.findViewById<View>(R.id.ActionHistory).setOnClickListener {
+            dialog.dismiss()
+            AIHistoryActivity.start(this, userId = getAiUserId())
+        }
+
+        dialog.setContentView(sheetView)
+        dialog.show()
+    }
+
+    private fun launchAISummary(noteText: String, section: AISummaryActivity.AISection) {
+        AISummaryActivity.start(this, noteText, notallyModel.id, section)
+    }
+
+    private fun getAttachedFileUris(): List<Uri> {
+        val uris = mutableListOf<Uri>()
+
+        // Files
+        val filesRoot = notallyModel.filesRoot
+        val fileAttachments = notallyModel.files.value ?: emptyList()
+        if (filesRoot != null && fileAttachments.isNotEmpty()) {
+            fileAttachments.forEach { attachment ->
+                val file = File(filesRoot, attachment.localName)
+                if (file.exists()) {
+                    uris.add(this.getUriForFile(file))
+                }
+            }
+        }
+
+        // Images
+        val imagesRoot = notallyModel.imageRoot
+        val imageAttachments = notallyModel.images.value ?: emptyList()
+        if (imagesRoot != null && imageAttachments.isNotEmpty()) {
+            imageAttachments.forEach { attachment ->
+                val file = File(imagesRoot, attachment.localName)
+                if (file.exists()) {
+                    uris.add(this.getUriForFile(file))
+                }
+            }
+        }
+
+        // Audios
+        val audioRoot = notallyModel.audioRoot
+        val audioAttachments = notallyModel.audios.value ?: emptyList()
+        if (audioRoot != null && audioAttachments.isNotEmpty()) {
+            audioAttachments.forEach { audio ->
+                val file = File(audioRoot, audio.name)
+                if (file.exists()) {
+                    uris.add(this.getUriForFile(file))
+                }
+            }
+        }
+
+        return uris.distinct()
     }
 
     private fun initBottomTextFormattingMenu() {
@@ -468,6 +680,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     companion object {
+        private const val TAG = "EditNoteActivity"
         private const val EXTRA_SELECTION_START = "notallyx.intent.extra.EXTRA_SELECTION_START"
         private const val EXTRA_SELECTION_END = "notallyx.intent.extra.EXTRA_SELECTION_END"
     }
