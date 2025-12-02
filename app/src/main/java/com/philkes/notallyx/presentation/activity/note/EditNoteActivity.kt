@@ -2,6 +2,8 @@ package com.philkes.notallyx.presentation.activity.note
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
@@ -13,19 +15,22 @@ import android.text.style.URLSpan
 import android.text.style.UnderlineSpan
 import android.util.Log
 import android.view.ActionMode
+import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.View.GONE
 import android.view.View.VISIBLE
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.content.ContextCompat
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.model.Type
@@ -325,8 +330,6 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                     }
                     .apply { isEnabled = changeHistory.canUndo.value }
 
-            updateLayoutParams<ConstraintLayout.LayoutParams> { endToStart = -1 }
-
             textFormatMenu =
                 addIconButton(R.string.edit, R.drawable.text_format) {
                         initBottomTextFormattingMenu()
@@ -357,6 +360,10 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                     }
                     .apply { isEnabled = changeHistory.canRedo.value }
 
+            addIconButton(R.string.draw, R.drawable.ic_pen_pencil, marginStart = 0) {
+                openDrawingScreen()
+            }
+
             addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
                 MoreNoteBottomSheet(this@EditNoteActivity, createFolderActions(), colorInt)
                     .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
@@ -371,12 +378,49 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         val button =
             MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle)
                 .apply {
-                    text = getString(R.string.ai_summarize_note)
-                    icon = getDrawable(R.drawable.ai_sparkle)
-                    iconPadding = 16.dp
+                    text = getString(R.string.ai_action_button_label)
+                    icon = ContextCompat.getDrawable(this@EditNoteActivity, R.drawable.ai_sparkle)
+                    iconPadding = 8.dp
+                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                    minWidth = 0
+                    minimumWidth = 0
+                    setInsetTop(0)
+                    setInsetBottom(0)
+                    setPaddingRelative(20.dp, 6.dp, 20.dp, 6.dp)
+                    cornerRadius = resources.getDimensionPixelSize(R.dimen.dp_20)
+                    val primary =
+                        MaterialColors.getColor(
+                            this,
+                            com.google.android.material.R.attr.colorPrimary,
+                            0,
+                        )
+                    val onPrimary =
+                        MaterialColors.getColor(
+                            this,
+                            com.google.android.material.R.attr.colorOnPrimary,
+                            Color.WHITE,
+                        )
+                    setBackgroundTintList(ColorStateList.valueOf(primary))
+                    setTextColor(onPrimary)
+                    iconTint = ColorStateList.valueOf(onPrimary)
+                    strokeWidth = resources.getDimensionPixelSize(R.dimen.dp_1)
+                    strokeColor =
+                        ColorStateList.valueOf(
+                            MaterialColors.getColor(
+                                this,
+                                com.google.android.material.R.attr.colorPrimaryContainer,
+                                primary,
+                            )
+                        )
                     setOnClickListener { openAIActionsMenu() }
                 }
-        binding.BottomAppBarCenter.addView(button)
+        val params =
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER,
+            )
+        binding.BottomAppBarCenter.addView(button, params)
     }
 
     private fun openAIActionsMenu() {
@@ -547,9 +591,6 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         }
         binding.BottomAppBarLeft.apply {
             removeAllViews()
-            updateLayoutParams<ConstraintLayout.LayoutParams> {
-                endToStart = R.id.BottomAppBarRight
-            }
             requestLayout()
             val layout = BottomTextFormattingMenuBinding.inflate(layoutInflater, this, false)
             layout.RecyclerView.apply {

@@ -332,6 +332,7 @@
     <!-- AI Features -->
     <string name="ai_summarize">AI Summary</string>
     <string name="ai_summarize_note">Summarize with AI</string>
+    <string name="ai_action_button_label">AI</string>
     <string name="ai_processing">Processing with AI…</string>
     <string name="ai_error">AI Error</string>
     <string name="ai_error_generic">An error occurred while processing. Please try again.</string>

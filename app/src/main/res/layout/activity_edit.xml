@@ -232,50 +232,45 @@
     </LinearLayout>
 
     <com.google.android.material.bottomappbar.BottomAppBar
-      android:id="@+id/BottomAppBarLayout"
-      android:layout_width="match_parent"
-      android:layout_height="45dp"
-      android:layout_gravity="bottom"
-      android:backgroundTint="?attr/colorSurface"
-      app:elevation="0dp"
-      >
-        <androidx.constraintlayout.widget.ConstraintLayout
-          android:id="@+id/BottomAppBar"
-          android:layout_width="match_parent"
-          android:layout_height="match_parent">
+         android:id="@+id/BottomAppBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:layout_gravity="bottom"
+        android:backgroundTint="?attr/colorSurface"
+        app:elevation="0dp">
+
+        <LinearLayout
+            android:id="@+id/BottomAppBar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:paddingHorizontal="@dimen/dp_8"
+            android:weightSum="3">
+
             <LinearLayout
-              android:id="@+id/BottomAppBarLeft"
-              app:layout_constraintStart_toStartOf="parent"
-              app:layout_constraintTop_toTopOf="parent"
-              app:layout_constraintBottom_toBottomOf="parent"
-              android:layout_width="0dp"
-              android:layout_height="match_parent"
-              android:orientation="horizontal"
-              >
-            </LinearLayout>
+                android:id="@+id/BottomAppBarLeft"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="start|center_vertical"
+                android:orientation="horizontal" />
+
+            <FrameLayout
+                android:id="@+id/BottomAppBarCenter"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:foregroundGravity="center"
+                android:gravity="center" />
+
             <LinearLayout
-              android:id="@+id/BottomAppBarCenter"
-              app:layout_constraintStart_toStartOf="parent"
-              app:layout_constraintEnd_toEndOf="parent"
-              app:layout_constraintTop_toTopOf="parent"
-              app:layout_constraintBottom_toBottomOf="parent"
-              android:layout_width="wrap_content"
-              android:layout_height="match_parent"
-              android:orientation="horizontal"
-              android:gravity="center_horizontal"
-              >
-            </LinearLayout>
-            <LinearLayout
-              android:id="@+id/BottomAppBarRight"
-              app:layout_constraintEnd_toEndOf="parent"
-              app:layout_constraintTop_toTopOf="parent"
-              app:layout_constraintBottom_toBottomOf="parent"
-              android:layout_width="wrap_content"
-              android:layout_height="match_parent"
-              android:orientation="horizontal"
-              >
-            </LinearLayout>
-        </androidx.constraintlayout.widget.ConstraintLayout>
+                android:id="@+id/BottomAppBarRight"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="end|center_vertical"
+                android:orientation="horizontal" />
+        </LinearLayout>
 
     </com.google.android.material.bottomappbar.BottomAppBar>
 
