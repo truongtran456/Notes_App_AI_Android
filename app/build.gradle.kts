@@ -103,6 +103,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
         dataBinding = true
     }
 
@@ -180,6 +181,8 @@ afterEvaluate {
 dependencies {
     val navVersion = "2.3.5"
     val roomVersion = "2.6.1"
+    val retrofitVersion = "2.9.0"
+    val okHttpVersion = "4.12.0"
 
     implementation("androidx.navigation:navigation-fragment-ktx:$navVersion")
     implementation("androidx.navigation:navigation-ui-ktx:$navVersion")
@@ -190,6 +193,20 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("androidx.sqlite:sqlite-ktx:2.4.0")
     implementation("androidx.work:work-runtime:2.9.1")
+    
+    // Networking - Retrofit + OkHttp for AI API
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
+    implementation("com.squareup.retrofit2:converter-gson:$retrofitVersion")
+    implementation("com.squareup.okhttp3:okhttp:$okHttpVersion")
+    implementation("com.squareup.okhttp3:logging-interceptor:$okHttpVersion")
+    
+    // Coroutines for async operations
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    
+    // Lifecycle for ViewModel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
 
     implementation("cat.ereza:customactivityoncrash:2.4.0")
     implementation("com.davemorrissey.labs:subsampling-scale-image-view-androidx:3.10.0")

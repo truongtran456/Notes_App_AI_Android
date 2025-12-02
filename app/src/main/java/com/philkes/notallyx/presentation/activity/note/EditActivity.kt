@@ -1,6 +1,7 @@
 package com.philkes.notallyx.presentation.activity.note
 
 import android.Manifest
+import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
@@ -9,7 +10,6 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.provider.Settings
 import android.text.Editable
 import android.util.TypedValue
@@ -33,10 +33,14 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.gson.Gson
 import com.philkes.notallyx.R
+import com.philkes.notallyx.common.datasource.AppSharePrefs
+import com.philkes.notallyx.common.datasource.AppSharePrefsImpl
+import com.philkes.notallyx.common.extension.rawColor
+import com.philkes.notallyx.common.extension.showMoreColor
 import com.philkes.notallyx.common.model.DrawToolBrush
 import com.philkes.notallyx.common.model.DrawToolPenType
-import com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolData
 import com.philkes.notallyx.data.NotallyDatabase
 import com.philkes.notallyx.data.model.Audio
 import com.philkes.notallyx.data.model.FileAttachment
@@ -44,20 +48,13 @@ import com.philkes.notallyx.data.model.Folder
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.model.toText
 import com.philkes.notallyx.databinding.ActivityEditBinding
+import com.philkes.notallyx.draw.ui.background.BackgroundBottomSheet
+import com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolData
+import com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolPickerView
 import com.philkes.notallyx.presentation.activity.LockedActivity
 import com.philkes.notallyx.presentation.activity.main.fragment.DisplayLabelFragment.Companion.EXTRA_DISPLAYED_LABEL
 import com.philkes.notallyx.presentation.activity.note.SelectLabelsActivity.Companion.EXTRA_SELECTED_LABELS
-import com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolPickerView
 import com.philkes.notallyx.presentation.activity.note.reminders.RemindersActivity
-import com.philkes.notallyx.common.datasource.AppSharePrefs
-import com.philkes.notallyx.common.datasource.AppSharePrefsImpl
-import com.philkes.notallyx.common.extension.showMoreColor
-import com.philkes.notallyx.common.extension.rawColor
-import com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
-import com.philkes.notallyx.draw.ui.background.BackgroundBottomSheet
-import com.google.gson.Gson
-import android.content.SharedPreferences
-import android.content.Context.MODE_PRIVATE
 import com.philkes.notallyx.presentation.add
 import com.philkes.notallyx.presentation.addFastScroll
 import com.philkes.notallyx.presentation.addIconButton
@@ -125,13 +122,14 @@ abstract class EditActivity(private val type: Type) :
     protected var redo: View? = null
 
     private val drawTools by lazy { DrawToolData.getDefault() }
-    
+
     private val appSharePrefs: AppSharePrefs by lazy {
-        val sharedPrefs = getSharedPreferences(AppSharePrefsImpl.Keys.SHARED_PREFS_NAME, MODE_PRIVATE)
+        val sharedPrefs =
+            getSharedPreferences(AppSharePrefsImpl.Keys.SHARED_PREFS_NAME, MODE_PRIVATE)
         val gson = Gson()
         AppSharePrefsImpl(sharedPrefs, gson)
     }
-    
+
     private var currentDrawTool: DrawToolBrush? = null
     private var isDrawingModeActive: Boolean = false
 
@@ -158,12 +156,12 @@ abstract class EditActivity(private val type: Type) :
     }
 
     open suspend fun saveNote() {
-        // Lưu strokes vào notallyModel trước khi save
+        // L?u strokes v�o notallyModel tr??c khi save
         if (isDrawingModeActive) {
             val strokes = binding.DrawingCanvas.getStrokes()
             notallyModel.drawingStrokes = ArrayList(strokes)
         }
-        
+
         notallyModel.modifiedTimestamp = System.currentTimeMillis()
         notallyModel.saveNote()
         WidgetProvider.sendBroadcast(application, longArrayOf(notallyModel.id))
@@ -494,234 +492,236 @@ abstract class EditActivity(private val type: Type) :
         setBottomAppBarColor(colorInt)
     }
 
-    private fun openDrawingScreen() {
-        // Load và merge brushes: default brushes + custom brushes từ SharedPreferences
+    protected fun openDrawingScreen() {
+        // Load v� merge brushes: default brushes + custom brushes t? SharedPreferences
         val defaultBrushes = ArrayList(drawTools)
         val savedCustomBrushes = appSharePrefs.drawToolBrushes
-        
-        // Merge: thêm custom brushes vào cuối danh sách
+
+        // Merge: th�m custom brushes v�o cu?i danh s�ch
         val toolsToShow = ArrayList(defaultBrushes)
         toolsToShow.addAll(savedCustomBrushes)
 
         // Setup listener cho DrawToolPickerView
-        binding.DrawToolPickerView.listener = object : DrawToolPickerView.OnItemClickListener {
-            override fun onDoneClick() {
-                // Đóng DrawToolPickerView (ẩn đi)
-                hideDrawingToolPicker()
-            }
-            
-            override fun onItemClick(tool: DrawToolBrush) {
-                // BƯỚC 1: Lưu brush đã chọn
-                currentDrawTool = tool
-                
-                // BƯỚC 2: Tự động hiển thị divider và canvas nếu chưa hiển thị
-                if (!isDrawingModeActive) {
-                    showDrawingArea()
+        binding.DrawToolPickerView.listener =
+            object : DrawToolPickerView.OnItemClickListener {
+                override fun onDoneClick() {
+                    // ?�ng DrawToolPickerView (?n ?i)
+                    hideDrawingToolPicker()
                 }
-                
-                // BƯỚC 3: Áp dụng brush config vào canvas ngay lập tức
-                // Điều này đảm bảo khi user touch canvas, nó sẽ vẽ với brush đã chọn
-                binding.DrawingCanvas.setBrush(tool)
-                
-                log("DrawTool selected: ${tool.brush}, color: ${tool.color}, size: ${tool.sliderSize}, opacity: ${tool.opacity}")
-            }
 
-            override fun onSave(tool: DrawToolBrush) {
-                // Lưu pen custom vào SharedPreferences (chỉ lưu custom brushes)
-                val currentCustomBrushes = appSharePrefs.drawToolBrushes
-                val existingIndex = currentCustomBrushes.indexOfFirst { it.id == tool.id }
-                
-                // Đảm bảo tool là custom type
-                val customTool = tool.copy(type = DrawToolPenType.CUSTOM)
-                
-                if (existingIndex >= 0) {
-                    // Update existing custom brush
-                    currentCustomBrushes[existingIndex] = customTool
-                } else {
-                    // Add new custom brush
-                    currentCustomBrushes.add(customTool)
+                override fun onItemClick(tool: DrawToolBrush) {
+                    // B??C 1: L?u brush ?� ch?n
+                    currentDrawTool = tool
+
+                    // B??C 2: T? ??ng hi?n th? divider v� canvas n?u ch?a hi?n th?
+                    if (!isDrawingModeActive) {
+                        showDrawingArea()
+                    }
+
+                    // B??C 3: �p d?ng brush config v�o canvas ngay l?p t?c
+                    // ?i?u n�y ??m b?o khi user touch canvas, n� s? v? v?i brush ?� ch?n
+                    binding.DrawingCanvas.setBrush(tool)
+
+                    log(
+                        "DrawTool selected: ${tool.brush}, color: ${tool.color}, size: ${tool.sliderSize}, opacity: ${tool.opacity}"
+                    )
                 }
-                
-                appSharePrefs.drawToolBrushes = currentCustomBrushes
-                
-                // Reload và merge lại brushes để hiển thị
-                val defaultBrushes = ArrayList(drawTools)
-                val updatedTools = ArrayList(defaultBrushes)
-                updatedTools.addAll(currentCustomBrushes)
-                binding.DrawToolPickerView.applyTools(updatedTools)
-                
-                showToast(getString(R.string.saved_to_device))
-            }
 
-            override fun onDelete(tool: DrawToolBrush) {
-                // Xóa pen custom khỏi SharedPreferences
-                val currentCustomBrushes = appSharePrefs.drawToolBrushes
-                currentCustomBrushes.removeAll { it.id == tool.id }
-                appSharePrefs.drawToolBrushes = currentCustomBrushes
-                
-                // Reload và merge lại brushes để hiển thị
-                val defaultBrushes = ArrayList(drawTools)
-                val updatedTools = ArrayList(defaultBrushes)
-                updatedTools.addAll(currentCustomBrushes)
-                binding.DrawToolPickerView.applyTools(updatedTools)
-                
-                showToast(getString(R.string.deleted))
-            }
+                override fun onSave(tool: DrawToolBrush) {
+                    // L?u pen custom v�o SharedPreferences (ch? l?u custom brushes)
+                    val currentCustomBrushes = appSharePrefs.drawToolBrushes
+                    val existingIndex = currentCustomBrushes.indexOfFirst { it.id == tool.id }
 
-            override fun onPaletteClick() {
-                // Lấy brush đang được chọn (từ tools list hoặc currentDrawTool)
-                val currentBrush = binding.DrawToolPickerView.tools.firstOrNull { it.isSelected }
-                    ?: currentDrawTool
-                    ?: run {
-                        // Nếu không có brush nào được chọn, hiển thị thông báo
-                        showToast("Vui lòng chọn bút vẽ trước")
+                    // ??m b?o tool l� custom type
+                    val customTool = tool.copy(type = DrawToolPenType.CUSTOM)
+
+                    if (existingIndex >= 0) {
+                        // Update existing custom brush
+                        currentCustomBrushes[existingIndex] = customTool
+                    } else {
+                        // Add new custom brush
+                        currentCustomBrushes.add(customTool)
+                    }
+
+                    appSharePrefs.drawToolBrushes = currentCustomBrushes
+
+                    // Reload v� merge l?i brushes ?? hi?n th?
+                    val defaultBrushes = ArrayList(drawTools)
+                    val updatedTools = ArrayList(defaultBrushes)
+                    updatedTools.addAll(currentCustomBrushes)
+                    binding.DrawToolPickerView.applyTools(updatedTools)
+
+                    showToast(getString(R.string.saved_to_device))
+                }
+
+                override fun onDelete(tool: DrawToolBrush) {
+                    // X�a pen custom kh?i SharedPreferences
+                    val currentCustomBrushes = appSharePrefs.drawToolBrushes
+                    currentCustomBrushes.removeAll { it.id == tool.id }
+                    appSharePrefs.drawToolBrushes = currentCustomBrushes
+
+                    // Reload v� merge l?i brushes ?? hi?n th?
+                    val defaultBrushes = ArrayList(drawTools)
+                    val updatedTools = ArrayList(defaultBrushes)
+                    updatedTools.addAll(currentCustomBrushes)
+                    binding.DrawToolPickerView.applyTools(updatedTools)
+
+                    showToast(getString(R.string.deleted))
+                }
+
+                override fun onPaletteClick() {
+                    // L?y brush ?ang ???c ch?n (t? tools list ho?c currentDrawTool)
+                    val currentBrush =
+                        binding.DrawToolPickerView.tools.firstOrNull { it.isSelected }
+                            ?: currentDrawTool
+                            ?: run {
+                                // N?u kh�ng c� brush n�o ???c ch?n, hi?n th? th�ng b�o
+                                showToast("Vui l�ng ch?n b�t v? tr??c")
+                                return
+                            }
+
+                    // M? color picker (ColorPickerDialog s? t? ??ng l?u/load m�u cu?i c�ng t?
+                    // preference)
+                    showMoreColor { colorInt ->
+                        val newColorHex = colorInt.rawColor()
+
+                        // Update brush v?i m�u m?i
+                        val updatedBrush =
+                            currentBrush.copy(
+                                color = newColorHex,
+                                isSelected = true, // Gi? selected state
+                            )
+
+                        // Update brush trong tools list (n?u brush c� trong list)
+                        val tools = binding.DrawToolPickerView.tools
+                        val index = tools.indexOfFirst { it.id == currentBrush.id }
+                        if (index >= 0) {
+                            tools[index] = updatedBrush
+                            binding.DrawToolPickerView.applyTools(tools)
+                        }
+
+                        // Update currentDrawTool
+                        currentDrawTool = updatedBrush
+
+                        // G?i callback ?? update UI v� canvas
+                        // ?i?u n�y s? trigger onItemClick() ?? �p d?ng brush m?i v�o canvas
+                        binding.DrawToolPickerView.listener?.onItemClick(updatedBrush)
+                    }
+                }
+
+                override fun onEyeDropperClick() {
+                    // B?t eyedropper tool ?? pick color t? canvas
+                    if (!isDrawingModeActive) {
+                        showToast("Vui l�ng ch?n b�t v? tr??c")
                         return
                     }
-                
-                // Mở color picker (ColorPickerDialog sẽ tự động lưu/load màu cuối cùng từ preference)
-                showMoreColor { colorInt ->
-                    val newColorHex = colorInt.rawColor()
-                    
-                    // Update brush với màu mới
-                    val updatedBrush = currentBrush.copy(
-                        color = newColorHex,
-                        isSelected = true // Giữ selected state
-                    )
-                    
-                    // Update brush trong tools list (nếu brush có trong list)
-                    val tools = binding.DrawToolPickerView.tools
-                    val index = tools.indexOfFirst { it.id == currentBrush.id }
-                    if (index >= 0) {
-                        tools[index] = updatedBrush
-                        binding.DrawToolPickerView.applyTools(tools)
-                    }
-                    
-                    // Update currentDrawTool
-                    currentDrawTool = updatedBrush
-                    
-                    // Gọi callback để update UI và canvas
-                    // Điều này sẽ trigger onItemClick() để áp dụng brush mới vào canvas
-                    binding.DrawToolPickerView.listener?.onItemClick(updatedBrush)
-                }
-            }
 
-            override fun onEyeDropperClick() {
-                // Bật eyedropper tool để pick color từ canvas
-                if (!isDrawingModeActive) {
-                    showToast("Vui lòng chọn bút vẽ trước")
-                    return
+                    enableEyeDropperMode()
                 }
-                
-                enableEyeDropperMode()
-            }
-            
-            override fun onBackgroundClick() {
-                // Mở bottom sheet chọn background cho canvas
-                val initialColor = Color.WHITE
-                val sheet = BackgroundBottomSheet.newInstance(initialColor)
-                sheet.setListener(
-                    object : BackgroundBottomSheet.Listener {
-                        override fun onBackgroundSelected(colorInt: Int) {
-                            // Đổi nền logic bên trong canvas
-                            binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
-                            // Đổi luôn background view để user thấy rõ
-                            binding.DrawingCanvas.setBackgroundColor(colorInt)
+
+                override fun onBackgroundClick() {
+                    // M? bottom sheet ch?n background cho canvas
+                    val initialColor = Color.WHITE
+                    val sheet = BackgroundBottomSheet.newInstance(initialColor)
+                    sheet.setListener(
+                        object : BackgroundBottomSheet.Listener {
+                            override fun onBackgroundSelected(colorInt: Int) {
+                                // ??i n?n logic b�n trong canvas
+                                binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
+                                // ??i lu�n background view ?? user th?y r�
+                                binding.DrawingCanvas.setBackgroundColor(colorInt)
+                            }
                         }
-                    }
-                )
-                sheet.show(supportFragmentManager, "BackgroundBottomSheet")
+                    )
+                    sheet.show(supportFragmentManager, "BackgroundBottomSheet")
+                }
             }
-        }
 
-        // Áp dụng tools vào DrawToolPickerView
+        // �p d?ng tools v�o DrawToolPickerView
         binding.DrawToolPickerView.applyTools(toolsToShow)
 
-        // Hiển thị DrawToolPickerView
+        // Hi?n th? DrawToolPickerView
         showDrawingToolPicker()
     }
-    
+
     private fun showDrawingToolPicker() {
         binding.DrawToolPickerView.visibility = View.VISIBLE
     }
-    
+
     private fun hideDrawingToolPicker() {
         binding.DrawToolPickerView.visibility = View.GONE
     }
 
     private fun showDrawingArea() {
-        // Hiển thị divider và canvas
+        // Hi?n th? divider v� canvas
         binding.DrawingDivider.visibility = View.VISIBLE
         binding.DrawingCanvas.visibility = View.VISIBLE
         isDrawingModeActive = true
-        
-        // Load strokes từ notallyModel nếu có
+
+        // Load strokes t? notallyModel n?u c�
         if (notallyModel.drawingStrokes.isNotEmpty()) {
             binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
         }
-        
-        // Set divider position (vị trí đường phân cách - relative trong canvas)
+
+        // Set divider position (v? tr� ???ng ph�n c�ch - relative trong canvas)
         binding.ScrollView.post {
-            // Tính vị trí divider relative trong canvas
+            // T�nh v? tr� divider relative trong canvas
             val dividerTop = binding.DrawingDivider.top
             val canvasTop = binding.DrawingCanvas.top
             val dividerYRelative = (dividerTop - canvasTop).toFloat()
             binding.DrawingCanvas.setDividerY(dividerYRelative)
-            
-            // Scroll đến canvas để user thấy ngay
+
+            // Scroll ??n canvas ?? user th?y ngay
             binding.ScrollView.smoothScrollTo(0, binding.DrawingCanvas.top)
         }
     }
 
     private fun hideDrawingArea() {
-        // Lưu strokes vào notallyModel trước khi ẩn (nếu có strokes)
+        // L?u strokes v�o notallyModel tr??c khi ?n (n?u c� strokes)
         val strokes = binding.DrawingCanvas.getStrokes()
         if (strokes.isNotEmpty()) {
             notallyModel.drawingStrokes = ArrayList(strokes)
         } else {
-            // Nếu không có strokes, xóa strokes cũ
+            // N?u kh�ng c� strokes, x�a strokes c?
             notallyModel.drawingStrokes.clear()
         }
-        
-        // Ẩn divider và canvas
+
+        // ?n divider v� canvas
         binding.DrawingDivider.visibility = View.GONE
         binding.DrawingCanvas.visibility = View.GONE
         isDrawingModeActive = false
         binding.DrawingCanvas.setZoomModeEnabled(false)
         binding.DrawingCanvas.setEyeDropperMode(false)
-        // Ẩn DrawToolPickerView luôn
+        // ?n DrawToolPickerView lu�n
         hideDrawingToolPicker()
     }
-    
-    /**
-     * Bật chế độ eyedropper để pick color từ canvas
-     */
+
+    /** B?t ch? ?? eyedropper ?? pick color t? canvas */
     private fun enableEyeDropperMode() {
         binding.DrawingCanvas.setEyeDropperMode(true)
         binding.DrawingCanvas.setOnColorPickedListener { color ->
-            // Áp dụng màu vào brush hiện tại
+            // �p d?ng m�u v�o brush hi?n t?i
             currentDrawTool?.let { tool ->
                 val colorHex = String.format("#%06X", 0xFFFFFF and color)
                 val updatedTool = tool.copy(color = colorHex)
                 currentDrawTool = updatedTool
                 binding.DrawingCanvas.setBrush(updatedTool)
-                showToast("Đã chọn màu: $colorHex")
+                showToast("?� ch?n m�u: $colorHex")
             }
         }
-        showToast("Tap trên canvas để chọn màu")
+        showToast("Tap tr�n canvas ?? ch?n m�u")
     }
-    
-    /**
-     * Toggle zoom mode cho canvas
-     */
+
+    /** Toggle zoom mode cho canvas */
     private fun toggleZoomMode() {
         val isZoomMode = binding.DrawingCanvas.isZoomModeEnabled()
         binding.DrawingCanvas.setZoomModeEnabled(!isZoomMode)
-        
-        // Update UI icon nếu cần (có thể thêm visual feedback)
+
+        // Update UI icon n?u c?n (c� th? th�m visual feedback)
         if (!isZoomMode) {
-            showToast("Đã bật chế độ zoom - Dùng 2 ngón tay để zoom, 1 ngón để pan")
+            showToast("?� b?t ch? ?? zoom - D�ng 2 ng�n tay ?? zoom, 1 ng�n ?? pan")
         } else {
-            showToast("Đã tắt chế độ zoom")
+            showToast("?� t?t ch? ?? zoom")
         }
     }
 
@@ -793,15 +793,15 @@ abstract class EditActivity(private val type: Type) :
             colorInt,
         )
         setColor()
-        
-        // Load drawing strokes vào canvas nếu có
+
+        // Load drawing strokes v�o canvas n?u c�
         if (notallyModel.drawingStrokes.isNotEmpty()) {
             binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
-            // Hiển thị divider và canvas nếu có strokes
+            // Hi?n th? divider v� canvas n?u c� strokes
             binding.DrawingDivider.visibility = View.VISIBLE
             binding.DrawingCanvas.visibility = View.VISIBLE
             isDrawingModeActive = true
-            
+
             // Set divider position
             binding.ScrollView.post {
                 val dividerTop = binding.DrawingDivider.top
