@@ -327,7 +327,8 @@
     <string name="yearly">Yearly</string>
     <string name="years">Years</string>
     <string name="your_notes_associated">Your notes attached to this label will not be deleted</string>
-    
+    <string name="done">Done</string>
+
     <!-- AI Features -->
     <string name="ai_summarize">AI Summary</string>
     <string name="ai_summarize_note">Summarize with AI</string>
