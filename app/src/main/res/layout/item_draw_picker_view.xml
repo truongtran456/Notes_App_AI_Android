@@ -95,7 +95,7 @@
                 android:src="@drawable/ic_saturation" />
 
             <androidx.appcompat.widget.AppCompatImageView
-                android:id="@+id/ivZoom"
+                android:id="@+id/ivBackground"
                 android:clickable="true"
                 android:focusable="true"
                 android:layout_width="@dimen/dp_30"
@@ -103,7 +103,7 @@
                 android:background="@drawable/bg_more"
                 android:foreground="?attr/selectableItemBackground"
                 android:padding="@dimen/dp_5"
-                android:src="@drawable/ic_zoom" />
+                android:src="@drawable/ic_menu_background" />
 
         </androidx.appcompat.widget.LinearLayoutCompat>
 

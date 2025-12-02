@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
@@ -53,6 +54,7 @@ import com.philkes.notallyx.common.datasource.AppSharePrefsImpl
 import com.philkes.notallyx.common.extension.showMoreColor
 import com.philkes.notallyx.common.extension.rawColor
 import com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
+import com.philkes.notallyx.draw.ui.background.BackgroundBottomSheet
 import com.google.gson.Gson
 import android.content.SharedPreferences
 import android.content.Context.MODE_PRIVATE
@@ -567,18 +569,39 @@ abstract class EditActivity(private val type: Type) :
             }
 
             override fun onPaletteClick() {
-                // Mở color picker
+                // Lấy brush đang được chọn (từ tools list hoặc currentDrawTool)
+                val currentBrush = binding.DrawToolPickerView.tools.firstOrNull { it.isSelected }
+                    ?: currentDrawTool
+                    ?: run {
+                        // Nếu không có brush nào được chọn, hiển thị thông báo
+                        showToast("Vui lòng chọn bút vẽ trước")
+                        return
+                    }
+                
+                // Mở color picker (ColorPickerDialog sẽ tự động lưu/load màu cuối cùng từ preference)
                 showMoreColor { colorInt ->
                     val newColorHex = colorInt.rawColor()
-                    // Update current brush color if one is selected
-                    currentDrawTool?.let { tool ->
-                        val updatedTool = tool.copy(color = newColorHex)
-                        currentDrawTool = updatedTool
-                        // Áp dụng màu mới vào canvas nếu đang ở chế độ vẽ
-                        if (isDrawingModeActive) {
-                            binding.DrawingCanvas.setBrush(updatedTool)
-                        }
+                    
+                    // Update brush với màu mới
+                    val updatedBrush = currentBrush.copy(
+                        color = newColorHex,
+                        isSelected = true // Giữ selected state
+                    )
+                    
+                    // Update brush trong tools list (nếu brush có trong list)
+                    val tools = binding.DrawToolPickerView.tools
+                    val index = tools.indexOfFirst { it.id == currentBrush.id }
+                    if (index >= 0) {
+                        tools[index] = updatedBrush
+                        binding.DrawToolPickerView.applyTools(tools)
                     }
+                    
+                    // Update currentDrawTool
+                    currentDrawTool = updatedBrush
+                    
+                    // Gọi callback để update UI và canvas
+                    // Điều này sẽ trigger onItemClick() để áp dụng brush mới vào canvas
+                    binding.DrawToolPickerView.listener?.onItemClick(updatedBrush)
                 }
             }
 
@@ -592,14 +615,21 @@ abstract class EditActivity(private val type: Type) :
                 enableEyeDropperMode()
             }
             
-            override fun onZoomClick() {
-                // Toggle zoom mode
-                if (!isDrawingModeActive) {
-                    showToast("Vui lòng chọn bút vẽ trước")
-                    return
-                }
-                
-                toggleZoomMode()
+            override fun onBackgroundClick() {
+                // Mở bottom sheet chọn background cho canvas
+                val initialColor = Color.WHITE
+                val sheet = BackgroundBottomSheet.newInstance(initialColor)
+                sheet.setListener(
+                    object : BackgroundBottomSheet.Listener {
+                        override fun onBackgroundSelected(colorInt: Int) {
+                            // Đổi nền logic bên trong canvas
+                            binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
+                            // Đổi luôn background view để user thấy rõ
+                            binding.DrawingCanvas.setBackgroundColor(colorInt)
+                        }
+                    }
+                )
+                sheet.show(supportFragmentManager, "BackgroundBottomSheet")
             }
         }
 
