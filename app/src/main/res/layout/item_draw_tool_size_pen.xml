@@ -34,12 +34,11 @@
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_corner_20"
-                android:fontFamily="?attr/fontSemiBold"
                 android:gravity="center"
                 android:layout_gravity="center_vertical"
                 android:maxWidth="@dimen/dp_60"
                 android:maxLines="1"
-                android:textColor="?attr/titleTextColor"
+                android:textColor="@color/color3D2A00"
                 android:textSize="@dimen/sp_13"
                 tools:text="100 px"/>
         </androidx.appcompat.widget.LinearLayoutCompat>

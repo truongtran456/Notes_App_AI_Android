@@ -43,8 +43,8 @@ class DrawToolPickerView @JvmOverloads constructor(
         fun onDelete(tool: DrawToolBrush)
         fun onPaletteClick()
         fun onEyeDropperClick()
-        fun onDoneClick() // Callback khi click nút Done
-        fun onZoomClick() // Callback khi click nút Zoom
+        fun onDoneClick() // Callback khi click nút Close (X)
+        fun onBackgroundClick() // Callback khi click nút Background
     }
 
     var listener: OnItemClickListener? = null
@@ -126,8 +126,8 @@ class DrawToolPickerView @JvmOverloads constructor(
             ivEyedropper.setOnClickListener {
                 listener?.onEyeDropperClick()
             }
-            ivZoom.setOnClickListener {
-                listener?.onZoomClick()
+            ivBackground.setOnClickListener {
+                listener?.onBackgroundClick()
             }
         }
     }

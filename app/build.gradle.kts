@@ -197,6 +197,7 @@ dependencies {
     implementation("io.github.ShawnLin013:number-picker:2.4.13")
     implementation("cn.Leaqi:SwipeDrawer:1.6")
     implementation("com.github.skydoves:colorpickerview:2.3.0")
+    implementation("me.relex:circleindicator:2.1.6")
     implementation("com.google.android.material:material:1.12.0")
     implementation("com.google.code.findbugs:jsr305:3.0.2")
     implementation("me.zhanghai.android.fastscroll:library:1.3.0")

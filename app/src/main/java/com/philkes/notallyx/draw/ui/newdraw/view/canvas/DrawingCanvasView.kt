@@ -40,6 +40,7 @@ class DrawingCanvasView @JvmOverloads constructor(
     private val paths = mutableListOf<DrawingPath>()
     private var currentPath: DrawingPath? = null
     private var currentBrush: DrawToolBrush? = null
+    private var canvasBackgroundColor: Int = Color.WHITE
     
     // Lưu strokes để persist drawing
     private val savedStrokes = mutableListOf<DrawingStroke>()
@@ -47,6 +48,12 @@ class DrawingCanvasView @JvmOverloads constructor(
     // Bitmap để lưu drawing state (backup cho eyedropper)
     private var savedDrawingBitmap: Bitmap? = null
     private var dividerY: Float = 0f // Vị trí đường divider
+    
+    // Bitmaps để xử lý eraser (theo flow Starnest)
+    private var layerBitmap: Bitmap? = null // Chứa tất cả strokes đã vẽ (đã được update với eraser)
+    private var strokeBitmap: Bitmap? = null // Bitmap tạm để vẽ stroke mới (với eraser)
+    private var resultBitmap: Bitmap? = null // Bitmap kết quả (để hiển thị)
+    private var hasEraserBeenUsed: Boolean = false // Flag để đánh dấu đã dùng eraser (layerBitmap đã bị modify)
     
     // Eyedropper mode
     private var isEyeDropperMode: Boolean = false
@@ -86,6 +93,14 @@ class DrawingCanvasView @JvmOverloads constructor(
         val path: Path,
         val paint: Paint
     )
+
+    /**
+     * Thay đổi màu nền cho vùng canvas (dưới các strokes)
+     */
+    fun setCanvasBackgroundColor(color: Int) {
+        canvasBackgroundColor = color
+        invalidate()
+    }
 
     fun setBrush(brush: DrawToolBrush) {
         currentBrush = brush
@@ -137,10 +152,10 @@ class DrawingCanvasView @JvmOverloads constructor(
                     paint.strokeCap = Paint.Cap.ROUND
                     paint.strokeJoin = Paint.Join.ROUND
                     paint.style = Paint.Style.STROKE
-                    // Sử dụng CLEAR mode để xóa
-                    paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+                    // Sử dụng DST_OUT mode để xóa (theo flow Starnest)
+                    paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
                     // Màu không quan trọng với eraser, nhưng vẫn set để tránh lỗi
-                    paint.color = Color.TRANSPARENT
+                    paint.color = Color.BLACK // DST_OUT cần màu đen
                     paint.alpha = 255 // Eraser cần alpha = 255 để xóa đúng
                 }
                 else -> {
@@ -210,6 +225,11 @@ class DrawingCanvasView @JvmOverloads constructor(
                     currentPath = DrawingPath(newPath, Paint(paint))
                     paths.add(currentPath!!)
                     
+                    // Xử lý eraser: copy layerBitmap vào strokeBitmap
+                    if (currentBrush?.brush == Brush.HardEraser || currentBrush?.brush == Brush.SoftEraser) {
+                        startDrawingWithEraser()
+                    }
+                    
                     // Mở rộng canvas nếu cần
                     expandCanvasIfNeeded(event.y)
                     
@@ -227,6 +247,19 @@ class DrawingCanvasView @JvmOverloads constructor(
                     val y = event.y
                     currentPath!!.path.lineTo(x, y)
                     
+                    // Nếu đang vẽ với eraser, update strokeBitmap ngay lập tức để hiển thị real-time
+                    if (currentBrush?.brush == Brush.HardEraser || currentBrush?.brush == Brush.SoftEraser) {
+                        strokeBitmap?.let { stroke ->
+                            val eraserPaint = Paint(paint).apply {
+                                xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+                                color = Color.BLACK
+                                alpha = 255
+                            }
+                            // Vẽ eraser path lên strokeBitmap (đã copy từ layerBitmap)
+                            Canvas(stroke).drawPath(currentPath!!.path, eraserPaint)
+                        }
+                    }
+                    
                     // Mở rộng canvas nếu cần
                     expandCanvasIfNeeded(y)
                     
@@ -236,7 +269,12 @@ class DrawingCanvasView @JvmOverloads constructor(
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     // Kết thúc vẽ và lưu stroke
                     if (currentPath != null && currentBrush != null) {
-                        saveCurrentStroke()
+                        // Xử lý eraser đặc biệt
+                        if (currentBrush!!.brush == Brush.HardEraser || currentBrush!!.brush == Brush.SoftEraser) {
+                            endDrawingWithEraser()
+                        } else {
+                            saveCurrentStroke()
+                        }
                     }
                     currentPath = null
                     return true
@@ -250,8 +288,8 @@ class DrawingCanvasView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         
-        // Vẽ nền trắng
-        canvas.drawColor(Color.WHITE)
+        // Vẽ nền canvas (có thể thay đổi bằng nút Background)
+        canvas.drawColor(canvasBackgroundColor)
         
         // Apply zoom and pan transformations (chỉ khi zoom mode bật và có scale)
         if (isZoomModeEnabled && scaleFactor != 1.0f) {
@@ -260,30 +298,32 @@ class DrawingCanvasView @JvmOverloads constructor(
             canvas.scale(scaleFactor, scaleFactor, width / 2f, height / 2f)
         }
         
-        // Vẽ tất cả saved strokes trước (restore drawing)
-        savedStrokes.forEach { stroke ->
-            val path = DrawingStroke.stringToPath(stroke.pathData)
-            val paint = createPaintFromStroke(stroke)
-            
-            // Với eraser, cần vẽ trên layer riêng
-            if (stroke.brush == Brush.HardEraser || stroke.brush == Brush.SoftEraser) {
-                canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
-                canvas.drawPath(path, paint)
-                canvas.restore()
-            } else {
-                canvas.drawPath(path, paint)
-            }
-        }
+        // Đảm bảo bitmaps được khởi tạo
+        ensureBitmapsInitialized()
         
-        // Vẽ các paths hiện tại (đang vẽ)
-        paths.forEach { drawingPath ->
-            val brush = currentBrush
-            if (brush != null && (brush.brush == Brush.HardEraser || brush.brush == Brush.SoftEraser)) {
-                // Với eraser, cần vẽ trên layer riêng
-                canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
-                canvas.drawPath(drawingPath.path, drawingPath.paint)
-                canvas.restore()
+        // Nếu đang vẽ với eraser, vẽ từ strokeBitmap (đã xóa một phần)
+        val isDrawingEraser = currentBrush?.brush == Brush.HardEraser || currentBrush?.brush == Brush.SoftEraser
+        if (isDrawingEraser && strokeBitmap != null) {
+            // Vẽ strokeBitmap (đang vẽ với eraser) - đã copy từ layerBitmap và xóa một phần
+            strokeBitmap?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+        } else {
+            // Vẽ bình thường: vẽ từ layerBitmap hoặc từ strokes
+            if (layerBitmap != null) {
+                // Vẽ từ layerBitmap (đã được update với eraser)
+                canvas.drawBitmap(layerBitmap!!, 0f, 0f, null)
             } else {
+                // Fallback: vẽ từ strokes (khi chưa có layerBitmap)
+                savedStrokes.forEach { stroke ->
+                    if (stroke.brush != Brush.HardEraser && stroke.brush != Brush.SoftEraser) {
+                        val path = DrawingStroke.stringToPath(stroke.pathData)
+                        val paint = createPaintFromStroke(stroke)
+                        canvas.drawPath(path, paint)
+                    }
+                }
+            }
+            
+            // Vẽ các paths hiện tại (đang vẽ - không phải eraser)
+            paths.forEach { drawingPath ->
                 canvas.drawPath(drawingPath.path, drawingPath.paint)
             }
         }
@@ -332,8 +372,8 @@ class DrawingCanvasView @JvmOverloads constructor(
             // Set brush type
             when (stroke.brush) {
                 Brush.HardEraser, Brush.SoftEraser -> {
-                    xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
-                    color = Color.TRANSPARENT
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+                    color = Color.BLACK
                     alpha = 255
                 }
                 else -> {
@@ -431,6 +471,13 @@ class DrawingCanvasView @JvmOverloads constructor(
         savedStrokes.clear()
         savedDrawingBitmap?.recycle()
         savedDrawingBitmap = null
+        layerBitmap?.recycle()
+        layerBitmap = null
+        strokeBitmap?.recycle()
+        strokeBitmap = null
+        resultBitmap?.recycle()
+        resultBitmap = null
+        hasEraserBeenUsed = false
         invalidate()
     }
 
@@ -477,6 +524,102 @@ class DrawingCanvasView @JvmOverloads constructor(
     }
     
     /**
+     * Bắt đầu vẽ với eraser: copy layerBitmap vào strokeBitmap
+     */
+    private fun startDrawingWithEraser() {
+        ensureBitmapsInitialized()
+        
+        layerBitmap?.let { layer ->
+            strokeBitmap?.let { stroke ->
+                // Xóa strokeBitmap
+                stroke.eraseColor(Color.TRANSPARENT)
+                
+                // Copy layerBitmap vào strokeBitmap (để có nền để xóa)
+                Canvas(stroke).drawBitmap(layer, 0f, 0f, null)
+            }
+        }
+    }
+    
+    /**
+     * Kết thúc vẽ với eraser: xử lý xóa trên layerBitmap
+     */
+    private fun endDrawingWithEraser() {
+        val path = currentPath?.path ?: return
+        
+        ensureBitmapsInitialized()
+        
+        // strokeBitmap đã được update trong ACTION_MOVE với eraser path
+        // Giờ chỉ cần copy strokeBitmap (đã xóa) vào layerBitmap
+        strokeBitmap?.let { stroke ->
+            // QUAN TRỌNG: Thay thế hoàn toàn layerBitmap bằng strokeBitmap (đã xóa)
+            // Đây là kết quả cuối cùng sau khi xóa - layerBitmap giờ chứa drawing đã bị xóa
+            layerBitmap?.let { layer ->
+                // Xóa layerBitmap cũ và vẽ lại từ strokeBitmap (đã xóa)
+                layer.eraseColor(Color.TRANSPARENT)
+                val layerCanvas = Canvas(layer)
+                layerCanvas.drawColor(Color.WHITE) // Vẽ nền trắng
+                layerCanvas.drawBitmap(stroke, 0f, 0f, null) // Vẽ strokeBitmap (đã xóa)
+            }
+            
+            // Đánh dấu đã dùng eraser (layerBitmap đã bị modify)
+            hasEraserBeenUsed = true
+        }
+        
+        // Lưu eraser stroke để có thể undo (tùy chọn)
+        // Không lưu eraser stroke vào savedStrokes vì nó chỉ là thao tác xóa
+        
+        // Clear path hiện tại
+        paths.remove(currentPath)
+        currentPath = null
+        
+        invalidate()
+    }
+    
+    /**
+     * Đảm bảo các bitmaps được khởi tạo
+     */
+    private fun ensureBitmapsInitialized() {
+        if (width <= 0 || height <= 0) return
+        
+        val needRebuildLayer = layerBitmap == null || 
+                               layerBitmap!!.width != width || 
+                               layerBitmap!!.height != height
+        
+        if (needRebuildLayer) {
+            layerBitmap?.recycle()
+            layerBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val layerCanvas = Canvas(layerBitmap!!)
+            layerCanvas.drawColor(Color.WHITE)
+            
+            // Vẽ tất cả saved strokes lên layerBitmap (trừ eraser strokes)
+            savedStrokes.forEach { stroke ->
+                if (stroke.brush != Brush.HardEraser && stroke.brush != Brush.SoftEraser) {
+                    val path = DrawingStroke.stringToPath(stroke.pathData)
+                    val paint = createPaintFromStroke(stroke)
+                    layerCanvas.drawPath(path, paint)
+                }
+            }
+            
+            // Reset flag khi rebuild (vì đã rebuild từ savedStrokes)
+            hasEraserBeenUsed = false
+        }
+        // QUAN TRỌNG: Nếu layerBitmap đã tồn tại và size không đổi, KHÔNG rebuild từ savedStrokes
+        // Vì layerBitmap đã chứa kết quả sau khi tẩy, nếu rebuild sẽ mất phần đã tẩy
+        
+        if (strokeBitmap == null || strokeBitmap!!.width != width || strokeBitmap!!.height != height) {
+            strokeBitmap?.recycle()
+            strokeBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            strokeBitmap!!.eraseColor(Color.TRANSPARENT)
+        }
+        
+        if (resultBitmap == null || resultBitmap!!.width != width || resultBitmap!!.height != height) {
+            resultBitmap?.recycle()
+            resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            resultBitmap!!.eraseColor(Color.TRANSPARENT)
+        }
+    }
+    
+    /**
      * Lưu stroke hiện tại vào danh sách savedStrokes
      */
     private fun saveCurrentStroke() {
@@ -504,6 +647,14 @@ class DrawingCanvasView @JvmOverloads constructor(
         // Lưu stroke
         savedStrokes.add(stroke)
         
+        // Update layerBitmap với stroke mới
+        ensureBitmapsInitialized()
+        layerBitmap?.let { layer ->
+            val pathObj = DrawingStroke.stringToPath(stroke.pathData)
+            val paintObj = createPaintFromStroke(stroke)
+            Canvas(layer).drawPath(pathObj, paintObj)
+        }
+        
         // Clear path hiện tại sau khi đã lưu
         paths.remove(currentPath)
         currentPath = null
@@ -523,6 +674,16 @@ class DrawingCanvasView @JvmOverloads constructor(
         savedStrokes.clear()
         savedStrokes.addAll(strokes)
         paths.clear()
+        
+        // Reset bitmaps để rebuild từ strokes mới
+        layerBitmap?.recycle()
+        layerBitmap = null
+        strokeBitmap?.recycle()
+        strokeBitmap = null
+        resultBitmap?.recycle()
+        resultBitmap = null
+        hasEraserBeenUsed = false
+        
         invalidate()
     }
     
