@@ -1,254 +1,352 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/md_theme_surfaceContainerLow">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="16dp">
 
+        <!-- Appearance -->
         <TextView
             style="@style/PreferenceHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/appearance" />
 
-        <include
-            android:id="@+id/View"
-            layout="@layout/preference" />
-
-        <include
-            android:id="@+id/Theme"
-            layout="@layout/preference" />
-
-        <include
-            android:id="@+id/DateFormat"
-            layout="@layout/preference" />
-
-        <include
-            android:id="@+id/TextSize"
-            layout="@layout/preference" />
-
-
-        <include
-            android:id="@+id/NotesSortOrder"
-            layout="@layout/preference" />
-
-        <include
-            android:id="@+id/CheckedListItemSorting"
-            layout="@layout/preference" />
-
-
-        <include
-          android:id="@+id/StartView"
-          layout="@layout/preference" />
-
-        <View
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?android:attr/listDivider" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="18dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="@color/md_theme_surfaceContainerHighest">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include
+                    android:id="@+id/View"
+                    layout="@layout/preference" />
+
+                <include
+                    android:id="@+id/Theme"
+                    layout="@layout/preference" />
+
+                <include
+                    android:id="@+id/DateFormat"
+                    layout="@layout/preference" />
+
+                <include
+                    android:id="@+id/TextSize"
+                    layout="@layout/preference" />
+
+                <include
+                    android:id="@+id/NotesSortOrder"
+                    layout="@layout/preference" />
+
+                <include
+                    android:id="@+id/CheckedListItemSorting"
+                    layout="@layout/preference" />
+
+                <include
+                    android:id="@+id/StartView"
+                    layout="@layout/preference" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Content density -->
         <TextView
             style="@style/PreferenceHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/content_density" />
 
-        <include
-            android:id="@+id/MaxTitle"
-            layout="@layout/preference_seekbar" />
-
-        <include
-            android:id="@+id/MaxItems"
-            layout="@layout/preference_seekbar" />
-
-        <include
-            android:id="@+id/MaxLines"
-            layout="@layout/preference_seekbar" />
-
-        <include
-          android:id="@+id/MaxLabels"
-          layout="@layout/preference_seekbar" />
-
-        <include
-          android:id="@+id/LabelsHiddenInOverview"
-          layout="@layout/preference" />
-
-        <View
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?android:attr/listDivider" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="18dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="@color/md_theme_surfaceContainerHighest">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include
+                    android:id="@+id/MaxTitle"
+                    layout="@layout/preference_seekbar" />
+
+                <include
+                    android:id="@+id/MaxItems"
+                    layout="@layout/preference_seekbar" />
+
+                <include
+                    android:id="@+id/MaxLines"
+                    layout="@layout/preference_seekbar" />
+
+                <include
+                    android:id="@+id/MaxLabels"
+                    layout="@layout/preference_seekbar" />
+
+                <include
+                    android:id="@+id/LabelsHiddenInOverview"
+                    layout="@layout/preference" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Backup & Auto backup -->
         <TextView
             style="@style/PreferenceHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/backup" />
 
-        <TextView
-            android:id="@+id/ImportBackup"
-            style="@style/Preference"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/import_backup" />
+            android:layout_marginTop="8dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="18dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="@color/md_theme_surfaceContainerHighest">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/ImportBackup"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/import_backup" />
+
+                <TextView
+                    android:id="@+id/ImportOther"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/import_other" />
+
+                <TextView
+                    android:id="@+id/ExportBackup"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/export_backup" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
-          android:id="@+id/ImportOther"
-          style="@style/Preference"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/import_other" />
-
-        <TextView
-            android:id="@+id/ExportBackup"
-            style="@style/Preference"
+            style="@style/PreferenceHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/export_backup" />
+            android:text="@string/auto_backup" />
 
-        <TextView
-          style="@style/PreferenceHeader"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/auto_backup" />
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="18dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="@color/md_theme_surfaceContainerHighest">
 
-        <include
-          android:id="@+id/BackupsFolder"
-          layout="@layout/preference" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-        <include
-          android:id="@+id/BackupOnSave"
-          layout="@layout/preference" />
+                <include
+                    android:id="@+id/BackupsFolder"
+                    layout="@layout/preference" />
 
-        <include
-          android:id="@+id/PeriodicBackups"
-          layout="@layout/preference" />
+                <include
+                    android:id="@+id/BackupOnSave"
+                    layout="@layout/preference" />
 
-        <TextView
-          android:id="@+id/PeriodicBackupLastExecution"
-          android:textAppearance="?attr/textAppearanceBodySmall"
-          android:paddingStart="16dp"
-          android:paddingEnd="16dp"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content" />
+                <include
+                    android:id="@+id/PeriodicBackups"
+                    layout="@layout/preference" />
 
-        <include
-          android:id="@+id/PeriodicBackupsPeriodInDays"
-          layout="@layout/preference_seekbar" />
+                <TextView
+                    android:id="@+id/PeriodicBackupLastExecution"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
 
-        <include
-          android:id="@+id/PeriodicBackupsMax"
-          layout="@layout/preference_seekbar" />
+                <include
+                    android:id="@+id/PeriodicBackupsPeriodInDays"
+                    layout="@layout/preference_seekbar" />
 
-        <View
-          android:layout_width="match_parent"
-          android:layout_height="1dp"
-          android:background="?android:attr/listDivider" />
+                <include
+                    android:id="@+id/PeriodicBackupsMax"
+                    layout="@layout/preference_seekbar" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
+        <!-- Security -->
         <TextView
             style="@style/PreferenceHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/security" />
 
-        <include
-            android:id="@+id/BiometricLock"
-            layout="@layout/preference" />
-
-        <include
-          android:id="@+id/BackupPassword"
-          layout="@layout/preference" />
-
-        <View
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?android:attr/listDivider" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="18dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="@color/md_theme_surfaceContainerHighest">
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include
+                    android:id="@+id/BiometricLock"
+                    layout="@layout/preference" />
+
+                <include
+                    android:id="@+id/BackupPassword"
+                    layout="@layout/preference" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Settings -->
         <TextView
-          style="@style/PreferenceHeader"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/settings" />
-
-        <TextView
-          android:id="@+id/ImportSettings"
-          style="@style/Preference"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/import_settings" />
-
-        <TextView
-          android:id="@+id/ExportSettings"
-          style="@style/Preference"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/export_settings" />
-
-        <TextView
-          android:id="@+id/ResetSettings"
-          style="@style/Preference"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/reset_settings" />
-
-        <include
-          android:id="@+id/DataInPublicFolder"
-          layout="@layout/preference" />
-
-        <TextView
-          android:id="@+id/ClearData"
-          style="@style/Preference"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/clear_data" />
-
-        <View
+            style="@style/PreferenceHeader"
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="?android:attr/listDivider" />
+            android:layout_height="wrap_content"
+            android:text="@string/settings" />
 
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="18dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="@color/md_theme_surfaceContainerHighest">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/ImportSettings"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/import_settings" />
+
+                <TextView
+                    android:id="@+id/ExportSettings"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/export_settings" />
+
+                <TextView
+                    android:id="@+id/ResetSettings"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/reset_settings" />
+
+                <include
+                    android:id="@+id/DataInPublicFolder"
+                    layout="@layout/preference" />
+
+                <TextView
+                    android:id="@+id/ClearData"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/clear_data" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- About -->
         <TextView
             style="@style/PreferenceHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/about" />
 
-        <TextView
-          android:id="@+id/SendFeedback"
-          style="@style/Preference"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/send_feedback" />
-
-        <TextView
-            android:id="@+id/SourceCode"
-            style="@style/Preference"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/source_code" />
+            android:layout_marginTop="8dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="18dp"
+            app:cardUseCompatPadding="true"
+            app:cardBackgroundColor="@color/md_theme_surfaceContainerHighest">
 
-        <TextView
-            android:id="@+id/Libraries"
-            style="@style/Preference"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/libraries" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-        <TextView
-          android:id="@+id/Donate"
-          style="@style/Preference"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="@string/donate" />
+                <TextView
+                    android:id="@+id/SendFeedback"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/send_feedback" />
 
-        <TextView
-          android:id="@+id/VersionText"
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:textAppearance="?attr/textAppearanceBodySmall"
-          android:gravity="start"
-          android:padding="16dp" />
+                <TextView
+                    android:id="@+id/SourceCode"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/source_code" />
+
+                <TextView
+                    android:id="@+id/Libraries"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/libraries" />
+
+                <TextView
+                    android:id="@+id/Donate"
+                    style="@style/Preference"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/donate" />
+
+                <TextView
+                    android:id="@+id/VersionText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:textAppearance="?attr/textAppearanceBodySmall" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 

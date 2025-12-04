@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/appearance_view"
+        android:title="@string/view"
+        android:icon="@drawable/edit"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/appearance_theme"
+        android:title="@string/theme"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/appearance_date_format"
+        android:title="@string/date_format"
+        android:icon="@drawable/notifications"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/appearance_text_size"
+        android:title="@string/text_size"
+        android:icon="@drawable/text_format"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/appearance_notes_sort"
+        android:title="@string/notes_sorted_by"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/appearance_list_sort"
+        android:title="@string/list_item_auto_sort"
+        android:icon="@drawable/checkbox"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/appearance_start_view"
+        android:title="@string/start_view"
+        android:icon="@drawable/home"
+        app:showAsAction="never" />
+
+</menu>
+
+

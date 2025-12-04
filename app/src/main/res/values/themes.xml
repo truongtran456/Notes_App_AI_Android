@@ -96,6 +96,14 @@
 
     <style name="NavigationView" parent="Widget.Material3.NavigationView">
         <item name="android:background">?attr/colorSurface</item>
+        <item name="itemHorizontalPadding">16dp</item>
+        <item name="itemIconPadding">12dp</item>
+        <item name="itemMaxLines">1</item>
+    </style>
+
+    <style name="NavigationViewItemShape">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
     </style>
 
     <style name="FileChip" parent="Widget.Material3.Chip.Assist">

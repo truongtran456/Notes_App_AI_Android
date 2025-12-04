@@ -8,12 +8,15 @@ import android.view.Menu.CATEGORY_CONTAINER
 import android.view.Menu.CATEGORY_SYSTEM
 import android.view.MenuItem
 import android.view.View
+import androidx.appcompat.widget.PopupMenu
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.children
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
@@ -51,6 +54,8 @@ import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel.Companion.CURRENT_LABEL_EMPTY
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel.Companion.CURRENT_LABEL_NONE
 import com.philkes.notallyx.presentation.viewmodel.ExportMimeType
+import com.philkes.notallyx.presentation.viewmodel.preference.NotesView
+import com.philkes.notallyx.presentation.viewmodel.preference.Theme
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences.Companion.START_VIEW_DEFAULT
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences.Companion.START_VIEW_UNLABELED
 import com.philkes.notallyx.utils.backup.exportNotes
@@ -81,6 +86,122 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         return navController.navigateUp(configuration)
     }
 
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.menu_main_toolbar, menu)
+        // Gắn click cho custom action layout (nút 3 chấm có background)
+        menu.findItem(R.id.action_appearance).actionView?.setOnClickListener {
+            showAppearancePopup(it)
+        }
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return super.onOptionsItemSelected(item)
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        // Chỉ hiển thị nút 3 chấm trên màn Notes / DisplayLabel / Unlabeled
+        val destinationId = navController.currentDestination?.id
+        val showAppearance =
+            destinationId == R.id.Notes ||
+                destinationId == R.id.DisplayLabel ||
+                destinationId == R.id.Unlabeled
+        menu.findItem(R.id.action_appearance)?.isVisible = showAppearance
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun showAppearancePopup(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menuInflater.inflate(R.menu.menu_appearance_popup, popup.menu)
+
+        popup.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.appearance_view -> {
+                    showViewChoiceDialog()
+                    true
+                }
+                R.id.appearance_theme -> {
+                    showThemeChoiceDialog()
+                    true
+                }
+                R.id.appearance_date_format -> {
+                    // TODO: Date format giống Settings
+                    true
+                }
+                R.id.appearance_text_size -> {
+                    // TODO: Text size giống Settings
+                    true
+                }
+                R.id.appearance_notes_sort -> {
+                    // TODO: Notes sort order giống Settings
+                    true
+                }
+                R.id.appearance_list_sort -> {
+                    // TODO: List item sorting giống Settings
+                    true
+                }
+                R.id.appearance_start_view -> {
+                    // TODO: Start view giống Settings
+                    true
+                }
+                else -> false
+            }
+        }
+
+        popup.show()
+    }
+
+    private fun showViewChoiceDialog() {
+        val current = preferences.notesView.value
+        val items = arrayOf(getString(R.string.list), getString(R.string.grid))
+        val values = arrayOf(NotesView.LIST, NotesView.GRID)
+        var checkedItem = values.indexOf(current).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.view)
+            .setSingleChoiceItems(items, checkedItem) { _, which ->
+                checkedItem = which
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val newValue = values[checkedItem]
+                baseModel.savePreference(preferences.notesView, newValue)
+                // Cập nhật ngay giao diện danh sách ghi chú
+                navigateToStartView()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showThemeChoiceDialog() {
+        val current = preferences.theme.value
+        val values = Theme.values()
+        val items = values.map { getString(it.textResId) }.toTypedArray()
+        var checkedItem = values.indexOf(current).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.theme)
+            .setSingleChoiceItems(items, checkedItem) { _, which ->
+                checkedItem = which
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val newValue = values[checkedItem]
+                baseModel.savePreference(preferences.theme, newValue)
+                // Áp dụng theme mới ngay lập tức
+                when (newValue) {
+                    Theme.DARK ->
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                    Theme.LIGHT ->
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                    Theme.FOLLOW_SYSTEM ->
+                        AppCompatDelegate.setDefaultNightMode(
+                            AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                        )
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -88,6 +209,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         setSupportActionBar(binding.Toolbar)
         setupFAB()
         setupMenu()
+        setupDrawerFooter()
         setupActionMode()
         setupNavigation()
 
@@ -197,6 +319,51 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         }
         baseModel.preferences.maxLabels.observe(this) { maxLabels ->
             binding.NavigationView.menu.setupLabelsMenuItems(labels, maxLabels)
+        }
+    }
+
+    private fun setupDrawerFooter() {
+        // Setup theme toggle - find footer view from root
+        val drawerFooter = binding.root.findViewById<View>(R.id.DrawerFooter)
+        val themeLight = drawerFooter?.findViewById<com.google.android.material.button.MaterialButton>(R.id.ThemeLight)
+        val themeDark = drawerFooter?.findViewById<com.google.android.material.button.MaterialButton>(R.id.ThemeDark)
+
+        if (themeLight != null && themeDark != null) {
+            // Update theme buttons state based on current theme
+            preferences.theme.observe(this) { currentTheme ->
+                when (currentTheme) {
+                    Theme.LIGHT -> {
+                        themeLight.isSelected = true
+                        themeDark.isSelected = false
+                        themeLight.backgroundTintList = ContextCompat.getColorStateList(this, R.color.md_theme_primaryContainer)
+                        themeDark.backgroundTintList = null
+                    }
+                    Theme.DARK -> {
+                        themeLight.isSelected = false
+                        themeDark.isSelected = true
+                        themeLight.backgroundTintList = null
+                        themeDark.backgroundTintList = ContextCompat.getColorStateList(this, R.color.md_theme_primaryContainer)
+                    }
+                    Theme.FOLLOW_SYSTEM -> {
+                        themeLight.isSelected = false
+                        themeDark.isSelected = false
+                        themeLight.backgroundTintList = null
+                        themeDark.backgroundTintList = null
+                    }
+                }
+            }
+
+            themeLight.setOnClickListener {
+                baseModel.savePreference(preferences.theme, Theme.LIGHT)
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                recreate()
+            }
+
+            themeDark.setOnClickListener {
+                baseModel.savePreference(preferences.theme, Theme.DARK)
+                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                recreate()
+            }
         }
     }
 
@@ -464,6 +631,8 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 }
             }
             isStartViewFragment = isStartViewFragment(destination.id, bundle)
+            // Cập nhật lại menu mỗi khi đổi màn hình (đảm bảo 3 chấm không xuất hiện ở Settings)
+            invalidateOptionsMenu()
         }
     }
 

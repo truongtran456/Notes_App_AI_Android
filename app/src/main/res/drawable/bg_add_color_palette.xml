@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="@dimen/dp_2">
+        <shape android:shape="oval"> <solid android:color="@color/colorFFD2AA" />
+        </shape>
+    </item>
+
+    <item android:bottom="@dimen/dp_3">
+        <shape android:shape="oval"> <gradient
+            android:angle="90"
+            android:endColor="#FFC340"
+            android:startColor="#FF8400" />
+        </shape>
+    </item>
+
+    <item
+        android:drawable="@drawable/ic_bong"
+        android:gravity="start|top"
+        android:start="4dp"
+        android:top="4dp" />
+
+</layer-list>

@@ -102,9 +102,15 @@ class DrawingCanvasView @JvmOverloads constructor(
         invalidate()
     }
 
-    fun setBrush(brush: DrawToolBrush) {
+    fun setBrush(brush: DrawToolBrush?) {
         currentBrush = brush
-        updatePaint()
+        if (brush != null) {
+            updatePaint()
+        } else {
+            // Clear brush - không thể vẽ được nữa
+            currentPath = null
+            paths.clear()
+        }
     }
 
     private fun updatePaint() {
@@ -209,15 +215,16 @@ class DrawingCanvasView @JvmOverloads constructor(
         
         // Xử lý vẽ bình thường (chỉ khi zoom mode tắt và có brush được chọn)
         if (!isZoomModeEnabled && !isEyeDropperMode && currentBrush != null) {
-            // Kiểm tra xem có vẽ dưới divider không (nếu có divider)
-            val canDraw = dividerY <= 0f || event.y >= dividerY
-            
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    // Chỉ cho phép vẽ dưới divider
+                    // Kiểm tra xem có vẽ dưới divider không (chỉ kiểm tra khi bắt đầu vẽ)
+                    val canDraw = dividerY <= 0f || event.y >= dividerY
                     if (!canDraw) {
                         return false
                     }
+                    
+                    // QUAN TRỌNG: Ngăn parent ScrollView scroll khi đang vẽ
+                    parent?.requestDisallowInterceptTouchEvent(true)
                     
                     // Bắt đầu vẽ với brush config đã set
                     val newPath = Path()
@@ -230,15 +237,12 @@ class DrawingCanvasView @JvmOverloads constructor(
                         startDrawingWithEraser()
                     }
                     
-                    // Mở rộng canvas nếu cần
-                    expandCanvasIfNeeded(event.y)
-                    
                     invalidate()
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    // Chỉ cho phép vẽ dưới divider
-                    if (!canDraw || currentPath == null) {
+                    // Một khi đã bắt đầu vẽ, cho phép vẽ tiếp dù y ở đâu (không kiểm tra dividerY nữa)
+                    if (currentPath == null) {
                         return false
                     }
                     
@@ -260,9 +264,6 @@ class DrawingCanvasView @JvmOverloads constructor(
                         }
                     }
                     
-                    // Mở rộng canvas nếu cần
-                    expandCanvasIfNeeded(y)
-                    
                     invalidate()
                     return true
                 }
@@ -277,6 +278,10 @@ class DrawingCanvasView @JvmOverloads constructor(
                         }
                     }
                     currentPath = null
+                    
+                    // Cho phép parent ScrollView scroll lại sau khi vẽ xong
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                    
                     return true
                 }
             }
@@ -499,28 +504,9 @@ class DrawingCanvasView @JvmOverloads constructor(
         invalidate()
     }
     
-    /**
-     * Mở rộng canvas nếu cần khi vẽ
-     */
-    private fun expandCanvasIfNeeded(y: Float) {
-        val currentHeight = height
-        val minHeight = (y + 200).toInt() // Thêm 200px padding để đảm bảo có đủ không gian
-        
-        if (minHeight > currentHeight) {
-            // Request layout để mở rộng canvas
-            minimumHeight = minHeight
-            requestLayout()
-        }
-    }
-    
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        // Canvas có chiều cao cố định, không tự động mở rộng
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        
-        // Đảm bảo canvas có thể mở rộng không giới hạn
-        val width = MeasureSpec.getSize(widthMeasureSpec)
-        val height = measuredHeight.coerceAtLeast(minimumHeight)
-        
-        setMeasuredDimension(width, height)
     }
     
     /**

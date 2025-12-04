@@ -62,18 +62,38 @@
             android:contentDescription="@string/take_note"
             android:tooltipText="@string/take_note"
             style="@style/FloatingActionButtonPrimary"
+            android:background="@drawable/bg_add_color_palette"
             app:srcCompat="@drawable/edit" />
 
     </RelativeLayout>
 
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/NavigationView"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="280dp"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        app:headerLayout="@layout/drawer_header"
-        app:itemIconTint="@color/navigation_view_item"
-        app:itemTextColor="@color/navigation_view_item"
-        app:drawerLayoutCornerSize="0dp"/>
+        android:background="?attr/colorSurfaceContainerLow"
+        android:orientation="vertical">
+
+        <com.google.android.material.navigation.NavigationView
+            android:id="@+id/NavigationView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            app:headerLayout="@layout/drawer_header"
+            app:itemIconTint="@color/navigation_view_item"
+            app:itemTextColor="@color/navigation_view_item"
+            app:itemShapeFillColor="?attr/colorSurfaceContainerHighest"
+            app:itemShapeInsetStart="12dp"
+            app:itemShapeInsetEnd="12dp"
+            app:itemShapeInsetTop="2dp"
+            app:itemShapeInsetBottom="2dp"
+            app:itemShapeAppearanceOverlay="@style/NavigationViewItemShape"
+            app:drawerLayoutCornerSize="0dp"/>
+
+        <include
+            android:id="@+id/DrawerFooter"
+            layout="@layout/drawer_footer" />
+
+    </LinearLayout>
 
 </androidx.drawerlayout.widget.DrawerLayout>
