@@ -337,16 +337,22 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                     .apply { isEnabled = binding.EnterBody.isActionModeOn }
         }
 
-        // CENTER: AI (run)
+        // CENTER: Empty (AI button moved to FAB ở góc dưới bên phải)
         binding.BottomAppBarCenter.apply {
-            visibility = VISIBLE
+            visibility = GONE
             removeAllViews()
         }
-        ensureAICenterButton()
+        
+        // Tạo FAB AI gradient ở góc dưới bên phải
+        setupAIFloatingButton()
 
         // RIGHT: Redo + More
         binding.BottomAppBarRight.apply {
             removeAllViews()
+            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
+                MoreNoteBottomSheet(this@EditNoteActivity, createFolderActions(), colorInt)
+                    .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
+            }
 
             redo =
                 addIconButton(R.string.redo, R.drawable.redo, marginStart = 0) {
@@ -423,7 +429,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         binding.BottomAppBarCenter.addView(button, params)
     }
 
-    private fun openAIActionsMenu() {
+    override fun openAIActionsMenu() {
         val noteText = binding.EnterBody.text?.toString().orEmpty()
         val attachmentUris = getAttachedFileUris()
         val dialog = BottomSheetDialog(this)

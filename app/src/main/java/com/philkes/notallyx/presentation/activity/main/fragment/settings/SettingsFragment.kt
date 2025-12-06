@@ -38,6 +38,7 @@ import com.philkes.notallyx.presentation.showAndFocus
 import com.philkes.notallyx.presentation.showDialog
 import com.philkes.notallyx.presentation.showToast
 import com.philkes.notallyx.presentation.view.misc.TextWithIconAdapter
+import com.philkes.notallyx.presentation.viewmodel.preference.Theme
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
 import com.philkes.notallyx.presentation.viewmodel.preference.Constants.PASSWORD_EMPTY
 import com.philkes.notallyx.presentation.viewmodel.preference.LongPreference
@@ -80,6 +81,12 @@ class SettingsFragment : Fragment() {
         savedInstanceState: Bundle?,
     ): View {
         val binding = FragmentSettingsBinding.inflate(inflater)
+
+        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ màn Settings
+        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
+            binding.root.setBackgroundResource(R.drawable.bg_background)
+        }
+
         model.preferences.apply {
             setupAppearance(binding)
             setupContentDensity(binding)

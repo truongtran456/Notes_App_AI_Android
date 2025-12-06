@@ -43,7 +43,7 @@
                 android:background="@drawable/bg_corner_12"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/tvDone">
+                app:layout_constraintTop_toBottomOf="@id/toolbar">
 
                 <com.philkes.notallyx.draw.ui.newdraw.view.drawtoolconfig.preview.DrawToolPreviewView
                     android:id="@+id/drawToolPreview"

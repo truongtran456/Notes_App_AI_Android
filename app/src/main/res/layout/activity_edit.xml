@@ -15,7 +15,13 @@
         android:id="@+id/Toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:navigationIcon="?attr/homeAsUpIndicator" >
+        app:navigationIcon="@null" >
+
+        <!-- Hàng icon mới: back + undo + redo + draw + search + pin -->
+        <include
+            layout="@layout/toolbar_draw_edit" />
+
+        <!-- Hàng search cũ, chỉ hiện khi startSearch() -->
         <LinearLayout
           android:layout_width="match_parent"
           android:layout_height="wrap_content"
@@ -234,7 +240,7 @@
     <com.google.android.material.bottomappbar.BottomAppBar
          android:id="@+id/BottomAppBarLayout"
         android:layout_width="match_parent"
-        android:layout_height="45dp"
+        android:layout_height="56dp"
         android:layout_gravity="bottom"
         android:backgroundTint="?attr/colorSurface"
         app:elevation="0dp">

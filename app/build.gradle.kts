@@ -57,7 +57,7 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-DEBUG"
-            resValue("string", "app_name", "NotallyX DEBUG")
+            resValue("string", "app_name", "SMART NOTES")
         }
         release {
             isCrunchPngs = false
@@ -242,4 +242,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.13")
     implementation("com.google.dagger:hilt-android:2.51")
     kapt("com.google.dagger:hilt-android-compiler:2.51")
+    
+    // ExpandableBottomBar
+    implementation("com.github.st235:expandablebottombar:1.5.1")
 }
