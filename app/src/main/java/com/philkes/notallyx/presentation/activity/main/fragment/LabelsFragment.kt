@@ -27,6 +27,7 @@ import com.philkes.notallyx.presentation.view.main.label.LabelAdapter
 import com.philkes.notallyx.presentation.view.main.label.LabelData
 import com.philkes.notallyx.presentation.view.main.label.LabelListener
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
+import com.philkes.notallyx.presentation.viewmodel.preference.Theme
 
 class LabelsFragment : Fragment(), LabelListener {
 
@@ -60,6 +61,12 @@ class LabelsFragment : Fragment(), LabelListener {
     ): View? {
         setHasOptionsMenu(true)
         binding = FragmentNotesBinding.inflate(inflater)
+        
+        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ fragment
+        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
+            binding?.root?.setBackgroundResource(R.drawable.bg_background)
+        }
+        
         return binding?.root
     }
 

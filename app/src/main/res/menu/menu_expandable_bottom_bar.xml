@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/icon_home"
+        android:icon="@drawable/home"
+        android:title="@string/notes"
+        app:exb_color="#A594F9" />
+
+    <item
+        android:id="@+id/icon_archive"
+        android:icon="@drawable/archive"
+        android:title="@string/archived"
+        app:exb_color="#32C5FF" />
+
+    <item
+        android:id="@+id/icon_trash"
+        android:icon="@drawable/delete"
+        android:title="@string/deleted"
+        app:exb_color="#FF5D8F" />
+
+    <item
+        android:id="@+id/icon_settings"
+        android:icon="@drawable/settings"
+        android:title="@string/settings"
+        app:exb_color="#FFA500" />
+
+</menu>
+

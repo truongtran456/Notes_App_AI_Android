@@ -238,11 +238,11 @@ fun ViewGroup.addIconButton(
             adjustViewBounds = true
             layoutParams =
                 LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        40.dp, // Set kích thước cụ thể thay vì WRAP_CONTENT
                         LinearLayout.LayoutParams.MATCH_PARENT,
                     )
                     .apply { setMargins(marginStart.dp, marginTop, 0, marginBottom) }
-            setPadding(8.dp)
+            setPadding(6.dp) // Giảm padding từ 8dp xuống 6dp để icon lớn hơn
         }
     addView(view)
     return view

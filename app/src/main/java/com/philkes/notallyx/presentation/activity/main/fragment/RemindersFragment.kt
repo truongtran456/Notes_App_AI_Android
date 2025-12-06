@@ -17,6 +17,7 @@ import com.philkes.notallyx.presentation.initListView
 import com.philkes.notallyx.presentation.view.main.reminder.NoteReminderAdapter
 import com.philkes.notallyx.presentation.view.main.reminder.NoteReminderListener
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
+import com.philkes.notallyx.presentation.viewmodel.preference.Theme
 import com.philkes.notallyx.utils.getOpenNoteIntent
 
 class RemindersFragment : Fragment(), NoteReminderListener {
@@ -56,6 +57,12 @@ class RemindersFragment : Fragment(), NoteReminderListener {
     ): View? {
         setHasOptionsMenu(true)
         binding = FragmentRemindersBinding.inflate(inflater)
+        
+        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ fragment
+        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
+            binding?.root?.setBackgroundResource(R.drawable.bg_background)
+        }
+        
         return binding?.root
     }
 

@@ -42,6 +42,7 @@ import com.philkes.notallyx.presentation.view.main.BaseNoteVHPreferences
 import com.philkes.notallyx.presentation.view.misc.ItemListener
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
 import com.philkes.notallyx.presentation.viewmodel.preference.NotesView
+import com.philkes.notallyx.presentation.viewmodel.preference.Theme
 
 abstract class NotallyFragment : Fragment(), ItemListener {
 
@@ -129,6 +130,12 @@ abstract class NotallyFragment : Fragment(), ItemListener {
     ): View? {
         setHasOptionsMenu(true)
         binding = FragmentNotesBinding.inflate(inflater)
+        
+        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ fragment
+        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
+            binding?.root?.setBackgroundResource(R.drawable.bg_background)
+        }
+        
         return binding?.root
     }
 
@@ -297,6 +304,15 @@ abstract class NotallyFragment : Fragment(), ItemListener {
             if (model.preferences.notesView.value == NotesView.GRID) {
                 StaggeredGridLayoutManager(2, RecyclerView.VERTICAL)
             } else LinearLayoutManager(requireContext())
+        
+        // Thêm padding bottom để các item cuối cùng không bị che bởi bottom bar
+        // Bottom bar có margin 20dp + chiều cao của nó (khoảng 56dp) + margin bottom từ window insets
+        binding?.RecyclerView?.setPadding(
+            binding?.RecyclerView?.paddingLeft ?: 0,
+            binding?.RecyclerView?.paddingTop ?: 0,
+            binding?.RecyclerView?.paddingRight ?: 0,
+            resources.getDimensionPixelSize(R.dimen.dp_100) // Padding bottom đủ lớn để không bị che
+        )
     }
 
     private fun goToActivity(activity: Class<*>, baseNote: BaseNote) {

@@ -8,15 +8,24 @@ import android.view.Menu.CATEGORY_CONTAINER
 import android.view.Menu.CATEGORY_SYSTEM
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.graphics.Color
 import androidx.appcompat.widget.PopupMenu
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.activity.enableEdgeToEdge
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
+import androidx.core.view.updatePadding
+import androidx.core.view.updateLayoutParams
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.appcompat.app.AppCompatDelegate
+import com.google.android.material.color.MaterialColors
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
@@ -32,6 +41,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.transition.platform.MaterialFade
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.NotallyDatabase
+import android.widget.Toast
 import com.philkes.notallyx.data.model.BaseNote
 import com.philkes.notallyx.data.model.Folder
 import com.philkes.notallyx.data.model.Type
@@ -64,6 +74,7 @@ import com.philkes.notallyx.utils.showColorSelectDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import github.com.st235.lib_expandablebottombar.ExpandableBottomBar
 
 class MainActivity : LockedActivity<ActivityMainBinding>() {
 
@@ -172,6 +183,76 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             .show()
     }
 
+    private fun applyBackgroundForTheme(theme: Theme) {
+        if (theme == Theme.FOLLOW_SYSTEM) {
+            // Khi chọn Follow system: dùng nền đặc biệt bg_background cho toàn màn Main + navigation
+            window.setBackgroundDrawableResource(R.drawable.bg_background)
+            binding.root.setBackgroundResource(R.drawable.bg_background)
+            binding.DrawerLayout.setBackgroundResource(R.drawable.bg_background)
+            binding.NavigationView.setBackgroundResource(android.R.color.transparent)
+        } else {
+            // Các theme khác: trả về nền mặc định của theme (màu background của Material 3)
+            window.setBackgroundDrawable(null)
+            val surfaceColor =
+                MaterialColors.getColor(
+                    binding.root,
+                    com.google.android.material.R.attr.colorSurface
+                )
+            binding.root.setBackgroundColor(surfaceColor)
+            binding.DrawerLayout.setBackgroundColor(surfaceColor)
+            binding.NavigationView.setBackgroundColor(
+                MaterialColors.getColor(
+                    binding.NavigationView,
+                    com.google.android.material.R.attr.colorSurfaceContainerLow
+                )
+            )
+        }
+    }
+
+    private fun setupWindowInsets() {
+        // Xử lý window insets cho NavigationDrawerContainer để drawer không bị cắt
+        // DrawerLayout cần full screen để drawer có thể slide, nhưng container bên trong cần padding
+        val navigationContainer = binding.root.findViewById<ViewGroup>(R.id.NavigationDrawerContainer)
+        if (navigationContainer != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(navigationContainer) { view, insets ->
+                val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+                val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+                
+                // Set padding top và bottom cho container để drawer không bị cắt bởi status bar và navigation bar
+                view.updatePadding(
+                    top = statusBars.top,
+                    bottom = navBars.bottom,
+                    left = view.paddingLeft,
+                    right = view.paddingRight
+                )
+                
+                insets
+            }
+        }
+        
+        ViewCompat.setOnApplyWindowInsetsListener(binding.RelativeLayout) { _, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            
+            // Padding cho toolbar để tránh status bar
+            binding.Toolbar.updatePadding(top = statusBars.top)
+            
+            // Điều chỉnh margin bottom cho bottom bar theo chiều cao navigation bar
+            // Chỉ set bottomMargin, không thay đổi margin khác
+            val bottomBarBottomMargin = navBars.bottom
+            val fabMargin = resources.getDimensionPixelSize(R.dimen.dp_16) + navBars.bottom
+            
+            binding.expandableBottomBar.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                bottomMargin = bottomBarBottomMargin
+            }
+            binding.FabContainer.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                bottomMargin = fabMargin
+            }
+            
+            insets
+        }
+    }
+
     private fun showThemeChoiceDialog() {
         val current = preferences.theme.value
         val values = Theme.values()
@@ -197,6 +278,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                             AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
                         )
                 }
+                applyBackgroundForTheme(newValue)
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -204,14 +286,26 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Bật edge-to-edge mode để background full màn hình
+        enableEdgeToEdge()
+        
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.Toolbar)
+
+        // Áp dụng nền theo theme hiện tại ngay khi mở MainActivity
+        applyBackgroundForTheme(preferences.theme.value)
+        
+        // Xử lý window insets để padding đúng cho content
+        setupWindowInsets()
+        
         setupFAB()
         setupMenu()
         setupDrawerFooter()
         setupActionMode()
         setupNavigation()
+        setupExpandableBottomBar()
 
         setupActivityResultLaunchers()
 
@@ -256,14 +350,81 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         navController.navigate(id, bundle)
     }
 
+    // Trạng thái FAB menu
+    private var isFabOpen = false
+    
+    // Animations
+    private val rotateForward by lazy { android.view.animation.AnimationUtils.loadAnimation(this, R.anim.rotate_forward) }
+    private val rotateBackward by lazy { android.view.animation.AnimationUtils.loadAnimation(this, R.anim.rotate_backward) }
+    private val fabOpen by lazy { android.view.animation.AnimationUtils.loadAnimation(this, R.anim.fab_open) }
+    private val fabClose by lazy { android.view.animation.AnimationUtils.loadAnimation(this, R.anim.fab_close) }
+    
     private fun setupFAB() {
+        // Main FAB (dấu +) - click để toggle expand/collapse menu
+        binding.MainFab.setOnClickListener {
+            animateFAB()
+        }
+        
+        // Child FAB 1: TakeNote - click để mở EditNoteActivity và collapse menu
         binding.TakeNote.setOnClickListener {
+            animateFAB() // Đóng menu lại
             val intent = Intent(this, EditNoteActivity::class.java)
             startActivity(prepareNewNoteIntent(intent))
         }
+        
+        // Child FAB 2: MakeList - click để mở EditListActivity và collapse menu
         binding.MakeList.setOnClickListener {
+            animateFAB() // Đóng menu lại
             val intent = Intent(this, EditListActivity::class.java)
             startActivity(prepareNewNoteIntent(intent))
+        }
+        
+        // Ban đầu: Ẩn các FAB phụ và tắt clickable
+        binding.TakeNote.visibility = View.INVISIBLE
+        binding.MakeList.visibility = View.INVISIBLE
+        binding.TakeNote.isClickable = false
+        binding.MakeList.isClickable = false
+    }
+    
+    private fun animateFAB() {
+        if (isFabOpen) {
+            // ĐANG MỞ -> Cần ĐÓNG lại
+            binding.MainFab.startAnimation(rotateBackward)
+            
+            binding.TakeNote.startAnimation(fabClose)
+            binding.MakeList.startAnimation(fabClose)
+            
+            // QUAN TRỌNG: Tắt khả năng click khi ẩn đi
+            binding.TakeNote.isClickable = false
+            binding.MakeList.isClickable = false
+            
+            // Ẩn sau khi animation xong
+            binding.TakeNote.postDelayed({
+                binding.TakeNote.visibility = View.INVISIBLE
+            }, 300)
+            binding.MakeList.postDelayed({
+                binding.MakeList.visibility = View.INVISIBLE
+            }, 300)
+            
+            // Cập nhật trạng thái
+            isFabOpen = false
+        } else {
+            // ĐANG ĐÓNG -> Cần MỞ ra
+            binding.MainFab.startAnimation(rotateForward)
+            
+            // Hiện FAB phụ trước khi animate
+            binding.TakeNote.visibility = View.VISIBLE
+            binding.MakeList.visibility = View.VISIBLE
+            
+            binding.TakeNote.startAnimation(fabOpen)
+            binding.MakeList.startAnimation(fabOpen)
+            
+            // QUAN TRỌNG: Bật khả năng click khi hiện lên
+            binding.TakeNote.isClickable = true
+            binding.MakeList.isClickable = true
+            
+            // Cập nhật trạng thái
+            isFabOpen = true
         }
     }
 
@@ -442,6 +603,8 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 excludeChildren(binding.NavHostFragment, true)
                 excludeTarget(binding.TakeNote, true)
                 excludeTarget(binding.MakeList, true)
+                excludeTarget(binding.MainFab, true)
+                excludeTarget(binding.FabContainer, true)
                 excludeTarget(binding.NavigationView, true)
             }
 
@@ -574,6 +737,10 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         val navHostFragment =
             supportFragmentManager.findFragmentById(R.id.NavHostFragment) as NavHostFragment
         navController = navHostFragment.navController
+
+        // Scrim tối cho drawer, tránh trong suốt
+        binding.DrawerLayout.setScrimColor(Color.parseColor("#80000000"))
+
         configuration = AppBarConfiguration(binding.NavigationView.menu, binding.DrawerLayout)
         setupActionBarWithNavController(navController, configuration)
 
@@ -621,18 +788,28 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 R.id.Notes,
                 R.id.DisplayLabel,
                 R.id.Unlabeled -> {
-                    binding.TakeNote.show()
-                    binding.MakeList.show()
+                    // Show main FAB (dấu +)
+                    binding.MainFab.show()
                 }
 
                 else -> {
-                    binding.TakeNote.hide()
-                    binding.MakeList.hide()
+                    // Hide main FAB và collapse menu nếu đang expand
+                    if (isFabOpen) {
+                        animateFAB() // Đóng menu nếu đang mở
+                    }
+                    binding.MainFab.hide()
                 }
             }
+
+            // Toolbar luôn transparent để background full màn hình hiển thị
+            binding.Toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            binding.Toolbar.elevation = 0f
             isStartViewFragment = isStartViewFragment(destination.id, bundle)
             // Cập nhật lại menu mỗi khi đổi màn hình (đảm bảo 3 chấm không xuất hiện ở Settings)
             invalidateOptionsMenu()
+            
+            // Đồng bộ trạng thái selected với ExpandableBottomBar
+            updateBottomBarSelection(destination.id)
         }
     }
 
@@ -652,9 +829,125 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 popExit = androidx.navigation.ui.R.anim.nav_default_pop_exit_anim
                 popEnter = androidx.navigation.ui.R.anim.nav_default_pop_enter_anim
             }
-            popUpTo(navController.graph.startDestination) { inclusive = false }
+            popUpTo(navController.graph.startDestinationId) { inclusive = false }
         }
         navController.navigate(id, null, options)
+    }
+
+    private var isUpdatingBottomBar = false // Flag để tránh loop khi update programmatically
+    
+    private fun setupExpandableBottomBar() {
+        val bottomBar = binding.root.findViewById<ExpandableBottomBar>(R.id.expandable_bottom_bar)
+            ?: return
+
+        // Map menu item IDs với destination IDs
+        val menuItemToDestinationMap = mapOf(
+            R.id.icon_home to R.id.Notes,
+            R.id.icon_archive to R.id.Archived,
+            R.id.icon_trash to R.id.Deleted,
+            R.id.icon_settings to R.id.Settings
+        )
+        
+        // Dùng onItemSelectedListener của ExpandableBottomBar
+        bottomBar.onItemSelectedListener = { view, menuItem, byUser ->
+            // Chỉ xử lý nếu không đang update programmatically
+            if (!isUpdatingBottomBar) {
+                // Lấy itemId từ menuItem
+                val itemId = try {
+                    when {
+                        menuItem is MenuItem -> menuItem.itemId
+                        else -> {
+                            // Thử dùng reflection để lấy itemId
+                            try {
+                                val getItemIdMethod = menuItem.javaClass.getMethod("getItemId")
+                                getItemIdMethod.invoke(menuItem) as? Int
+                            } catch (e: NoSuchMethodException) {
+                                // Thử method khác
+                                try {
+                                    val getIdMethod = menuItem.javaClass.getMethod("getId")
+                                    getIdMethod.invoke(menuItem) as? Int
+                                } catch (e2: Exception) {
+                                    null
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
+                
+                // Map menu item ID với destination ID và navigate
+                val destinationId = itemId?.let { menuItemToDestinationMap[it] }
+                if (destinationId != null) {
+                    // Navigate ngay lập tức khi user click
+                    navigateWithAnimation(destinationId)
+                }
+            }
+        }
+    }
+    
+    private fun updateBottomBarSelection(destinationId: Int?) {
+        if (isUpdatingBottomBar) return // Đang update rồi thì bỏ qua
+        
+        val bottomBar = binding.root.findViewById<ExpandableBottomBar>(R.id.expandable_bottom_bar)
+            ?: return
+        
+        // Map destination IDs với menu item IDs
+        val destinationToMenuItemMap = mapOf(
+            R.id.Notes to R.id.icon_home,
+            R.id.Archived to R.id.icon_archive,
+            R.id.Deleted to R.id.icon_trash,
+            R.id.Settings to R.id.icon_settings
+        )
+        
+        val menuItemId = destinationId?.let { destinationToMenuItemMap[it] }
+        
+        if (menuItemId != null) {
+            bottomBar.post {
+                try {
+                    // Dùng reflection để gọi select() method với byUser = false
+                    // Điều này sẽ highlight item mà không trigger listener
+                    val selectMethod = bottomBar.javaClass.getMethod("select", Int::class.java, Boolean::class.java)
+                    isUpdatingBottomBar = true
+                    selectMethod.invoke(bottomBar, menuItemId, false) // false = không trigger listener
+                    // Reset flag sau một chút
+                    bottomBar.postDelayed({ isUpdatingBottomBar = false }, 100)
+                } catch (e: Exception) {
+                    // Nếu không có method select, thử cách khác
+                    isUpdatingBottomBar = false
+                    // Fallback: tìm view và trigger click programmatically
+                    try {
+                        // Tìm view bằng cách duyệt qua children
+                        bottomBar.postDelayed({
+                            val view = findViewByMenuItemId(bottomBar, menuItemId)
+                            if (view != null && view.isClickable) {
+                                isUpdatingBottomBar = true
+                                view.performClick()
+                                bottomBar.postDelayed({ isUpdatingBottomBar = false }, 200)
+                            }
+                        }, 50)
+                    } catch (e2: Exception) {
+                        // Ignore
+                        e2.printStackTrace()
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun findViewByMenuItemId(parent: ViewGroup, menuItemId: Int): View? {
+        for (i in 0 until parent.childCount) {
+            val child = parent.getChildAt(i)
+            if (child.id == menuItemId) {
+                return child
+            }
+            if (child is ViewGroup) {
+                val found = findViewByMenuItemId(child, menuItemId)
+                if (found != null) return found
+            }
+        }
+        return null
     }
 
     private fun setupActivityResultLaunchers() {

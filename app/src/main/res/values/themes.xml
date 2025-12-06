@@ -106,6 +106,11 @@
         <item name="cornerSize">8dp</item>
     </style>
 
+    <style name="ShapeAppearanceOverlay.NavDrawerItem" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+
     <style name="FileChip" parent="Widget.Material3.Chip.Assist">
         <item name="android:stateListAnimator">@null</item>
         <item name="android:paddingBottom">16dp</item>
@@ -113,7 +118,7 @@
         <item name="android:ellipsize">end</item>
         <item name="android:textAppearance">?attr/textAppearanceBodySmall</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
-        <item name="chipIconSize">10pt</item>
+        <item name="chipIconSize">18dp</item>
         <item name="chipIconTint">?attr/colorOnSurface</item>
         <item name="chipStrokeColor">?attr/colorOnSurface</item>
         <item name="chipStartPadding">4dp</item>
@@ -131,15 +136,6 @@
         <item name="android:focusable">true</item>
     </style>
 
-    <!-- Clickable icon style used by draw toolbar -->
-    <style name="Theme.Main.ClickableView" parent="Widget.AppCompat.ImageButton">
-        <item name="android:layout_width">@dimen/dp_24</item>
-        <item name="android:layout_height">@dimen/dp_24</item>
-        <item name="android:padding">@dimen/dp_2</item>
-        <item name="android:clickable">true</item>
-        <item name="android:focusable">true</item>
-        <item name="android:foreground">?attr/selectableItemBackgroundBorderless</item>
-    </style>
 
 
     <style name="FilterChip" parent="Widget.Material3.Chip.Filter">
@@ -153,11 +149,13 @@
 
     <style name="PreferenceHeader" parent="Widget.AppCompat.TextView">
         <item name="android:paddingEnd">16dp</item>
-        <item name="android:paddingTop">16dp</item>
+        <item name="android:paddingTop">24dp</item>
         <item name="android:paddingStart">16dp</item>
         <item name="android:paddingBottom">8dp</item>
         <item name="android:textColor">?attr/colorPrimary</item>
-        <item name="android:textAppearance">?attr/textAppearanceSubtitle2</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAppearance">?attr/textAppearanceTitleSmall</item>
     </style>
 
     <style name="WidgetPreview.ListItem" parent="Widget.AppCompat.TextView">

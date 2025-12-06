@@ -128,11 +128,7 @@ class DrawToolConfigView(
     }
 
     private fun setupAction() {
-        viewBinding().toolbar.tvDone.debounceClick {
-            val drawToolPen = drawToolBrush ?: return@debounceClick
 
-            listener?.onChange(drawToolPen)
-        }
     }
 
     private fun setupPreview() {

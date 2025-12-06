@@ -18,17 +18,24 @@ import android.view.View
 import android.view.View.GONE
 import android.view.ViewGroup.LayoutParams
 import android.view.ViewGroup.VISIBLE
+import android.widget.ImageView
 import android.view.inputmethod.InputMethodManager
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.ColorInt
 import androidx.annotation.RequiresApi
+import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
+import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
@@ -55,10 +62,12 @@ import com.philkes.notallyx.presentation.activity.LockedActivity
 import com.philkes.notallyx.presentation.activity.main.fragment.DisplayLabelFragment.Companion.EXTRA_DISPLAYED_LABEL
 import com.philkes.notallyx.presentation.activity.note.SelectLabelsActivity.Companion.EXTRA_SELECTED_LABELS
 import com.philkes.notallyx.presentation.activity.note.reminders.RemindersActivity
+import android.widget.LinearLayout
 import com.philkes.notallyx.presentation.add
 import com.philkes.notallyx.presentation.addFastScroll
 import com.philkes.notallyx.presentation.addIconButton
 import com.philkes.notallyx.presentation.bindLabels
+import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.displayFormattedTimestamp
 import com.philkes.notallyx.presentation.extractColor
 import com.philkes.notallyx.presentation.getQuantityString
@@ -112,7 +121,6 @@ abstract class EditActivity(private val type: Type) :
     private lateinit var exportNotesActivityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var exportFileActivityResultLauncher: ActivityResultLauncher<Intent>
 
-    private lateinit var pinMenuItem: MenuItem
     protected var search = Search()
 
     internal val notallyModel: NotallyModel by viewModels()
@@ -170,11 +178,18 @@ abstract class EditActivity(private val type: Type) :
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Bật edge-to-edge mode để background full màn hình
+        enableEdgeToEdge()
+        
         inputMethodManager =
             ContextCompat.getSystemService(baseContext, InputMethodManager::class.java)
         notallyModel.type = type
         initialiseBinding()
         setContentView(binding.root)
+        
+        // Xử lý window insets để padding đúng cho content
+        setupWindowInsets()
 
         initChangeHistory()
         lifecycleScope.launch {
@@ -193,6 +208,7 @@ abstract class EditActivity(private val type: Type) :
             }
 
             setupToolbars()
+            setupWindowInsets()
             setupListeners()
             setStateFromModel(savedInstanceState)
 
@@ -337,16 +353,11 @@ abstract class EditActivity(private val type: Type) :
     }
 
     protected open fun setupToolbars() {
-        binding.Toolbar.setNavigationOnClickListener { finish() }
-        binding.Toolbar.menu.apply {
-            clear() // TODO: needed?
-            add(R.string.search, R.drawable.search, MenuItem.SHOW_AS_ACTION_ALWAYS) {
-                startSearch()
-            }
-            pinMenuItem =
-                add(R.string.pin, R.drawable.pin, MenuItem.SHOW_AS_ACTION_ALWAYS) { pin() }
-            bindPinned()
-        }
+        // Khởi tạo toolbar vẽ (back + undo + redo + draw + search + pin)
+        initDrawToolbar()
+
+        // Menu trên toolbar giờ chỉ dùng cho search/prev/next khi đang ở search mode.
+        // Mặc định không thêm search/pin ở menu nữa vì đã có icon riêng trong layout.
 
         search.results.mergeSkipFirst(search.resultPos).observe(this) { (amount, pos) ->
             val hasResults = amount > 0
@@ -364,6 +375,33 @@ abstract class EditActivity(private val type: Type) :
             }
         }
         initBottomMenu()
+    }
+
+    private fun setupWindowInsets() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            
+            // Padding cho toolbar để tránh status bar
+            binding.Toolbar.updatePadding(top = statusBars.top)
+            
+            // Điều chỉnh margin bottom cho BottomAppBar để tránh navigation bar
+            binding.BottomAppBarLayout.updateLayoutParams<androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams> {
+                bottomMargin = navBars.bottom
+            }
+            
+            // Điều chỉnh margin bottom cho FAB AI để nằm trên bottom bar (giống MainFab)
+            binding.root.findViewWithTag<CardView>("ai_fab")?.let { fab ->
+                (fab.layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)?.let { params ->
+                    val bottomBarHeight = 56.dp // Chiều cao bottom bar
+                    val fabMargin = 16.dp // Margin từ bottom bar
+                    params.bottomMargin = bottomBarHeight + fabMargin + navBars.bottom
+                    fab.layoutParams = params
+                }
+            }
+            
+            insets
+        }
     }
 
     protected fun updateSearchResults(query: String) {
@@ -432,6 +470,8 @@ abstract class EditActivity(private val type: Type) :
             text = ""
             visibility = VISIBLE
         }
+
+        // Khi vào search mode, có thể ẩn bớt icon vẽ nếu bạn muốn (tuỳ chỉnh sau)
     }
 
     protected fun isInSearchMode(): Boolean = binding.EnterSearchKeyword.visibility == VISIBLE
@@ -445,6 +485,7 @@ abstract class EditActivity(private val type: Type) :
             visibility = GONE
             text = ""
         }
+        // Khôi phục lại menu search/pin mặc định
         setupToolbars()
         binding.Toolbar.navigationIcon = navigationIconBeforeSearch
         binding.Toolbar.setControlsContrastColorForAllViews(colorInt, overwriteBackground = false)
@@ -485,13 +526,224 @@ abstract class EditActivity(private val type: Type) :
         }
         binding.BottomAppBarRight.apply {
             removeAllViews()
-            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
-                MoreNoteBottomSheet(this@EditActivity, createFolderActions(), colorInt)
-                    .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
-            }
+            // Nút "more" được giữ lại ở right
         }
         setBottomAppBarColor(colorInt)
     }
+    
+    /**
+     * Setup FAB AI gradient ở góc dưới bên phải màn hình
+     * Dùng CardView để có elevation và corner radius tốt hơn
+     */
+    protected fun setupAIFloatingButton() {
+        // Xóa FAB cũ nếu có (dùng tag để tìm)
+        val existingFab = binding.root.findViewWithTag<CardView>("ai_fab")
+        existingFab?.let {
+            binding.root.removeView(it)
+        }
+        
+        // Tạo CardView để bọc nút AI
+        val cardView = CardView(this@EditActivity).apply {
+            tag = "ai_fab"
+            layoutParams = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
+                56.dp, // Kích thước chuẩn FAB
+                56.dp
+            ).apply {
+                // Đặt ở góc dưới bên phải, trên bottom bar
+                gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+                // Margin: 16dp từ cạnh phải, margin bottom sẽ được tính trong setupWindowInsets()
+                setMargins(0, 0, 16.dp, 0)
+            }
+            
+            // Corner radius = một nửa chiều rộng để tạo hình tròn hoàn hảo
+            radius = 28.dp.toFloat()
+            
+            // Elevation để nổi bật
+            cardElevation = 6.dp.toFloat()
+            
+            // Prevent card padding
+            setContentPadding(0, 0, 0, 0)
+            
+            // Prevent card background
+            setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
+        }
+        
+        // Tạo ImageView bên trong CardView
+        val aiButton = androidx.appcompat.widget.AppCompatImageView(this@EditActivity).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            
+            // Background gradient
+            setBackgroundResource(R.drawable.bg_ai_gradient)
+            
+            // Icon sparkles
+            setImageResource(R.drawable.ai_sparkle)
+            imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+            
+            // Scale type
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(14.dp, 14.dp, 14.dp, 14.dp)
+            
+            // Clickable
+            isClickable = true
+            isFocusable = true
+            
+            // Ripple effect - dùng TypedValue để lấy drawable
+            val typedValue = android.util.TypedValue()
+            this@EditActivity.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+            foreground = ContextCompat.getDrawable(this@EditActivity, typedValue.resourceId)
+            
+            // Content description
+            contentDescription = this@EditActivity.getString(R.string.ai_assistant)
+            
+            // Click listener
+            setOnClickListener {
+                // Animation bounce khi click
+                animate()
+                    .scaleX(0.9f)
+                    .scaleY(0.9f)
+                    .setDuration(100)
+                    .withEndAction {
+                        animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(100)
+                            .start()
+                    }
+                    .start()
+                
+                // Gọi method abstract để mở AI menu (EditNoteActivity/EditListActivity sẽ override)
+                openAIActionsMenu()
+            }
+        }
+        
+        // Thêm ImageView vào CardView
+        cardView.addView(aiButton)
+        
+        // Animation khi view được add (bounce effect)
+        cardView.alpha = 0f
+        cardView.scaleX = 0f
+        cardView.scaleY = 0f
+        cardView.post {
+            cardView.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(300)
+                .setInterpolator(android.view.animation.OvershootInterpolator(2f))
+                .start()
+        }
+        
+        // Thêm CardView vào CoordinatorLayout (root)
+        binding.root.addView(cardView)
+    }
+    
+    /**
+     * Setup nút AI gradient đẹp thay thế nút AI đen ở center (deprecated - dùng setupAIFloatingButton thay thế)
+     * Dùng CardView để có elevation và corner radius tốt hơn
+     */
+    @Deprecated("Use setupAIFloatingButton() instead")
+    protected fun android.widget.FrameLayout.setupAIGradientButton() {
+        // Tạo CardView để bọc nút AI
+        val cardView = CardView(context).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                56.dp, // Kích thước chuẩn FAB
+                56.dp,
+                android.view.Gravity.CENTER
+            )
+            
+            // Corner radius = một nửa chiều rộng để tạo hình tròn hoàn hảo
+            radius = 28.dp.toFloat()
+            
+            // Elevation để nổi bật
+            cardElevation = 6.dp.toFloat()
+            
+            // Prevent card padding
+            setContentPadding(0, 0, 0, 0)
+            
+            // Prevent card background
+            setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
+        }
+        
+        // Tạo ImageView bên trong CardView
+        val aiButton = androidx.appcompat.widget.AppCompatImageView(this@EditActivity).apply {
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            
+            // Background gradient
+            setBackgroundResource(R.drawable.bg_ai_gradient)
+            
+            // Icon sparkles
+            setImageResource(R.drawable.ai_sparkle)
+            imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+            
+            // Scale type
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(14.dp, 14.dp, 14.dp, 14.dp)
+            
+            // Clickable
+            isClickable = true
+            isFocusable = true
+            
+            // Ripple effect - dùng TypedValue để lấy drawable
+            val typedValue = android.util.TypedValue()
+            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+            foreground = ContextCompat.getDrawable(context, typedValue.resourceId)
+            
+            // Content description
+            contentDescription = context.getString(R.string.ai_assistant)
+            
+            // Click listener
+            setOnClickListener {
+                // Animation bounce khi click
+                animate()
+                    .scaleX(0.9f)
+                    .scaleY(0.9f)
+                    .setDuration(100)
+                    .withEndAction {
+                        animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(100)
+                            .start()
+                    }
+                    .start()
+                
+                // Gọi method abstract để mở AI menu (EditNoteActivity/EditListActivity sẽ override)
+                openAIActionsMenu()
+            }
+        }
+        
+        // Thêm ImageView vào CardView
+        cardView.addView(aiButton)
+        
+        // Animation khi view được add (bounce effect)
+        cardView.alpha = 0f
+        cardView.scaleX = 0f
+        cardView.scaleY = 0f
+        cardView.post {
+            cardView.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(300)
+                .setInterpolator(android.view.animation.OvershootInterpolator(2f))
+                .start()
+        }
+        
+        // Thêm CardView vào FrameLayout
+        addView(cardView)
+    }
+    
+    /**
+     * Abstract method để mở AI actions menu
+     * EditNoteActivity và EditListActivity sẽ override method này
+     */
+    protected abstract fun openAIActionsMenu()
 
     protected fun openDrawingScreen() {
         // Load v� merge brushes: default brushes + custom brushes t? SharedPreferences
@@ -653,6 +905,49 @@ abstract class EditActivity(private val type: Type) :
         binding.DrawToolPickerView.visibility = View.GONE
     }
 
+    private fun initDrawToolbar() {
+        // Toolbar luôn hiển thị layout mới (back + undo + redo + draw + search + pin)
+        val toolbar = binding.Toolbar
+        val ivBack = toolbar.findViewById<ImageView>(R.id.ivBack)
+        val ivUndo = toolbar.findViewById<ImageView>(R.id.ivUndo)
+        val ivRedo = toolbar.findViewById<ImageView>(R.id.ivRedo)
+        val ivDraw = toolbar.findViewById<ImageView>(R.id.ivDraw)
+        val ivSearch = toolbar.findViewById<ImageView>(R.id.ivSearch)
+        val ivPin = toolbar.findViewById<ImageView>(R.id.ivPin)
+
+        ivBack.setOnClickListener { finish() }
+
+        ivUndo.setOnClickListener {
+            try {
+                changeHistory.undo()
+            } catch (e: ChangeHistory.ChangeHistoryException) {
+                application.log(TAG, throwable = e)
+            }
+        }
+
+        ivRedo.setOnClickListener {
+            try {
+                changeHistory.redo()
+            } catch (e: ChangeHistory.ChangeHistoryException) {
+                application.log(TAG, throwable = e)
+            }
+        }
+
+        ivDraw.setOnClickListener {
+            openDrawingScreen()
+        }
+
+        // Search icon: mở search như toolbar cũ
+        ivSearch.setOnClickListener {
+            startSearch()
+        }
+
+        // Pin icon: giữ logic pin/unpin gốc
+        ivPin.setOnClickListener {
+            pin()
+        }
+    }
+
     private fun showDrawingArea() {
         // Hi?n th? divider v� canvas
         binding.DrawingDivider.visibility = View.VISIBLE
@@ -743,6 +1038,7 @@ abstract class EditActivity(private val type: Type) :
         binding.DrawingCanvas.setEyeDropperMode(false)
         // ?n DrawToolPickerView lu�n
         hideDrawingToolPicker()
+
     }
 
     /** B?t ch? ?? eyedropper ?? pick color t? canvas */
@@ -1252,19 +1548,15 @@ abstract class EditActivity(private val type: Type) :
     }
 
     private fun bindPinned() {
-        val icon: Int
-        val title: Int
+        val icon: Int =
         if (notallyModel.pinned) {
-            icon = R.drawable.unpin
-            title = R.string.unpin
+                R.drawable.unpin
         } else {
-            icon = R.drawable.pin
-            title = R.string.pin
-        }
-        pinMenuItem.apply {
-            setTitle(title)
-            setIcon(icon)
-        }
+                R.drawable.pin
+            }
+        // Cập nhật icon cho ivPin trên toolbar mới
+        val ivPin = binding.Toolbar.findViewById<ImageView>(R.id.ivPin)
+        ivPin.setImageResource(icon)
     }
 
     data class Search(

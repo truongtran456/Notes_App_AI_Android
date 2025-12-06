@@ -4,12 +4,16 @@
     android:id="@+id/DrawerLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="false">
 
-    <RelativeLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/RelativeLayout"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/Toolbar"
@@ -18,7 +22,10 @@
             android:contentDescription="Toolbar"
             app:collapseContentDescription="ToolbarCollapse"
             app:navigationContentDescription="ToolbarNavigation"
-            app:contentInsetEnd="16dp">
+            app:contentInsetEnd="16dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
 
         </com.google.android.material.appbar.MaterialToolbar>
 
@@ -26,69 +33,120 @@
             android:id="@+id/ActionMode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_below="@id/Toolbar"
-            app:navigationIcon="@drawable/close" />
+            app:navigationIcon="@drawable/close"
+            app:layout_constraintTop_toBottomOf="@id/Toolbar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/NavHostFragment"
             android:name="androidx.navigation.fragment.NavHostFragment"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_below="@id/ActionMode"
+            android:layout_height="0dp"
             app:defaultNavHost="true"
-            app:navGraph="@navigation/navigation" />
+            app:navGraph="@navigation/navigation"
+            app:layout_constraintTop_toBottomOf="@id/ActionMode"
+            app:layout_constraintBottom_toTopOf="@id/expandable_bottom_bar"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
+        <github.com.st235.lib_expandablebottombar.ExpandableBottomBar
+            android:id="@+id/expandable_bottom_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="20dp"
+            app:exb_backgroundCornerRadius="25dp"
+            app:exb_backgroundColor="#FFFFFF"
+            app:exb_elevation="8dp"
+            app:exb_itemInactiveColor="#898989"
+            app:exb_items="@menu/menu_expandable_bottom_bar"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- FAB Container: FrameLayout đơn giản -->
+        <FrameLayout
+            android:id="@+id/FabContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            app:layout_constraintBottom_toTopOf="@id/expandable_bottom_bar"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <!-- Child FAB 2: MakeList - ở trên cùng (cao nhất) -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/MakeList"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_above="@id/TakeNote"
-            android:layout_alignParentEnd="true"
-            android:layout_marginEnd="16dp"
-            android:layout_marginBottom="16dp"
+                android:layout_gravity="end|bottom"
+                android:layout_marginBottom="144dp"
+                android:visibility="invisible"
             android:contentDescription="@string/make_list"
             android:tooltipText="@string/make_list"
             style="@style/FloatingActionButtonPrimary"
             app:srcCompat="@drawable/checkbox" />
 
+            <!-- Child FAB 1: TakeNote - ở giữa -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/TakeNote"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentBottom="true"
-            android:layout_marginEnd="16dp"
-            android:layout_marginBottom="16dp"
+                android:layout_gravity="end|bottom"
+                android:layout_marginBottom="72dp"
+                android:visibility="invisible"
             android:contentDescription="@string/take_note"
             android:tooltipText="@string/take_note"
             style="@style/FloatingActionButtonPrimary"
-            android:background="@drawable/bg_add_color_palette"
             app:srcCompat="@drawable/edit" />
 
-    </RelativeLayout>
+            <!-- Main FAB: Dấu + - ở dưới cùng, click để expand -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/MainFab"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|bottom"
+                android:contentDescription="@string/add"
+                android:tooltipText="@string/add"
+                style="@style/FloatingActionButtonPrimary"
+                android:background="@drawable/bg_add_color_palette"
+                app:srcCompat="@drawable/add" />
+
+        </FrameLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <LinearLayout
-        android:layout_width="280dp"
+        android:id="@+id/NavigationDrawerContainer"
+        android:layout_width="@dimen/nav_width"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:background="?attr/colorSurfaceContainerLow"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="@dimen/nav_card_padding"
+        android:background="#EAF0FF">
 
-        <com.google.android.material.navigation.NavigationView
-            android:id="@+id/NavigationView"
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/NavigationView"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            app:headerLayout="@layout/drawer_header"
-            app:itemIconTint="@color/navigation_view_item"
-            app:itemTextColor="@color/navigation_view_item"
-            app:itemShapeFillColor="?attr/colorSurfaceContainerHighest"
-            app:itemShapeInsetStart="12dp"
-            app:itemShapeInsetEnd="12dp"
-            app:itemShapeInsetTop="2dp"
-            app:itemShapeInsetBottom="2dp"
-            app:itemShapeAppearanceOverlay="@style/NavigationViewItemShape"
-            app:drawerLayoutCornerSize="0dp"/>
+            android:background="@drawable/bg_nav_drawer_card"
+            android:padding="@dimen/nav_card_padding"
+            android:elevation="8dp"
+        app:headerLayout="@layout/drawer_header"
+            app:itemIconTint="@color/nav_item_icon"
+            app:itemTextColor="@color/nav_item_text"
+            app:itemRippleColor="@color/nav_item_ripple"
+            app:itemHorizontalPadding="@dimen/nav_item_horizontal_padding"
+            app:itemVerticalPadding="@dimen/nav_item_vertical_padding"
+            app:itemIconSize="22dp"
+            app:itemBackground="@drawable/bg_nav_item"
+            app:itemMaxLines="1"
+            app:drawerLayoutCornerSize="0dp" />
 
         <include
             android:id="@+id/DrawerFooter"

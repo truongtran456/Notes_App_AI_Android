@@ -10,10 +10,12 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.model.Type
+import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
 import com.philkes.notallyx.presentation.addIconButton
 import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.setOnNextAction
+import com.philkes.notallyx.presentation.showToast
 import com.philkes.notallyx.presentation.view.note.action.AddBottomSheet
 import com.philkes.notallyx.presentation.view.note.action.MoreListActions
 import com.philkes.notallyx.presentation.view.note.action.MoreListBottomSheet
@@ -29,6 +31,7 @@ import com.philkes.notallyx.presentation.view.note.listitem.sorting.toMutableLis
 import com.philkes.notallyx.presentation.viewmodel.preference.ListItemSort
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences
 import com.philkes.notallyx.utils.findAllOccurrences
+import com.philkes.notallyx.utils.getUriForFile
 import com.philkes.notallyx.utils.log
 
 class EditListActivity : EditActivity(Type.LIST), MoreListActions {
@@ -98,9 +101,14 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                     .apply { isEnabled = changeHistory.canUndo.value }
         }
 
-        // CENTER: n�t AI nh?
-        binding.BottomAppBarCenter.apply { removeAllViews() }
-        ensureAICenterButtonForList()
+        // CENTER: n�t AI nh?
+        binding.BottomAppBarCenter.apply { 
+            visibility = android.view.View.GONE
+            removeAllViews() 
+        }
+        
+        // Tạo FAB AI gradient ở góc dưới bên phải
+        setupAIFloatingButton()
 
         // RIGHT: Redo + Draw + More
         binding.BottomAppBarRight.apply {
@@ -170,7 +178,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                                 primary,
                             )
                         )
-                    setOnClickListener { openAIActionsMenuForList() }
+                    setOnClickListener { openAIActionsMenu() }
                 }
         val params =
             FrameLayout.LayoutParams(
@@ -181,15 +189,153 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         binding.BottomAppBarCenter.addView(button, params)
     }
 
-    private fun openAIActionsMenuForList() {
-        // L?y text t? c�c item checklist l�m input cho AI (t?m th?i ch? m? ph?n Summary)
+    override fun openAIActionsMenu() {
+        // L?y text t? c�c item checklist l�m input cho AI (t?m th?i ch? m? ph?n Summary)
         val noteText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
-        AISummaryActivity.start(
-            this,
-            noteText,
-            notallyModel.id,
-            AISummaryActivity.AISection.SUMMARY,
-        )
+        val attachmentUris = getAttachedFileUris()
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
+
+        sheetView.findViewById<android.view.View>(R.id.ActionSummary).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = com.philkes.notallyx.presentation.activity.ai.AISummaryActivity.AISection.SUMMARY,
+                )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.SUMMARY,
+                )
+            }
+        }
+
+        sheetView.findViewById<android.view.View>(R.id.ActionBullet).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = com.philkes.notallyx.presentation.activity.ai.AISummaryActivity.AISection.BULLET_POINTS,
+                )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.BULLET_POINTS,
+                )
+            }
+        }
+
+        sheetView.findViewById<android.view.View>(R.id.ActionQuestions).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = com.philkes.notallyx.presentation.activity.ai.AISummaryActivity.AISection.QUESTIONS,
+                )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.QUESTIONS,
+                )
+            }
+        }
+
+        sheetView.findViewById<android.view.View>(R.id.ActionMCQ).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = com.philkes.notallyx.presentation.activity.ai.AISummaryActivity.AISection.MCQ,
+                )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.MCQ,
+                )
+            }
+        }
+
+        sheetView.findViewById<android.view.View>(R.id.ActionFile).setOnClickListener {
+            dialog.dismiss()
+            com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity.start(
+                context = this,
+                noteText = noteText,
+                noteId = notallyModel.id,
+            )
+        }
+
+        sheetView.findViewById<android.view.View>(R.id.ActionHistory).setOnClickListener {
+            dialog.dismiss()
+            com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity.start(this, userId = getAiUserId())
+        }
+
+        dialog.setContentView(sheetView)
+        dialog.show()
+    }
+    
+    private fun getAttachedFileUris(): List<android.net.Uri> {
+        val uris = mutableListOf<android.net.Uri>()
+
+        val filesRoot = notallyModel.filesRoot
+        val fileAttachments = notallyModel.files.value ?: emptyList()
+        if (filesRoot != null && fileAttachments.isNotEmpty()) {
+            fileAttachments.forEach { attachment ->
+                val file = java.io.File(filesRoot, attachment.localName)
+                if (file.exists()) {
+                    uris.add(this.getUriForFile(file))
+                }
+            }
+        }
+
+        val imagesRoot = notallyModel.imageRoot
+        val imageAttachments = notallyModel.images.value ?: emptyList()
+        if (imagesRoot != null && imageAttachments.isNotEmpty()) {
+            imageAttachments.forEach { attachment ->
+                val file = java.io.File(imagesRoot, attachment.localName)
+                if (file.exists()) {
+                    uris.add(this.getUriForFile(file))
+                }
+            }
+        }
+
+        return uris
     }
 
     override fun highlightSearchResults(search: String): Int {
