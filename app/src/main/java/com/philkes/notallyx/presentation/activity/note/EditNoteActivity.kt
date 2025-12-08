@@ -39,6 +39,7 @@ import com.philkes.notallyx.data.model.getNoteIdFromUrl
 import com.philkes.notallyx.data.model.getNoteTypeFromUrl
 import com.philkes.notallyx.data.model.isNoteUrl
 import com.philkes.notallyx.data.preferences.getAiUserId
+import com.philkes.notallyx.data.preferences.getBackendNoteIdOrLocal
 import com.philkes.notallyx.databinding.BottomTextFormattingMenuBinding
 import com.philkes.notallyx.databinding.RecyclerToggleBinding
 import com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
@@ -310,6 +311,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     override fun initBottomMenu() {
+        // LEFT: +, Undo
         binding.BottomAppBarLeft.apply {
             removeAllViews()
 
@@ -346,7 +348,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         // Tạo FAB AI gradient ở góc dưới bên phải
         setupAIFloatingButton()
 
-        // RIGHT: Redo + More
+        // RIGHT: Redo + Draw + More
         binding.BottomAppBarRight.apply {
             removeAllViews()
             addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
@@ -441,11 +443,13 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                 return@setOnClickListener
             }
             dialog.dismiss()
+            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
             if (attachmentUris.isNotEmpty()) {
                 AIFileProcessActivity.startWithAttachments(
                     context = this,
                     noteText = noteText.ifBlank { null },
                     noteId = notallyModel.id,
+                    backendNoteId = backendNoteId,
                     attachments = attachmentUris,
                     initialSection = AISummaryActivity.AISection.SUMMARY,
                 )
@@ -460,11 +464,13 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                 return@setOnClickListener
             }
             dialog.dismiss()
+            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
             if (attachmentUris.isNotEmpty()) {
                 AIFileProcessActivity.startWithAttachments(
                     context = this,
                     noteText = noteText.ifBlank { null },
                     noteId = notallyModel.id,
+                    backendNoteId = backendNoteId,
                     attachments = attachmentUris,
                     initialSection = AISummaryActivity.AISection.BULLET_POINTS,
                 )
@@ -479,11 +485,13 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                 return@setOnClickListener
             }
             dialog.dismiss()
+            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
             if (attachmentUris.isNotEmpty()) {
                 AIFileProcessActivity.startWithAttachments(
                     context = this,
                     noteText = noteText.ifBlank { null },
                     noteId = notallyModel.id,
+                    backendNoteId = backendNoteId,
                     attachments = attachmentUris,
                     initialSection = AISummaryActivity.AISection.QUESTIONS,
                 )
@@ -498,11 +506,13 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                 return@setOnClickListener
             }
             dialog.dismiss()
+            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
             if (attachmentUris.isNotEmpty()) {
                 AIFileProcessActivity.startWithAttachments(
                     context = this,
                     noteText = noteText.ifBlank { null },
                     noteId = notallyModel.id,
+                    backendNoteId = backendNoteId,
                     attachments = attachmentUris,
                     initialSection = AISummaryActivity.AISection.MCQ,
                 )
@@ -513,10 +523,12 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
 
         sheetView.findViewById<View>(R.id.ActionFile).setOnClickListener {
             dialog.dismiss()
+            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
             AIFileProcessActivity.start(
                 context = this,
                 noteText = noteText,
                 noteId = notallyModel.id,
+                backendNoteId = backendNoteId,
             )
         }
 
@@ -530,7 +542,9 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     private fun launchAISummary(noteText: String, section: AISummaryActivity.AISection) {
-        AISummaryActivity.start(this, noteText, notallyModel.id, section)
+        // Use backend_note_id if available, otherwise use local note_id
+        val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
+        AISummaryActivity.start(this, noteText, notallyModel.id, section, backendNoteId)
     }
 
     private fun getAttachedFileUris(): List<Uri> {

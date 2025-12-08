@@ -7,13 +7,16 @@ import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.api.models.AIResult
+import com.philkes.notallyx.data.preferences.AIUserPreferences
 import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.databinding.ActivityAiSummaryBinding
+import java.security.MessageDigest
 import kotlinx.coroutines.launch
 
 class AIFileProcessActivity : AppCompatActivity() {
@@ -21,17 +24,19 @@ class AIFileProcessActivity : AppCompatActivity() {
     companion object {
         private const val EXTRA_NOTE_TEXT = "extra_note_text"
         private const val EXTRA_NOTE_ID = "extra_note_id"
+        private const val EXTRA_BACKEND_NOTE_ID = "extra_backend_note_id"
         private const val EXTRA_ATTACH_URIS = "extra_attach_uris"
         private const val EXTRA_INITIAL_SECTION = "extra_initial_section"
         private const val EXTRA_SHOW_ALL = "extra_show_all"
 
-        fun start(context: Context, noteText: String, noteId: Long) {
+        fun start(context: Context, noteText: String, noteId: Long, backendNoteId: String? = null) {
             val intent =
                 Intent(context, AIFileProcessActivity::class.java).apply {
                     putExtra(EXTRA_NOTE_TEXT, noteText)
                     putExtra(EXTRA_NOTE_ID, noteId)
                     putExtra(EXTRA_INITIAL_SECTION, AISummaryActivity.AISection.SUMMARY.name)
                     putExtra(EXTRA_SHOW_ALL, true)
+                    backendNoteId?.let { putExtra(EXTRA_BACKEND_NOTE_ID, it) }
                 }
             context.startActivity(intent)
         }
@@ -43,6 +48,7 @@ class AIFileProcessActivity : AppCompatActivity() {
             attachments: List<Uri>,
             initialSection: AISummaryActivity.AISection,
             showAllSections: Boolean = false,
+            backendNoteId: String? = null,
         ) {
             val intent =
                 Intent(context, AIFileProcessActivity::class.java).apply {
@@ -51,6 +57,7 @@ class AIFileProcessActivity : AppCompatActivity() {
                     putParcelableArrayListExtra(EXTRA_ATTACH_URIS, ArrayList(attachments))
                     putExtra(EXTRA_INITIAL_SECTION, initialSection.name)
                     putExtra(EXTRA_SHOW_ALL, showAllSections)
+                    backendNoteId?.let { putExtra(EXTRA_BACKEND_NOTE_ID, it) }
                 }
             context.startActivity(intent)
         }
@@ -62,6 +69,7 @@ class AIFileProcessActivity : AppCompatActivity() {
     private var initialAttachments: ArrayList<Uri>? = null
     private var initialSection: AISummaryActivity.AISection = AISummaryActivity.AISection.SUMMARY
     private var showAllSections: Boolean = false
+    private var isVocabMode: Boolean = false
 
     private val pickFilesLauncher =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -74,6 +82,8 @@ class AIFileProcessActivity : AppCompatActivity() {
 
     private var noteText: String? = null
     private var noteId: Long = -1L
+    private var backendNoteId: String? = null
+    private var pendingContentHash: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,12 +94,14 @@ class AIFileProcessActivity : AppCompatActivity() {
         userId = getAiUserId()
         noteText = intent.getStringExtra(EXTRA_NOTE_TEXT)
         noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1L)
+        backendNoteId = intent.getStringExtra(EXTRA_BACKEND_NOTE_ID)
         initialAttachments = intent.getParcelableArrayListExtra(EXTRA_ATTACH_URIS)
         showAllSections = intent.getBooleanExtra(EXTRA_SHOW_ALL, false)
         initialSection =
             intent.getStringExtra(EXTRA_INITIAL_SECTION)?.let {
                 runCatching { AISummaryActivity.AISection.valueOf(it) }.getOrNull()
             } ?: AISummaryActivity.AISection.SUMMARY
+        isVocabMode = initialSection.isVocabSection()
 
         setupToolbar()
         setupInitialUi()
@@ -154,9 +166,13 @@ class AIFileProcessActivity : AppCompatActivity() {
         binding.ProgressStage.text = ""
         binding.ProgressText.text = getString(R.string.ai_processing_file)
 
-        val noteIdString = if (noteId != -1L) noteId.toString() else null
+        // Use backend_note_id if available, otherwise use local note_id
+        val noteIdString = backendNoteId ?: (if (noteId != -1L) noteId.toString() else null)
 
         lifecycleScope.launch {
+            val shouldUseCache = shouldUseLocalCache(uris)
+            val contentType = if (isVocabMode) "vocab" else null
+
             when (
                 val result =
                     repository.processCombinedInputs(
@@ -164,16 +180,28 @@ class AIFileProcessActivity : AppCompatActivity() {
                         attachments = uris,
                         userId = userId,
                         noteId = noteIdString,
+                        contentType = contentType,
+                        useCache = shouldUseCache,
                     )
             ) {
                 is AIResult.Success -> {
+                    // Save backend_note_id if not exists and noteId is valid
+                    if (backendNoteId == null && noteId != -1L && noteIdString != null) {
+                        AIUserPreferences.setBackendNoteId(
+                            this@AIFileProcessActivity,
+                            noteId,
+                            noteIdString,
+                        )
+                    }
                     AISummaryActivity.startWithResult(
                         context = this@AIFileProcessActivity,
                         summaryResponse = result.data,
                         noteId = noteId,
                         showAllSections = showAllSections,
                         initialSection = initialSection,
+                        isVocabMode = isVocabMode,
                     )
+                    persistContentHashIfNeeded()
                     finish()
                 }
                 is AIResult.Error -> {
@@ -188,4 +216,78 @@ class AIFileProcessActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun AISummaryActivity.AISection.isVocabSection(): Boolean {
+        return this in
+            listOf(
+                AISummaryActivity.AISection.VOCAB_STORY,
+                AISummaryActivity.AISection.VOCAB_MCQ,
+                AISummaryActivity.AISection.VOCAB_FLASHCARDS,
+                AISummaryActivity.AISection.VOCAB_MINDMAP,
+                AISummaryActivity.AISection.VOCAB_SUMMARY_TABLE,
+            )
+    }
+
+    private fun shouldUseLocalCache(uris: List<Uri>): Boolean {
+        if (noteId == -1L) {
+            pendingContentHash = null
+            return false
+        }
+        val hash = computeContentHash(noteText, uris)
+        pendingContentHash = hash
+        if (hash.isNullOrBlank()) return false
+        val mode = currentHashMode()
+        val stored = AIUserPreferences.getNoteContentHash(this, noteId, mode)
+        return stored == hash
+    }
+
+    private fun persistContentHashIfNeeded() {
+        val hash = pendingContentHash
+        if (hash.isNullOrBlank() || noteId == -1L) {
+            return
+        }
+        AIUserPreferences.setNoteContentHash(this, noteId, currentHashMode(), hash)
+    }
+
+    private fun computeContentHash(noteText: String?, uris: List<Uri>): String? {
+        val digest = MessageDigest.getInstance("SHA-256")
+        var hasData = false
+
+        noteText
+            ?.takeIf { it.isNotBlank() }
+            ?.let {
+                digest.update("TEXT".toByteArray())
+                digest.update(it.trim().toByteArray())
+                hasData = true
+            }
+
+        uris
+            .sortedBy { it.toString() }
+            .forEach { uri ->
+                digest.update("URI".toByteArray())
+                digest.update(uri.toString().toByteArray())
+                val doc = DocumentFile.fromSingleUri(this, uri)
+                val size = doc?.length() ?: queryFileSize(uri)
+                val lastModified = doc?.lastModified() ?: 0L
+                digest.update(size.toString().toByteArray())
+                digest.update(lastModified.toString().toByteArray())
+                hasData = true
+            }
+
+        return if (hasData) {
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } else {
+            null
+        }
+    }
+
+    private fun queryFileSize(uri: Uri): Long {
+        return try {
+            contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
+        } catch (_: Exception) {
+            -1L
+        }
+    }
+
+    private fun currentHashMode(): String = if (isVocabMode) "combined_vocab" else "combined"
 }
