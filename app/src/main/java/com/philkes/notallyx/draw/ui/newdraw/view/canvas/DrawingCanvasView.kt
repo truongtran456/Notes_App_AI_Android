@@ -3,12 +3,14 @@ package com.philkes.notallyx.draw.ui.newdraw.view.canvas
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Rect
 import android.graphics.Paint
 import android.graphics.Path
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import com.philkes.notallyx.R
 import com.philkes.notallyx.common.model.Brush
 import com.philkes.notallyx.common.model.DrawToolBrush
@@ -21,6 +23,7 @@ import android.view.GestureDetector
 import android.view.ScaleGestureDetector
 import java.util.UUID
 import android.graphics.RectF
+import androidx.annotation.DrawableRes
 
 /**
  * Simple canvas view for drawing with selected brush tools
@@ -41,6 +44,8 @@ class DrawingCanvasView @JvmOverloads constructor(
     private var currentPath: DrawingPath? = null
     private var currentBrush: DrawToolBrush? = null
     private var canvasBackgroundColor: Int = Color.WHITE
+    private var backgroundBitmap: Bitmap? = null
+    private var backgroundDrawableResId: Int? = null
     
     // Lưu strokes để persist drawing
     private val savedStrokes = mutableListOf<DrawingStroke>()
@@ -99,7 +104,31 @@ class DrawingCanvasView @JvmOverloads constructor(
      */
     fun setCanvasBackgroundColor(color: Int) {
         canvasBackgroundColor = color
+        backgroundBitmap = null
+        backgroundDrawableResId = null
         invalidate()
+    }
+
+    /**
+     * Set background bằng drawable (ảnh). Nếu truyền null sẽ quay lại dùng màu.
+     */
+    fun setCanvasBackgroundDrawable(@DrawableRes resId: Int?) {
+        backgroundDrawableResId = resId
+        if (resId == null) {
+            backgroundBitmap = null
+            invalidate()
+            return
+        }
+        backgroundBitmap = decodeBackgroundBitmap(resId)
+        invalidate()
+    }
+
+    private fun decodeBackgroundBitmap(@DrawableRes resId: Int): Bitmap? {
+        return try {
+            ContextCompat.getDrawable(context, resId)?.toBitmap()
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun setBrush(brush: DrawToolBrush?) {
@@ -293,8 +322,11 @@ class DrawingCanvasView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         
-        // Vẽ nền canvas (có thể thay đổi bằng nút Background)
-        canvas.drawColor(canvasBackgroundColor)
+        // Vẽ nền canvas (màu hoặc ảnh)
+        backgroundBitmap?.let { bmp ->
+            val dest = Rect(0, 0, width, height)
+            canvas.drawBitmap(bmp, null, dest, null)
+        } ?: canvas.drawColor(canvasBackgroundColor)
         
         // Apply zoom and pan transformations (chỉ khi zoom mode bật và có scale)
         if (isZoomModeEnabled && scaleFactor != 1.0f) {
@@ -541,10 +573,11 @@ class DrawingCanvasView @JvmOverloads constructor(
             // Đây là kết quả cuối cùng sau khi xóa - layerBitmap giờ chứa drawing đã bị xóa
             layerBitmap?.let { layer ->
                 // Xóa layerBitmap cũ và vẽ lại từ strokeBitmap (đã xóa)
-                layer.eraseColor(Color.TRANSPARENT)
-                val layerCanvas = Canvas(layer)
-                layerCanvas.drawColor(Color.WHITE) // Vẽ nền trắng
-                layerCanvas.drawBitmap(stroke, 0f, 0f, null) // Vẽ strokeBitmap (đã xóa)
+            layer.eraseColor(Color.TRANSPARENT)
+            val layerCanvas = Canvas(layer)
+            // Giữ trong suốt để không che nền background
+            layerCanvas.drawColor(Color.TRANSPARENT)
+            layerCanvas.drawBitmap(stroke, 0f, 0f, null) // Vẽ strokeBitmap (đã xóa)
             }
             
             // Đánh dấu đã dùng eraser (layerBitmap đã bị modify)
@@ -575,7 +608,8 @@ class DrawingCanvasView @JvmOverloads constructor(
             layerBitmap?.recycle()
             layerBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val layerCanvas = Canvas(layerBitmap!!)
-            layerCanvas.drawColor(Color.WHITE)
+            // Giữ transparent để không che nền background (màu/ảnh)
+            layerCanvas.drawColor(Color.TRANSPARENT)
             
             // Vẽ tất cả saved strokes lên layerBitmap (trừ eraser strokes)
             savedStrokes.forEach { stroke ->

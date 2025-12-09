@@ -99,8 +99,15 @@ class CustomColorView @JvmOverloads constructor(
     }
 
     private fun setupViewPager() = viewBinding().apply {
+        // Setup ViewPager2
         viewPager.adapter = pageAdapter
         viewPager.offscreenPageLimit = 1
+        
+        // Setup Indicator
+        indicator.setViewPager(viewPager)
+        pageAdapter.registerAdapterDataObserver(indicator.adapterDataObserver)
+        
+        // Listen to page changes
         viewPager.registerOnPageChangeCallback(
             object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
@@ -109,8 +116,8 @@ class CustomColorView @JvmOverloads constructor(
                 }
             },
         )
-        indicator.setViewPager(viewPager)
     }
+
 
     private fun divideIntoPages(
         items: List<ColorCustomItem>,

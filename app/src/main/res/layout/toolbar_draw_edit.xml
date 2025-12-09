@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="56dp">
+    android:layout_height="@dimen/dp_48">
 
     <androidx.appcompat.widget.LinearLayoutCompat
         android:id="@+id/llToolbarDraw"
@@ -13,92 +13,85 @@
         <!-- Back -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/ivBack"
-            android:clickable= "true"
+            android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="12dp"
-            android:padding="6dp"
+            android:layout_width="@dimen/dp_42"
+            android:layout_height="@dimen/dp_30"
+            android:layout_marginStart="@dimen/dp_16"
             android:background="@drawable/bg_back"
-            android:scaleType="centerInside"
+            android:padding="@dimen/dp_4"
             android:src="@drawable/ic_back" />
 
         <!-- Undo -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/ivUndo"
-            android:clickable= "true"
+            android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:padding="6dp"
-            android:background="@drawable/bg_back"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_undo" />
+            android:layout_width="@dimen/dp_30"
+            android:layout_height="@dimen/dp_30"
+            android:layout_marginStart="@dimen/dp_16"
+            android:background="@drawable/bg_undo"
+            android:padding="@dimen/dp_6"
+            android:src="@drawable/undo" />
 
         <!-- Redo -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/ivRedo"
-            android:clickable= "true"
+            android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:padding="6dp"
-            android:background="@drawable/bg_back"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_redo" />
+            android:layout_width="@dimen/dp_30"
+            android:layout_height="@dimen/dp_30"
+            android:layout_marginStart="@dimen/dp_12"
+            android:background="@drawable/bg_undo"
+            android:padding="@dimen/dp_6"
+            android:src="@drawable/redo" />
 
-        <!-- Spacer -->
         <View
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1" />
 
-        <!-- Draw / Brush picker -->
+        <!-- Background (thay cho Grid) -->
         <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/ivDraw"
-            android:clickable= "true"
+            android:id="@+id/ivBackground"
+            android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_layer"
-            android:padding="6dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_pen_pencil" />
+            android:layout_width="@dimen/dp_30"
+            android:layout_height="@dimen/dp_30"
+            android:layout_marginEnd="@dimen/dp_12"
+            android:background="@drawable/bg_grid"
+            android:padding="@dimen/dp_6"
+            android:src="@drawable/change_color" />
 
-        <!-- Search icon (giữ lại giống toolbar cũ) -->
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/ivSearch"
-            android:clickable= "true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/bg_undo"
-            android:padding="6dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/search" />
-
-        <!-- Pin icon (giữ lại giống toolbar cũ) -->
+        <!-- Pin (thay cho Layer) -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/ivPin"
-            android:clickable= "true"
+            android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="12dp"
-            android:background="@drawable/bg_undo"
-            android:padding="6dp"
-            android:scaleType="centerInside"
+            android:layout_width="@dimen/dp_30"
+            android:layout_height="@dimen/dp_30"
+            android:layout_marginEnd="@dimen/dp_12"
+            android:background="@drawable/bg_layer"
+            android:padding="@dimen/dp_6"
             android:src="@drawable/pin" />
+
+        <!-- More -->
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ivMore"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:layout_width="@dimen/dp_30"
+            android:layout_height="@dimen/dp_30"
+            android:layout_marginEnd="@dimen/dp_16"
+            android:background="@drawable/bg_more"
+            android:padding="@dimen/dp_6"
+            android:src="@drawable/more_vert" />
 
     </androidx.appcompat.widget.LinearLayoutCompat>
 
