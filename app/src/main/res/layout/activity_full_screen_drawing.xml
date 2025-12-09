@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <!-- Background blur overlay -->
+    <View
+        android:id="@+id/blurOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#E0FFFFFF"
+        android:alpha="0"
+        android:visibility="gone" />
+
+    <!-- Toolbar ở trên cùng với back, undo, redo, grid, save -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        app:elevation="4dp">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorSurface"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingVertical="4dp">
+
+                <!-- Nút Back -->
+                <ImageButton
+                    android:id="@+id/btnBack"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/ic_menu_revert"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Back"
+                    app:tint="?attr/colorOnSurface" />
+
+                <!-- Nút Undo -->
+                <ImageButton
+                    android:id="@+id/btnUndo"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:src="@drawable/undo"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Undo"
+                    app:tint="?attr/colorOnSurface" />
+
+                <!-- Nút Redo -->
+                <ImageButton
+                    android:id="@+id/btnRedo"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:src="@drawable/redo"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Redo"
+                    app:tint="?attr/colorOnSurface" />
+
+                <!-- Nút Grid -->
+                <ImageButton
+                    android:id="@+id/btnGrid"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="8dp"
+                    android:src="@android:drawable/ic_menu_view"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Grid"
+                    app:tint="?attr/colorOnSurface" />
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <!-- Nút Save -->
+                <Button
+                    android:id="@+id/btnSave"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Save"
+                    android:textColor="?attr/colorOnSurface"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp"
+                    style="@style/Widget.Material3.Button.TextButton" />
+            </LinearLayout>
+        </androidx.appcompat.widget.Toolbar>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Canvas full screen ở trên - giao diện chính để vẽ -->
+    <!-- Canvas sẽ có transitionName để Shared Element Transition -->
+    <com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
+        android:id="@+id/DrawingCanvas"
+        android:transitionName="shared_canvas"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/bg_canvas_rounded" />
+
+    <!-- DrawToolPickerView ở dưới cùng - sẽ trồi lên với animation -->
+    <com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolPickerView
+        android:id="@+id/DrawToolPickerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="?attr/colorSurface"
+        android:translationY="200dp"
+        android:alpha="0"
+        app:elevation="8dp" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

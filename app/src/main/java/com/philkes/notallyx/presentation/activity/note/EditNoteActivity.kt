@@ -288,16 +288,20 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         }
         binding.EnterBody.setOnSelectionChange { selStart, selEnd ->
             if (selEnd - selStart > 0) {
-                if (!textFormatMenu.isEnabled) {
+                if (!::textFormatMenu.isInitialized || !textFormatMenu.isEnabled) {
                     initBottomTextFormattingMenu()
                 }
-                textFormatMenu.isEnabled = true
+                if (::textFormatMenu.isInitialized) {
+                    textFormatMenu.isEnabled = true
+                }
                 textFormattingAdapter?.updateTextFormattingToggles(selStart, selEnd)
             } else {
-                if (textFormatMenu.isEnabled) {
+                if (::textFormatMenu.isInitialized && textFormatMenu.isEnabled) {
                     initBottomMenu()
                 }
-                textFormatMenu.isEnabled = false
+                if (::textFormatMenu.isInitialized) {
+                    textFormatMenu.isEnabled = false
+                }
             }
         }
         binding.ContentLayout.setOnClickListener {
@@ -310,73 +314,26 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     override fun initBottomMenu() {
-        binding.BottomAppBarLeft.apply {
-            removeAllViews()
-
-            addIconButton(R.string.add_item, R.drawable.add, marginStart = 0) {
-                AddNoteBottomSheet(this@EditNoteActivity, colorInt)
-                    .show(supportFragmentManager, AddNoteBottomSheet.TAG)
-            }
-
-            undo =
-                addIconButton(R.string.undo, R.drawable.undo, marginStart = 2) {
-                        try {
-                            changeHistory.undo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            Log.e(TAG, "ChangeHistory error", e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canUndo.value }
-
-            textFormatMenu =
-                addIconButton(R.string.edit, R.drawable.text_format) {
-                        initBottomTextFormattingMenu()
-                    }
-                    .apply { isEnabled = binding.EnterBody.isActionModeOn }
+        super.initBottomMenu()
+    }
+    
+    override fun openAddItemMenu() {
+        AddNoteBottomSheet(this, colorInt)
+            .show(supportFragmentManager, AddNoteBottomSheet.TAG)
+    }
+    
+    override fun openTextFormattingMenu() {
+        if (binding.EnterBody.isActionModeOn) {
+            initBottomTextFormattingMenu()
+        } else {
+            binding.EnterBody.requestFocus()
+            binding.EnterBody.setSelection(binding.EnterBody.length())
         }
-
-        // CENTER: Empty (AI button moved to FAB ở góc dưới bên phải)
-        binding.BottomAppBarCenter.apply {
-            visibility = GONE
-            removeAllViews()
-        }
-        
-        // Tạo FAB AI gradient ở góc dưới bên phải
-        setupAIFloatingButton()
-
-        // RIGHT: Redo + More
-        binding.BottomAppBarRight.apply {
-            removeAllViews()
-            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
-                MoreNoteBottomSheet(this@EditNoteActivity, createFolderActions(), colorInt)
-                    .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
-            }
-
-            redo =
-                addIconButton(R.string.redo, R.drawable.redo, marginStart = 0) {
-                        try {
-                            changeHistory.redo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            Log.e(TAG, "ChangeHistory error", e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canRedo.value }
-
-            addIconButton(R.string.draw, R.drawable.ic_pen_pencil, marginStart = 0) {
-                openDrawingScreen()
-            }
-
-            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
-                MoreNoteBottomSheet(this@EditNoteActivity, createFolderActions(), colorInt)
-                    .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
-            }
-        }
-
-        setBottomAppBarColor(colorInt)
+    }
+    
+    override fun openMoreMenu() {
+        MoreNoteBottomSheet(this, createFolderActions(), colorInt)
+            .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
     }
 
     private fun ensureAICenterButton() {
@@ -605,6 +562,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                 adapter = textFormattingAdapter
                 layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
             }
+            textFormatMenu = layout.root
             addView(layout.root)
         }
     }

@@ -10,18 +10,18 @@ plugins {
     kotlin("kapt")
     id("com.google.devtools.ksp")
     id("com.ncorti.ktfmt.gradle") version "0.20.1"
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.0"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.24"
     id("io.github.philkes.android-translations-converter") version "1.0.4"
     id("com.google.dagger.hilt.android")
 }
 
 android {
     namespace = "com.philkes.notallyx"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.philkes.notallyx"
-        minSdk = 21
+        minSdk = 24  // JellyFab library yêu cầu minSdk 24
         targetSdk = 34
         versionCode = project.findProperty("app.versionCode").toString().toInt()
         versionName = project.findProperty("app.versionName").toString()
@@ -105,6 +105,11 @@ android {
         viewBinding = true
         buildConfig = true
         dataBinding = true
+        compose = true
+    }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
 
     packaging {
@@ -178,6 +183,20 @@ afterEvaluate {
     }
 }
 
+// Force resolution strategy để tránh pull version mới hơn yêu cầu compileSdk 36
+configurations.all {
+    resolutionStrategy {
+        force("androidx.activity:activity-ktx:1.8.2")
+        force("androidx.activity:activity:1.8.2")
+        force("androidx.activity:activity-compose:1.8.2")
+        force("androidx.core:core:1.13.1")
+        force("androidx.core:core-ktx:1.13.1")
+        // Force kotlinx-serialization version tương thích với Kotlin 1.9.24
+        force("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
+    }
+}
+
 dependencies {
     val navVersion = "2.3.5"
     val roomVersion = "2.6.1"
@@ -220,6 +239,8 @@ dependencies {
     implementation("me.zhanghai.android.fastscroll:library:1.3.0")
     implementation("net.lingala.zip4j:zip4j:2.11.5")
     implementation("net.zetetic:android-database-sqlcipher:4.5.3")
+    // Downgrade kotlinx-serialization để tương thích với Kotlin 1.9.24
+    // Version 1.7.3 yêu cầu Kotlin 2.0.0-RC1, nên dùng 1.6.3 tương thích với Kotlin 1.9.24
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.jsoup:jsoup:1.18.1")
@@ -245,4 +266,37 @@ dependencies {
     
     // ExpandableBottomBar
     implementation("com.github.st235:expandablebottombar:1.5.1")
+    
+    // Jetpack Compose
+    // Dùng BOM version tương thích với compileSdk 35
+    val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    // Force version tương thích với compileSdk 35 (không dùng 1.11.0 yêu cầu compileSdk 36)
+    // Exclude transitive dependencies để tránh pull version mới
+    implementation("androidx.activity:activity-compose:1.8.2") {
+        exclude(group = "androidx.activity", module = "activity-ktx")
+        exclude(group = "androidx.activity", module = "activity")
+    }
+    // Force version cũ hơn cho activity-ktx và activity để tránh yêu cầu compileSdk 36
+    // resolutionStrategy.force() ở trên đã handle việc force version
+    implementation("androidx.activity:activity-ktx:1.8.2")
+    implementation("androidx.activity:activity:1.8.2")
+    // Force version tương thích với compileSdk 35
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.compose.ui:ui-tooling")
+    
+    // Force version cũ hơn cho core để tránh yêu cầu compileSdk 36
+    // resolutionStrategy.force() ở trên đã handle việc force version
+    implementation("androidx.core:core:1.13.1")
+    implementation("androidx.core:core-ktx:1.13.1")
+    
+    // JellyFab - Modern expandable FAB menu
+    // Kiểm tra version mới nhất tại: https://jitpack.io/#iprashantpanwar/JellyFab
+    // Thử với main branch hoặc commit hash nếu tag không hoạt động
+    implementation("com.github.iprashantpanwar:JellyFab:main-SNAPSHOT")
 }

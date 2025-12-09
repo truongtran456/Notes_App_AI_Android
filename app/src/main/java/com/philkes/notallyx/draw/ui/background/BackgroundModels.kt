@@ -15,6 +15,7 @@ data class BackgroundItem(
     val category: BackgroundCategoryType,
     val isCustomAdd: Boolean = false,
     var isSelected: Boolean = false,
+    val drawableResId: Int? = null, // Resource ID của ảnh background
 )
 
 data class BackgroundSection(

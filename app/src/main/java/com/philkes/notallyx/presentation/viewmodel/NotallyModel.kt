@@ -97,6 +97,8 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
     
     // Drawing strokes để lưu drawing
     var drawingStrokes = ArrayList<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>()
+    var drawingBackgroundColor: Int = android.graphics.Color.WHITE
+    var drawingBackgroundDrawableResId: Int? = null
 
     val addingFiles = MutableLiveData<Progress>()
     val eventBus = MutableLiveData<Event<List<FileError>>>()

@@ -118,17 +118,37 @@
                     android:paddingBottom="8dp"
                     android:textAppearance="?attr/textAppearanceHeadline6" />
 
-                <TextView
-                    android:id="@+id/Date"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
                     android:paddingStart="24dp"
-                    android:paddingTop="2dp"
                     android:paddingEnd="24dp"
-                    android:paddingBottom="6dp"
-                    android:text="@string/date"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    android:textColor="?android:textColorHint" />
+                    android:paddingTop="2dp"
+                    android:paddingBottom="6dp">
+
+                    <TextView
+                        android:id="@+id/Date"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/date"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?android:textColorHint" />
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/InlineAiButton"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:contentDescription="@string/ai_assistant"
+                        android:background="@drawable/bg_ai_gradient"
+                        android:padding="10dp"
+                        android:src="@drawable/ai_sparkle"
+                        android:scaleType="centerInside"
+                        android:backgroundTint="@null"
+                        android:tint="@android:color/white" />
+                </LinearLayout>
 
 
                 <androidx.recyclerview.widget.RecyclerView
@@ -182,10 +202,12 @@
                 <!-- Canvas view for drawing -->
                 <com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
                     android:id="@+id/DrawingCanvas"
+                    android:transitionName="shared_canvas"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:minHeight="400dp"
-                    android:background="@android:color/white"
+                    android:layout_margin="20dp"
+                    android:background="@drawable/bg_canvas_rounded"
                     android:visibility="gone" />
 
                 <TextView
@@ -237,12 +259,14 @@
 
     </LinearLayout>
 
+    <!-- Bottom bar đã bị ẩn, thay bằng expandable FAB menu -->
     <com.google.android.material.bottomappbar.BottomAppBar
          android:id="@+id/BottomAppBarLayout"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:layout_gravity="bottom"
         android:backgroundTint="?attr/colorSurface"
+        android:visibility="gone"
         app:elevation="0dp">
 
         <LinearLayout
@@ -261,13 +285,13 @@
                 android:gravity="start|center_vertical"
                 android:orientation="horizontal" />
 
-            <FrameLayout
+            <LinearLayout
                 android:id="@+id/BottomAppBarCenter"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:foregroundGravity="center"
-                android:gravity="center" />
+                android:gravity="center"
+                android:orientation="horizontal" />
 
             <LinearLayout
                 android:id="@+id/BottomAppBarRight"
@@ -279,6 +303,15 @@
         </LinearLayout>
 
     </com.google.android.material.bottomappbar.BottomAppBar>
+    
+    <!-- JellyFab ComposeView - Modern expandable FAB menu với jelly animation -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/JellyFabComposeView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="0dp"
+        android:layout_marginBottom="16dp" />
 
     <!-- DrawToolPickerView - hiển thị cố định ở bottom -->
     <com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolPickerView

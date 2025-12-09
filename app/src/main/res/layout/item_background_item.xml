@@ -7,33 +7,51 @@
     </data>
 
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="true"
+        android:focusable="true">
 
+        <!-- Ảnh background -->
         <FrameLayout
+            android:id="@+id/clImage"
             android:layout_width="0dp"
             android:layout_height="0dp"
             app:layout_constraintDimensionRatio="4:3"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintWidth_max="@dimen/dp_80">
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp">
 
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/ivBackground"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:background="@drawable/bg_item_color_normal" />
+                    android:scaleType="centerCrop" />
 
-            <View
-                android:id="@+id/selectionOverlay"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_item_color_selected"
-                android:visibility="gone" />
+            </androidx.cardview.widget.CardView>
 
         </FrameLayout>
+
+        <!-- Border khi selected (đặt sau để nằm trên ảnh) -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clImageSelected"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="@drawable/bg_background_selected_border"
+            android:visibility="gone"
+            android:clickable="false"
+            android:focusable="false"
+            app:layout_constraintDimensionRatio="4:3"
+            app:layout_constraintTop_toTopOf="@+id/clImage"
+            app:layout_constraintStart_toStartOf="@+id/clImage"
+            app:layout_constraintEnd_toEndOf="@+id/clImage"
+            app:layout_constraintBottom_toBottomOf="@+id/clImage" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

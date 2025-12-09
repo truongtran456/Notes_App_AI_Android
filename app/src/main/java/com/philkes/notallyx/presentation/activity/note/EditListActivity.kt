@@ -78,119 +78,18 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     }
 
     override fun initBottomMenu() {
-        // B? c?c thanh d??i t??ng t? EditNoteActivity:
-        // LEFT: +, Undo
-        binding.BottomAppBarLeft.apply {
-            removeAllViews()
-
-            addIconButton(R.string.adding_files, R.drawable.add, marginStart = 0) {
-                AddBottomSheet(this@EditListActivity, colorInt)
+        super.initBottomMenu()
+    }
+    
+    override fun openAddItemMenu() {
+        AddBottomSheet(this, colorInt)
                     .show(supportFragmentManager, AddBottomSheet.TAG)
             }
 
-            undo =
-                addIconButton(R.string.undo, R.drawable.undo, marginStart = 2) {
-                        try {
-                            changeHistory.undo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            application.log(TAG, throwable = e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canUndo.value }
-        }
-
-        // CENTER: n�t AI nh?
-        binding.BottomAppBarCenter.apply { 
-            visibility = android.view.View.GONE
-            removeAllViews() 
-        }
-        
-        // Tạo FAB AI gradient ở góc dưới bên phải
-        setupAIFloatingButton()
-
-        // RIGHT: Redo + Draw + More
-        binding.BottomAppBarRight.apply {
-            removeAllViews()
-
-            redo =
-                addIconButton(R.string.redo, R.drawable.redo, marginStart = 0) {
-                        try {
-                            changeHistory.redo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            application.log(TAG, throwable = e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canRedo.value }
-
-            addIconButton(R.string.draw, R.drawable.ic_pen_pencil, marginStart = 0) {
-                openDrawingScreen()
-            }
-
-            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
-                MoreListBottomSheet(this@EditListActivity, createFolderActions(), colorInt)
-                    .show(supportFragmentManager, MoreListBottomSheet.TAG)
-            }
-        }
-
-        setBottomAppBarColor(colorInt)
-    }
-
-    private fun ensureAICenterButtonForList() {
-        if (binding.BottomAppBarCenter.childCount > 0) return
-        val button =
-            MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle)
-                .apply {
-                    text = getString(R.string.ai_action_button_label)
-                    icon = ContextCompat.getDrawable(this@EditListActivity, R.drawable.ai_sparkle)
-                    iconPadding = 8.dp
-                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-                    minWidth = 0
-                    minimumWidth = 0
-                    setInsetTop(0)
-                    setInsetBottom(0)
-                    setPaddingRelative(20.dp, 6.dp, 20.dp, 6.dp)
-                    cornerRadius = resources.getDimensionPixelSize(R.dimen.dp_20)
-                    val primary =
-                        MaterialColors.getColor(
-                            this,
-                            com.google.android.material.R.attr.colorPrimary,
-                            0,
-                        )
-                    val onPrimary =
-                        MaterialColors.getColor(
-                            this,
-                            com.google.android.material.R.attr.colorOnPrimary,
-                            Color.WHITE,
-                        )
-                    setBackgroundTintList(ColorStateList.valueOf(primary))
-                    setTextColor(onPrimary)
-                    iconTint = ColorStateList.valueOf(onPrimary)
-                    strokeWidth = resources.getDimensionPixelSize(R.dimen.dp_1)
-                    strokeColor =
-                        ColorStateList.valueOf(
-                            MaterialColors.getColor(
-                                this,
-                                com.google.android.material.R.attr.colorPrimaryContainer,
-                                primary,
-                            )
-                        )
-                    setOnClickListener { openAIActionsMenu() }
-                }
-        val params =
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER,
-            )
-        binding.BottomAppBarCenter.addView(button, params)
+    override fun openTextFormattingMenu() {
     }
 
     override fun openAIActionsMenu() {
-        // L?y text t? c�c item checklist l�m input cho AI (t?m th?i ch? m? ph?n Summary)
         val noteText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
         val attachmentUris = getAttachedFileUris()
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
@@ -260,7 +159,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                 )
             } else {
                 AISummaryActivity.start(
-                    this,
+                            this,
                     noteText,
                     notallyModel.id,
                     AISummaryActivity.AISection.QUESTIONS,
@@ -283,10 +182,10 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                     initialSection = com.philkes.notallyx.presentation.activity.ai.AISummaryActivity.AISection.MCQ,
                 )
             } else {
-                AISummaryActivity.start(
-                    this,
-                    noteText,
-                    notallyModel.id,
+        AISummaryActivity.start(
+            this,
+            noteText,
+            notallyModel.id,
                     AISummaryActivity.AISection.MCQ,
                 )
             }
@@ -468,3 +367,4 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         private const val EXTRA_SELECTION_END = "notallyx.intent.extra.EXTRA_SELECTION_END"
     }
 }
+
