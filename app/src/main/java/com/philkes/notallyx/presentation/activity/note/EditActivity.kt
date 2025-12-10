@@ -19,24 +19,24 @@ import android.view.View.GONE
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams
 import android.view.ViewGroup.VISIBLE
-import android.widget.ImageView
 import android.view.inputmethod.InputMethodManager
+import android.widget.ImageView
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.ColorInt
 import androidx.annotation.RequiresApi
-import androidx.activity.enableEdgeToEdge
+import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
 import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
-import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
@@ -64,14 +64,11 @@ import com.philkes.notallyx.presentation.activity.LockedActivity
 import com.philkes.notallyx.presentation.activity.main.fragment.DisplayLabelFragment.Companion.EXTRA_DISPLAYED_LABEL
 import com.philkes.notallyx.presentation.activity.note.SelectLabelsActivity.Companion.EXTRA_SELECTED_LABELS
 import com.philkes.notallyx.presentation.activity.note.reminders.RemindersActivity
-import com.philkes.notallyx.presentation.activity.note.FullScreenDrawingActivity
-import android.widget.LinearLayout
 import com.philkes.notallyx.presentation.add
 import com.philkes.notallyx.presentation.addFastScroll
-import com.philkes.notallyx.presentation.addIconButton
 import com.philkes.notallyx.presentation.bindLabels
-import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.displayFormattedTimestamp
+import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.extractColor
 import com.philkes.notallyx.presentation.getQuantityString
 import com.philkes.notallyx.presentation.isLightColor
@@ -85,9 +82,7 @@ import com.philkes.notallyx.presentation.view.misc.NotNullLiveData
 import com.philkes.notallyx.presentation.view.note.ErrorAdapter
 import com.philkes.notallyx.presentation.view.note.action.Action
 import com.philkes.notallyx.presentation.view.note.action.AddActions
-import com.philkes.notallyx.presentation.view.note.action.AddBottomSheet
 import com.philkes.notallyx.presentation.view.note.action.MoreActions
-import com.philkes.notallyx.presentation.view.note.action.MoreNoteBottomSheet
 import com.philkes.notallyx.presentation.view.note.audio.AudioAdapter
 import com.philkes.notallyx.presentation.view.note.preview.PreviewFileAdapter
 import com.philkes.notallyx.presentation.view.note.preview.PreviewImageAdapter
@@ -107,11 +102,11 @@ import com.philkes.notallyx.utils.shareNote
 import com.philkes.notallyx.utils.showColorSelectDialog
 import com.philkes.notallyx.utils.wrapWithChooser
 import java.io.File
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.max
-import kotlin.math.min
 
 abstract class EditActivity(private val type: Type) :
     LockedActivity<ActivityEditBinding>(), AddActions, MoreActions {
@@ -150,7 +145,7 @@ abstract class EditActivity(private val type: Type) :
 
     protected var colorInt: Int = -1
     protected var inputMethodManager: InputMethodManager? = null
-    
+
     // Store animations to cancel on destroy
     private val activeAnimators = mutableListOf<android.animation.Animator>()
     private val postRunnables = mutableListOf<Runnable>()
@@ -167,34 +162,32 @@ abstract class EditActivity(private val type: Type) :
             }
         }
         activeAnimators.clear()
-        
+
         // Cancel all post operations
         try {
-            postRunnables.forEach { runnable ->
-                binding.root.removeCallbacks(runnable)
-            }
+            postRunnables.forEach { runnable -> binding.root.removeCallbacks(runnable) }
         } catch (e: Exception) {
             // Ignore errors if binding is already destroyed
         }
         postRunnables.clear()
-        
+
         // Clear references
         try {
             binding.DrawingCanvas.setBrush(null)
-            binding.DrawingCanvas.setOnColorPickedListener { }
+            binding.DrawingCanvas.setOnColorPickedListener {}
         } catch (e: Exception) {
             // Ignore errors if view is already destroyed
         }
-        
+
         super.onDestroy()
     }
 
     override fun finish() {
         if (isFinishing || isDestroyed) return
-        
+
         lifecycleScope.launch(Dispatchers.Main) {
             if (isFinishing || isDestroyed) return@launch
-            
+
             try {
                 if (notallyModel.isEmpty()) {
                     notallyModel.deleteBaseNote(checkAutoSave = false)
@@ -213,7 +206,7 @@ abstract class EditActivity(private val type: Type) :
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        
+
         if (requestCode == REQUEST_CODE_FULL_SCREEN_DRAWING && resultCode == RESULT_OK) {
             val strokesJson = data?.getStringExtra(FullScreenDrawingActivity.RESULT_STROKES)
             handleDrawingStrokesResult(strokesJson)
@@ -231,17 +224,26 @@ abstract class EditActivity(private val type: Type) :
         // Persist current background state for this note
         persistCurrentBackground()
     }
-    
+
     private fun handleDrawingStrokesResult(strokesJson: String?) {
         if (strokesJson == null) return
-        
+
         try {
             val gson = Gson()
-            val strokesType = object : TypeToken<List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>>() {}.type
-            val strokes = gson.fromJson<List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>>(strokesJson, strokesType)
+            val strokesType =
+                object :
+                        TypeToken<
+                            List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>
+                        >() {}
+                    .type
+            val strokes =
+                gson.fromJson<List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>>(
+                    strokesJson,
+                    strokesType,
+                )
             if (strokes != null) {
                 notallyModel.drawingStrokes = ArrayList(strokes)
-                
+
                 if (!isDrawingModeActive) {
                     showDrawingArea()
                 }
@@ -268,8 +270,8 @@ abstract class EditActivity(private val type: Type) :
 
     open suspend fun saveNote() {
         if (isDestroyed || isFinishing) return
-        
-        // L?u strokes v�o notallyModel tr??c khi save
+
+        // L?u strokes v?o notallyModel tr??c khi save
         if (isDrawingModeActive) {
             try {
                 val strokes = binding.DrawingCanvas.getStrokes()
@@ -282,21 +284,24 @@ abstract class EditActivity(private val type: Type) :
         notallyModel.modifiedTimestamp = System.currentTimeMillis()
         notallyModel.saveNote()
         // Persist background after note is saved (ensures correct noteId key)
-        saveDrawingBackgroundPreference(notallyModel.drawingBackgroundColor, notallyModel.drawingBackgroundDrawableResId)
+        saveDrawingBackgroundPreference(
+            notallyModel.drawingBackgroundColor,
+            notallyModel.drawingBackgroundDrawableResId,
+        )
         WidgetProvider.sendBroadcast(application, longArrayOf(notallyModel.id))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         enableEdgeToEdge()
-        
+
         inputMethodManager =
             ContextCompat.getSystemService(baseContext, InputMethodManager::class.java)
         notallyModel.type = type
         initialiseBinding()
         setContentView(binding.root)
-        
+
         setupWindowInsets()
 
         initChangeHistory()
@@ -304,11 +309,11 @@ abstract class EditActivity(private val type: Type) :
             val persistedId = savedInstanceState?.getLong("id")
             val selectedId = intent.getLongExtra(EXTRA_SELECTED_BASE_NOTE, 0L)
             val id = persistedId ?: selectedId
-            
+
             if (persistedId == null) {
                 notallyModel.setState(id)
             }
-            
+
             if (notallyModel.isNewNote && intent.action == Intent.ACTION_SEND) {
                 handleSharedNote()
             } else if (notallyModel.isNewNote) {
@@ -440,7 +445,8 @@ abstract class EditActivity(private val type: Type) :
         fullScreenDrawingActivityResultLauncher =
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 if (result.resultCode == RESULT_OK) {
-                    val strokesJson = result.data?.getStringExtra(FullScreenDrawingActivity.RESULT_STROKES)
+                    val strokesJson =
+                        result.data?.getStringExtra(FullScreenDrawingActivity.RESULT_STROKES)
                     handleDrawingStrokesResult(strokesJson)
                 }
             }
@@ -497,27 +503,33 @@ abstract class EditActivity(private val type: Type) :
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
             val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            
+
             binding.Toolbar.updatePadding(top = statusBars.top)
-            
-            binding.BottomAppBarLayout.updateLayoutParams<androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams> {
+
+            binding.BottomAppBarLayout.updateLayoutParams<
+                androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+            > {
                 bottomMargin = navBars.bottom
             }
-            
-            binding.JellyFabComposeView.updateLayoutParams<androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams> {
+
+            binding.JellyFabComposeView.updateLayoutParams<
+                androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+            > {
                 val fabMargin = 16.dp
                 bottomMargin = fabMargin + navBars.bottom
             }
-            
+
             binding.root.findViewWithTag<CardView>("ai_fab")?.let { fab ->
-                (fab.layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)?.let { params ->
-                    val fabSize = 56.dp
-                    val fabSpacing = 16.dp
-                    params.bottomMargin = fabSize + fabSpacing + navBars.bottom
-                    fab.layoutParams = params
-                }
+                (fab.layoutParams
+                        as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)
+                    ?.let { params ->
+                        val fabSize = 56.dp
+                        val fabSpacing = 16.dp
+                        params.bottomMargin = fabSize + fabSpacing + navBars.bottom
+                        fab.layoutParams = params
+                    }
             }
-            
+
             insets
         }
     }
@@ -588,7 +600,6 @@ abstract class EditActivity(private val type: Type) :
             text = ""
             visibility = VISIBLE
         }
-
     }
 
     protected fun isInSearchMode(): Boolean = binding.EnterSearchKeyword.visibility == VISIBLE
@@ -609,78 +620,78 @@ abstract class EditActivity(private val type: Type) :
 
     protected open fun initBottomMenu() {
         binding.BottomAppBarLayout.visibility = View.GONE
-        // AI FAB thay bằng nút inline trên header, không tạo FAB nổi nữa
+        // AI FAB thay b?ng n�t inline tr�n header, kh�ng t?o FAB n?i n?a
         setupJellyFab()
     }
-    
+
     protected fun setupAIFloatingButton() {
         val existingFab = binding.root.findViewWithTag<CardView>("ai_fab")
-        existingFab?.let {
-            binding.root.removeView(it)
-        }
-        
-        val cardView = CardView(this@EditActivity).apply {
-            tag = "ai_fab"
-            layoutParams = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-                56.dp,
-                56.dp
-            ).apply {
-                gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
-                setMargins(0, 0, 0, 0)
+        existingFab?.let { binding.root.removeView(it) }
+
+        val cardView =
+            CardView(this@EditActivity).apply {
+                tag = "ai_fab"
+                layoutParams =
+                    androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(56.dp, 56.dp)
+                        .apply {
+                            gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+                            setMargins(0, 0, 0, 0)
+                        }
+
+                radius = 28.dp.toFloat()
+                cardElevation = 6.dp.toFloat()
+                setContentPadding(0, 0, 0, 0)
+                setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
-            
-            radius = 28.dp.toFloat()
-            cardElevation = 6.dp.toFloat()
-            setContentPadding(0, 0, 0, 0)
-            setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
-        }
-        
-        val aiButton = androidx.appcompat.widget.AppCompatImageView(this@EditActivity).apply {
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            
-            setBackgroundResource(R.drawable.bg_ai_gradient)
-            setImageResource(R.drawable.ai_sparkle)
-            imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setPadding(14.dp, 14.dp, 14.dp, 14.dp)
-            isClickable = true
-            isFocusable = true
-            
-            val typedValue = android.util.TypedValue()
-            this@EditActivity.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
-            foreground = ContextCompat.getDrawable(this@EditActivity, typedValue.resourceId)
-            
-            contentDescription = this@EditActivity.getString(R.string.ai_assistant)
-            
-            setOnClickListener {
-                animate()
-                    .scaleX(0.9f)
-                    .scaleY(0.9f)
-                    .setDuration(100)
-                    .withEndAction {
-                        animate()
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(100)
-                            .start()
-                    }
-                    .start()
-                
-                openAIActionsMenu()
+
+        val aiButton =
+            androidx.appcompat.widget.AppCompatImageView(this@EditActivity).apply {
+                layoutParams =
+                    android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    )
+
+                setBackgroundResource(R.drawable.bg_ai_gradient)
+                setImageResource(R.drawable.ai_sparkle)
+                imageTintList =
+                    android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
+                isClickable = true
+                isFocusable = true
+
+                val typedValue = android.util.TypedValue()
+                this@EditActivity.theme.resolveAttribute(
+                    android.R.attr.selectableItemBackground,
+                    typedValue,
+                    true,
+                )
+                foreground = ContextCompat.getDrawable(this@EditActivity, typedValue.resourceId)
+
+                contentDescription = this@EditActivity.getString(R.string.ai_assistant)
+
+                setOnClickListener {
+                    animate()
+                        .scaleX(0.9f)
+                        .scaleY(0.9f)
+                        .setDuration(100)
+                        .withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(100).start() }
+                        .start()
+
+                    openAIActionsMenu()
+                }
             }
-        }
-        
+
         cardView.addView(aiButton)
-        
+
         cardView.alpha = 0f
         cardView.scaleX = 0f
         cardView.scaleY = 0f
         val postRunnable = Runnable {
             if (isDestroyed || isFinishing) return@Runnable
-            cardView.animate()
+            cardView
+                .animate()
                 .alpha(1f)
                 .scaleX(1f)
                 .scaleY(1f)
@@ -690,26 +701,24 @@ abstract class EditActivity(private val type: Type) :
         }
         postRunnables.add(postRunnable)
         cardView.post(postRunnable)
-        
+
         binding.root.addView(cardView)
     }
-    
-    
+
     protected open fun openAddItemMenu() {
         // Override trong EditNoteActivity/EditListActivity
     }
-    
+
     protected open fun openTextFormattingMenu() {
         // Override trong EditNoteActivity
     }
-    
+
     protected open fun openAddFilesMenu() {
         attachFiles()
     }
-    
-    protected open fun linkNote() {
-    }
-    
+
+    protected open fun linkNote() {}
+
     private fun setupJellyFab() {
         fun getAiFabView(): CardView? = null
 
@@ -723,26 +732,20 @@ abstract class EditActivity(private val type: Type) :
                             e.printStackTrace()
                         }
                     },
-                    onTextFormatClick = {
-                        openTextFormattingMenu()
-                    },
+                    onTextFormatClick = { openTextFormattingMenu() },
                     onMoreClick = {},
-                    onAddFilesClick = {
-                        attachFiles()
-                    },
-                    onAddImagesClick = {
-                        addImages()
-                    },
-                    onRecordAudioClick = {
-                        recordAudio()
-                    },
-                    onLinkNoteClick = if (this is com.philkes.notallyx.presentation.activity.note.EditNoteActivity) {
-                        {
-                            linkNote()
-                        }
-                    } else null,
-                    showLinkNote = this is com.philkes.notallyx.presentation.activity.note.EditNoteActivity,
-                    onMainFabClick = {}
+                    onAddFilesClick = { attachFiles() },
+                    onAddImagesClick = { addImages() },
+                    onRecordAudioClick = { recordAudio() },
+                    onLinkNoteClick =
+                        if (
+                            this is com.philkes.notallyx.presentation.activity.note.EditNoteActivity
+                        ) {
+                            { linkNote() }
+                        } else null,
+                    showLinkNote =
+                        this is com.philkes.notallyx.presentation.activity.note.EditNoteActivity,
+                    onMainFabClick = {},
                 )
             }
         }
@@ -759,16 +762,16 @@ abstract class EditActivity(private val type: Type) :
             isFocusable = true
             setOnClickListener {
                 animate()
-                    .scaleX(0.9f).scaleY(0.9f).setDuration(80)
-                    .withEndAction {
-                        animate().scaleX(1f).scaleY(1f).setDuration(80).start()
-                    }
+                    .scaleX(0.9f)
+                    .scaleY(0.9f)
+                    .setDuration(80)
+                    .withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(80).start() }
                     .start()
                 openAIActionsMenu()
             }
         }
     }
-    
+
     private fun hideAIFab(aiFabView: CardView?) {
         if (isDestroyed || isFinishing) return
         aiFabView?.let {
@@ -783,27 +786,24 @@ abstract class EditActivity(private val type: Type) :
                 .start()
         }
     }
-    
+
     private fun showAIFab(aiFabView: CardView?) {
         if (isDestroyed || isFinishing) return
         aiFabView?.let {
             it.visibility = View.VISIBLE
             it.alpha = 0f
-            it.animate()
-                .alpha(1f)
-                .setDuration(200)
-                .start()
+            it.animate().alpha(1f).setDuration(200).start()
         }
     }
-    
+
     protected abstract fun openAIActionsMenu()
 
     protected fun openDrawingScreen() {
-        // Load v� merge brushes: default brushes + custom brushes t? SharedPreferences
+        // Load v? merge brushes: default brushes + custom brushes t? SharedPreferences
         val defaultBrushes = ArrayList(drawTools)
         val savedCustomBrushes = appSharePrefs.drawToolBrushes
 
-        // Merge: th�m custom brushes v�o cu?i danh s�ch
+        // Merge: th?m custom brushes v?o cu?i danh s?ch
         val toolsToShow = ArrayList(defaultBrushes)
         toolsToShow.addAll(savedCustomBrushes)
 
@@ -811,21 +811,21 @@ abstract class EditActivity(private val type: Type) :
         binding.DrawToolPickerView.listener =
             object : DrawToolPickerView.OnItemClickListener {
                 override fun onDoneClick() {
-                    // ?�ng DrawToolPickerView (?n ?i)
+                    // ??ng DrawToolPickerView (?n ?i)
                     hideDrawingToolPicker()
                 }
 
                 override fun onItemClick(tool: DrawToolBrush) {
-                    // B??C 1: L?u brush ?� ch?n
+                    // B??C 1: L?u brush ?? ch?n
                     currentDrawTool = tool
 
-                    // B??C 2: T? ??ng hi?n th? divider v� canvas n?u ch?a hi?n th?
+                    // B??C 2: T? ??ng hi?n th? divider v? canvas n?u ch?a hi?n th?
                     if (!isDrawingModeActive) {
                         showDrawingArea()
                     }
 
-                    // B??C 3: �p d?ng brush config v�o canvas ngay l?p t?c
-                    // ?i?u n�y ??m b?o khi user touch canvas, n� s? v? v?i brush ?� ch?n
+                    // B??C 3: ?p d?ng brush config v?o canvas ngay l?p t?c
+                    // ?i?u n?y ??m b?o khi user touch canvas, n? s? v? v?i brush ?? ch?n
                     binding.DrawingCanvas.setBrush(tool)
 
                     log(
@@ -834,11 +834,11 @@ abstract class EditActivity(private val type: Type) :
                 }
 
                 override fun onSave(tool: DrawToolBrush) {
-                    // L?u pen custom v�o SharedPreferences (ch? l?u custom brushes)
+                    // L?u pen custom v?o SharedPreferences (ch? l?u custom brushes)
                     val currentCustomBrushes = appSharePrefs.drawToolBrushes
                     val existingIndex = currentCustomBrushes.indexOfFirst { it.id == tool.id }
 
-                    // ??m b?o tool l� custom type
+                    // ??m b?o tool l? custom type
                     val customTool = tool.copy(type = DrawToolPenType.CUSTOM)
 
                     if (existingIndex >= 0) {
@@ -851,7 +851,7 @@ abstract class EditActivity(private val type: Type) :
 
                     appSharePrefs.drawToolBrushes = currentCustomBrushes
 
-                    // Reload v� merge l?i brushes ?? hi?n th?
+                    // Reload v? merge l?i brushes ?? hi?n th?
                     val defaultBrushes = ArrayList(drawTools)
                     val updatedTools = ArrayList(defaultBrushes)
                     updatedTools.addAll(currentCustomBrushes)
@@ -861,12 +861,12 @@ abstract class EditActivity(private val type: Type) :
                 }
 
                 override fun onDelete(tool: DrawToolBrush) {
-                    // X�a pen custom kh?i SharedPreferences
+                    // X?a pen custom kh?i SharedPreferences
                     val currentCustomBrushes = appSharePrefs.drawToolBrushes
                     currentCustomBrushes.removeAll { it.id == tool.id }
                     appSharePrefs.drawToolBrushes = currentCustomBrushes
 
-                    // Reload v� merge l?i brushes ?? hi?n th?
+                    // Reload v? merge l?i brushes ?? hi?n th?
                     val defaultBrushes = ArrayList(drawTools)
                     val updatedTools = ArrayList(defaultBrushes)
                     updatedTools.addAll(currentCustomBrushes)
@@ -885,19 +885,19 @@ abstract class EditActivity(private val type: Type) :
                                 return
                             }
 
-                    // M? color picker (ColorPickerDialog s? t? ??ng l?u/load m�u cu?i c�ng t?
+                    // M? color picker (ColorPickerDialog s? t? ??ng l?u/load m?u cu?i c?ng t?
                     // preference)
                     showMoreColor { colorInt ->
                         val newColorHex = colorInt.rawColor()
 
-                        // Update brush v?i m�u m?i
+                        // Update brush v?i m?u m?i
                         val updatedBrush =
                             currentBrush.copy(
                                 color = newColorHex,
                                 isSelected = true, // Gi? selected state
                             )
 
-                        // Update brush trong tools list (n?u brush c� trong list)
+                        // Update brush trong tools list (n?u brush c? trong list)
                         val tools = binding.DrawToolPickerView.tools
                         val index = tools.indexOfFirst { it.id == currentBrush.id }
                         if (index >= 0) {
@@ -908,8 +908,8 @@ abstract class EditActivity(private val type: Type) :
                         // Update currentDrawTool
                         currentDrawTool = updatedBrush
 
-                        // G?i callback ?? update UI v� canvas
-                        // ?i?u n�y s? trigger onItemClick() ?? �p d?ng brush m?i v�o canvas
+                        // G?i callback ?? update UI v? canvas
+                        // ?i?u n?y s? trigger onItemClick() ?? ?p d?ng brush m?i v?o canvas
                         binding.DrawToolPickerView.listener?.onItemClick(updatedBrush)
                     }
                 }
@@ -924,7 +924,7 @@ abstract class EditActivity(private val type: Type) :
                 }
 
                 override fun onBackgroundClick() {
-                    // Mở bottom sheet chọn background cho canvas
+                    // M? bottom sheet ch?n background cho canvas
                     val initialColor = notallyModel.drawingBackgroundColor
                     val sheet = BackgroundBottomSheet.newInstance(initialColor)
                     sheet.setListener(
@@ -938,7 +938,7 @@ abstract class EditActivity(private val type: Type) :
                 }
             }
 
-        // �p d?ng tools v�o DrawToolPickerView
+        // ?p d?ng tools v?o DrawToolPickerView
         binding.DrawToolPickerView.applyTools(toolsToShow)
 
         // Hi?n th? DrawToolPickerView
@@ -946,18 +946,20 @@ abstract class EditActivity(private val type: Type) :
     }
 
     /**
-     * Hiển thị canvas và bottom bar ngay trong EditActivity
-     * Toolbar giữ nguyên, chỉ show canvas và bottom bar với animation
+     * Hi?n th? canvas v� bottom bar ngay trong EditActivity Toolbar gi? nguy�n, ch? show canvas v�
+     * bottom bar v?i animation
      */
     private fun openFullScreenDrawing() {
         if (!isDrawingModeActive) {
             showDrawingArea()
         }
-        
-        if (notallyModel.drawingStrokes.isNotEmpty() && binding.DrawingCanvas.getStrokes().isEmpty()) {
+
+        if (
+            notallyModel.drawingStrokes.isNotEmpty() && binding.DrawingCanvas.getStrokes().isEmpty()
+        ) {
             binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
         }
-        
+
         if (binding.DrawToolPickerView.listener == null) {
             val drawTools = DrawToolData.getDefault()
             val defaultBrushes = ArrayList(drawTools)
@@ -969,7 +971,7 @@ abstract class EditActivity(private val type: Type) :
             binding.DrawToolPickerView.listener =
                 object : DrawToolPickerView.OnItemClickListener {
                     override fun onDoneClick() {
-                                hideDrawingArea()
+                        hideDrawingArea()
                     }
 
                     override fun onItemClick(tool: DrawToolBrush) {
@@ -1027,10 +1029,8 @@ abstract class EditActivity(private val type: Type) :
 
                         showMoreColor { colorInt ->
                             val newColorHex = colorInt.rawColor()
-                            val updatedBrush = currentBrush.copy(
-                                color = newColorHex,
-                                isSelected = true,
-                            )
+                            val updatedBrush =
+                                currentBrush.copy(color = newColorHex, isSelected = true)
 
                             val tools = binding.DrawToolPickerView.tools
                             val index = tools.indexOfFirst { it.id == currentBrush.id }
@@ -1057,7 +1057,10 @@ abstract class EditActivity(private val type: Type) :
                         val sheet = BackgroundBottomSheet.newInstance(initialColor)
                         sheet.setListener(
                             object : BackgroundBottomSheet.Listener {
-                                override fun onBackgroundSelected(colorInt: Int, drawableResId: Int?) {
+                                override fun onBackgroundSelected(
+                                    colorInt: Int,
+                                    drawableResId: Int?,
+                                ) {
                                     applyAndPersistBackground(colorInt, drawableResId)
                                 }
                             }
@@ -1068,21 +1071,20 @@ abstract class EditActivity(private val type: Type) :
 
             binding.DrawToolPickerView.applyTools(toolsToShow)
         }
-        
+
         val postRunnable = Runnable {
             if (isDestroyed || isFinishing) return@Runnable
-            
+
             val marginPx = dpToPx(20)
             val bottomBarHeight = measureBottomBarHeight()
             val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
-            val contentHeight = computeContentHeightFromStrokes(notallyModel.drawingStrokes, dpToPx(50))
+            val contentHeight =
+                computeContentHeightFromStrokes(notallyModel.drawingStrokes, dpToPx(50))
             val targetHeight = max(availableHeight, contentHeight)
             applyCanvasLayout(targetHeight, marginPx)
 
             binding.JellyFabComposeView.visibility = View.GONE
-            binding.root.findViewWithTag<CardView>("ai_fab")?.let { aiFab ->
-                hideAIFab(aiFab)
-            }
+            binding.root.findViewWithTag<CardView>("ai_fab")?.let { aiFab -> hideAIFab(aiFab) }
 
             val scrollRunnable = Runnable {
                 if (!isDestroyed && !isFinishing) {
@@ -1097,19 +1099,17 @@ abstract class EditActivity(private val type: Type) :
         postRunnables.add(postRunnable)
         binding.root.post(postRunnable)
     }
-    
-    /**
-     * Animation cho canvas và bottom bar khi mở drawing mode
-     */
+
+    /** Animation cho canvas v� bottom bar khi m? drawing mode */
     private fun startDrawingModeAnimations() {
         if (isDestroyed || isFinishing) return
-        
+
         binding.DrawingCanvas.apply {
             alpha = 0f
             scaleX = 0.8f
             scaleY = 0.8f
             visibility = View.VISIBLE
-            
+
             android.animation.ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
                 duration = 1500
                 interpolator = android.view.animation.DecelerateInterpolator()
@@ -1129,22 +1129,23 @@ abstract class EditActivity(private val type: Type) :
                 start()
             }
         }
-        
+
         val postRunnable = Runnable {
             if (isDestroyed || isFinishing) return@Runnable
-            
+
             val toolbarHeight = binding.DrawToolPickerView.height.toFloat()
             binding.DrawToolPickerView.apply {
                 translationY = toolbarHeight
                 alpha = 0f
                 visibility = View.VISIBLE
-                
-                android.animation.ObjectAnimator.ofFloat(this, "translationY", toolbarHeight, 0f).apply {
-                    duration = 1500
-                    interpolator = android.view.animation.AnticipateOvershootInterpolator(2.0f)
-                    activeAnimators.add(this)
-                    start()
-                }
+
+                android.animation.ObjectAnimator.ofFloat(this, "translationY", toolbarHeight, 0f)
+                    .apply {
+                        duration = 1500
+                        interpolator = android.view.animation.AnticipateOvershootInterpolator(2.0f)
+                        activeAnimators.add(this)
+                        start()
+                    }
                 android.animation.ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
                     duration = 1500
                     interpolator = android.view.animation.DecelerateInterpolator()
@@ -1165,13 +1166,11 @@ abstract class EditActivity(private val type: Type) :
         binding.DrawToolPickerView.visibility = View.GONE
         showFABs()
     }
-    
+
     private fun showFABs() {
         binding.JellyFabComposeView.visibility = View.VISIBLE
         val aiFabView = binding.root.findViewWithTag<CardView>("ai_fab")
-        aiFabView?.let { aiFab ->
-            showAIFab(aiFab)
-        }
+        aiFabView?.let { aiFab -> showAIFab(aiFab) }
     }
 
     private fun initDrawToolbar() {
@@ -1188,7 +1187,8 @@ abstract class EditActivity(private val type: Type) :
         ivUndo.setOnClickListener {
             try {
                 changeHistory.undo()
-            } catch (e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
+            } catch (
+                e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
                 application.log(TAG, throwable = e)
             }
         }
@@ -1200,7 +1200,8 @@ abstract class EditActivity(private val type: Type) :
         ivRedo.setOnClickListener {
             try {
                 changeHistory.redo()
-            } catch (e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
+            } catch (
+                e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
                 application.log(TAG, throwable = e)
             }
         }
@@ -1213,38 +1214,33 @@ abstract class EditActivity(private val type: Type) :
             if (isDrawingModeActive) {
                 val initialColor = Color.WHITE
                 val sheet = BackgroundBottomSheet.newInstance(initialColor)
-                        sheet.setListener(
-                            object : BackgroundBottomSheet.Listener {
-                                override fun onBackgroundSelected(colorInt: Int, drawableResId: Int?) {
-                                    if (drawableResId != null) {
-                                        binding.DrawingCanvas.setCanvasBackgroundDrawable(drawableResId)
-                                    } else {
-                                        binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
-                                    }
-                                }
+                sheet.setListener(
+                    object : BackgroundBottomSheet.Listener {
+                        override fun onBackgroundSelected(colorInt: Int, drawableResId: Int?) {
+                            if (drawableResId != null) {
+                                binding.DrawingCanvas.setCanvasBackgroundDrawable(drawableResId)
+                            } else {
+                                binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
                             }
-                        )
+                        }
+                    }
+                )
                 sheet.show(supportFragmentManager, "BackgroundBottomSheet")
             } else {
                 changeColor()
             }
         }
 
-        ivPin.setOnClickListener {
-            pin()
-        }
+        ivPin.setOnClickListener { pin() }
 
-        ivMore.setOnClickListener {
-            openMoreMenu()
-        }
+        ivMore.setOnClickListener { openMoreMenu() }
     }
-    
-    protected open fun openMoreMenu() {
-    }
+
+    protected open fun openMoreMenu() {}
 
     private fun showDrawingArea() {
         if (isDestroyed || isFinishing) return
-        
+
         binding.DrawingDivider.visibility = View.VISIBLE
         binding.DrawingCanvas.visibility = View.VISIBLE
         applySavedBackgroundToCanvas()
@@ -1257,7 +1253,7 @@ abstract class EditActivity(private val type: Type) :
 
         val postRunnable = Runnable {
             if (isDestroyed || isFinishing) return@Runnable
-            
+
             val dividerTop = binding.DrawingDivider.top
             val canvasTop = binding.DrawingCanvas.top
             val dividerYRelative = (dividerTop - canvasTop).toFloat()
@@ -1268,8 +1264,14 @@ abstract class EditActivity(private val type: Type) :
             val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
             applyCanvasLayout(availableHeight, marginPx)
 
-            if (binding.ScrollView is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView) {
-                (binding.ScrollView as com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView).setScrollEnabled(false)
+            if (
+                binding.ScrollView
+                    is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView
+            ) {
+                (binding.ScrollView
+                        as
+                        com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView)
+                    .setScrollEnabled(false)
             }
 
             binding.ScrollView.smoothScrollTo(0, binding.DrawingCanvas.top)
@@ -1291,7 +1293,8 @@ abstract class EditActivity(private val type: Type) :
     }
 
     private fun applySavedBackgroundToCanvas() {
-        // Load persisted preference (per note). If not found, fallback to draft key (id=0) then migrate.
+        // Load persisted preference (per note). If not found, fallback to draft key (id=0) then
+        // migrate.
         loadDrawingBackgroundPreference()?.let { (color, drawableResId) ->
             notallyModel.drawingBackgroundColor = color
             notallyModel.drawingBackgroundDrawableResId = drawableResId
@@ -1299,15 +1302,16 @@ abstract class EditActivity(private val type: Type) :
 
         notallyModel.drawingBackgroundDrawableResId?.let { resId ->
             binding.DrawingCanvas.setCanvasBackgroundDrawable(resId)
-        } ?: run {
-            binding.DrawingCanvas.setCanvasBackgroundColor(notallyModel.drawingBackgroundColor)
         }
+            ?: run {
+                binding.DrawingCanvas.setCanvasBackgroundColor(notallyModel.drawingBackgroundColor)
+            }
     }
 
     private fun persistCurrentBackground() {
         saveDrawingBackgroundPreference(
             notallyModel.drawingBackgroundColor,
-            notallyModel.drawingBackgroundDrawableResId
+            notallyModel.drawingBackgroundDrawableResId,
         )
     }
 
@@ -1366,6 +1370,7 @@ abstract class EditActivity(private val type: Type) :
     }
 
     private fun bgColorKey(id: Long) = "bg_color_$id"
+
     private fun bgResKey(id: Long) = "bg_res_$id"
 
     private fun hideDrawingArea() {
@@ -1383,8 +1388,13 @@ abstract class EditActivity(private val type: Type) :
         binding.DrawingCanvas.isEnabled = false
 
         // Re-enable scroll
-        if (binding.ScrollView is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView) {
-            (binding.ScrollView as com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView).setScrollEnabled(true)
+        if (
+            binding.ScrollView
+                is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView
+        ) {
+            (binding.ScrollView
+                    as com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView)
+                .setScrollEnabled(true)
         }
 
         // Keep canvas visible on note screen
@@ -1426,7 +1436,7 @@ abstract class EditActivity(private val type: Type) :
     private fun measureBottomBarHeight(): Int {
         binding.DrawToolPickerView.measure(
             View.MeasureSpec.makeMeasureSpec(binding.root.width, View.MeasureSpec.AT_MOST),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
         )
         return binding.DrawToolPickerView.measuredHeight
     }
@@ -1439,7 +1449,7 @@ abstract class EditActivity(private val type: Type) :
 
     private fun computeContentHeightFromStrokes(
         strokes: List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>,
-        paddingPx: Int
+        paddingPx: Int,
     ): Int {
         if (strokes.isEmpty()) return 0
         var minTop = Float.MAX_VALUE
@@ -1474,8 +1484,7 @@ abstract class EditActivity(private val type: Type) :
         }
     }
 
-    private fun dpToPx(dp: Int): Int =
-        (dp * resources.displayMetrics.density).toInt()
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
 
     protected fun createFolderActions() =
         when (notallyModel.folder) {
@@ -1546,10 +1555,10 @@ abstract class EditActivity(private val type: Type) :
         )
         setColor()
 
-        // Load drawing strokes v�o canvas n?u c�
+        // Load drawing strokes v?o canvas n?u c?
         if (notallyModel.drawingStrokes.isNotEmpty()) {
             binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
-            // Hi?n th? divider v� canvas n?u c� strokes
+            // Hi?n th? divider v? canvas n?u c? strokes
             binding.DrawingDivider.visibility = View.VISIBLE
             binding.DrawingCanvas.visibility = View.VISIBLE
             isDrawingModeActive = true
@@ -1557,7 +1566,7 @@ abstract class EditActivity(private val type: Type) :
             // Set divider position
             val postRunnable = Runnable {
                 if (isDestroyed || isFinishing) return@Runnable
-                
+
                 val dividerTop = binding.DrawingDivider.top
                 val canvasTop = binding.DrawingCanvas.top
                 val dividerYRelative = (dividerTop - canvasTop).toFloat()
@@ -1566,7 +1575,8 @@ abstract class EditActivity(private val type: Type) :
                 val marginPx = dpToPx(20)
                 val bottomBarHeight = measureBottomBarHeight()
                 val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
-                val contentHeight = computeContentHeightFromStrokes(notallyModel.drawingStrokes, dpToPx(50))
+                val contentHeight =
+                    computeContentHeightFromStrokes(notallyModel.drawingStrokes, dpToPx(50))
                 val targetHeight = max(availableHeight, contentHeight)
                 applyCanvasLayout(targetHeight, marginPx)
             }
@@ -1655,13 +1665,15 @@ abstract class EditActivity(private val type: Type) :
 
     override fun changeColor() {
         lifecycleScope.launch {
-            val colors = withContext(Dispatchers.IO) {
-                NotallyDatabase.getDatabase(this@EditActivity, observePreferences = false)
-                    .value
-                    .getBaseNoteDao()
-                    .getAllColors()
-            }.toMutableList()
-            
+            val colors =
+                withContext(Dispatchers.IO) {
+                        NotallyDatabase.getDatabase(this@EditActivity, observePreferences = false)
+                            .value
+                            .getBaseNoteDao()
+                            .getAllColors()
+                    }
+                    .toMutableList()
+
             if (colors.none { it == notallyModel.color }) {
                 colors.add(notallyModel.color)
             }
@@ -1967,9 +1979,9 @@ abstract class EditActivity(private val type: Type) :
 
     private fun bindPinned() {
         val icon: Int =
-        if (notallyModel.pinned) {
+            if (notallyModel.pinned) {
                 R.drawable.unpin
-        } else {
+            } else {
                 R.drawable.pin
             }
         val ivPin = binding.Toolbar.findViewById<ImageView>(R.id.ivPin)

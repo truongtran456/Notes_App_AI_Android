@@ -32,12 +32,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.sin
 
 @Composable
 fun JellyFab(
@@ -75,54 +74,54 @@ fun JellyFab(
             didRunOnce = true
             return@LaunchedEffect
         }
-        primaryAnimJob = scope.launch {
-            if (state.expanded) {
-                expandPrimaryLayer(primaryProgress, bulges, config) { bulge ->
-                    playDoubleBounce(bulge, outward = true, soft = true)
+        primaryAnimJob =
+            scope.launch {
+                if (state.expanded) {
+                    expandPrimaryLayer(primaryProgress, bulges, config) { bulge ->
+                        playDoubleBounce(bulge, outward = true, soft = true)
+                    }
+                } else {
+                    collapsePrimaryLayer(
+                        primaryProgress,
+                        bulges,
+                        config,
+                        bounceTopBulge = { playDoubleBounce(it, outward = false) },
+                        bounceSideBulge = { playDoubleBounce(it, outward = false) },
+                    )
                 }
-            } else {
-                collapsePrimaryLayer(
-                    primaryProgress,
-                    bulges,
-                    config,
-                    bounceTopBulge = { playDoubleBounce(it, outward = false) },
-                    bounceSideBulge = { playDoubleBounce(it, outward = false) }
-                )
             }
-        }
     }
 
     LaunchedEffect(state.secondaryExpanded) {
         secondaryAnimJob?.cancel()
-        secondaryAnimJob = scope.launch {
-            if (state.secondaryExpanded) {
-                expandSecondaryLayer(secondaryProgress, config)
-            } else {
-                collapseSecondaryLayer(secondaryProgress, config)
+        secondaryAnimJob =
+            scope.launch {
+                if (state.secondaryExpanded) {
+                    expandSecondaryLayer(secondaryProgress, config)
+                } else {
+                    collapseSecondaryLayer(secondaryProgress, config)
+                }
             }
-        }
     }
 
     val centerCorrect = (miniFabSize - fabSize) / 2f
 
-    Box(
-        modifier = modifier.fillMaxSize()
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
         val scrimVisible = state.expanded || state.secondaryExpanded
-        val scrimAlpha by animateFloatAsState(
-            targetValue = if (scrimVisible) 1f else 0f,
-            animationSpec = tween(250)
-        )
+        val scrimAlpha by
+            animateFloatAsState(
+                targetValue = if (scrimVisible) 1f else 0f,
+                animationSpec = tween(250),
+            )
 
         if (showScrim && scrimAlpha > 0.01f) {
             Box(
-                Modifier
-                    .matchParentSize()
+                Modifier.matchParentSize()
                     .graphicsLayer { alpha = scrimAlpha }
                     .background(Color.White.copy(alpha = 0.55f))
                     .clickable(
                         indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
+                        interactionSource = remember { MutableInteractionSource() },
                     ) {
                         scope.launch {
                             state.secondaryExpanded = false
@@ -134,15 +133,16 @@ fun JellyFab(
         }
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.BottomEnd
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            contentAlignment = Alignment.BottomEnd,
         ) {
-            val primaryAngles = remember(primaryItems.size) { evenArcAngles(startDeg = 180.0, endDeg = 270.0, count = primaryItems.size) }
+            val primaryAngles =
+                remember(primaryItems.size) {
+                    evenArcAngles(startDeg = 180.0, endDeg = 270.0, count = primaryItems.size)
+                }
             val primaryPositions = remember { MutableList(primaryItems.size) { Offset.Zero } }
 
-            // PRIMARY LAYER â€” executes item.onClick(); last item toggles secondary if present
+            // PRIMARY LAYER — executes item.onClick(); last item toggles secondary if present
             primaryItems.forEachIndexed { index, item ->
                 val angleRad = Math.toRadians(primaryAngles[index])
                 val p = primaryProgress[index].value
@@ -153,7 +153,8 @@ fun JellyFab(
                 FloatingActionButton(
                     onClick = {
                         scope.launch {
-                            val isMorePrimary = (index == primaryItems.lastIndex) && secondaryItems.isNotEmpty()
+                            val isMorePrimary =
+                                (index == primaryItems.lastIndex) && secondaryItems.isNotEmpty()
                             if (isMorePrimary) {
                                 // toggle secondary layer from the "more" primary (last item)
                                 state.secondaryExpanded = !state.secondaryExpanded
@@ -167,26 +168,28 @@ fun JellyFab(
                             }
                         }
                     },
-                    modifier = Modifier
-                        .offset(dx.dp + centerCorrect, dy.dp + centerCorrect)
-                        .graphicsLayer {
-                            scaleX = 0.8f + 0.2f * p
-                            scaleY = 0.8f + 0.2f * p
-                        }
-                        .size(miniFabSize),
+                    modifier =
+                        Modifier.offset(dx.dp + centerCorrect, dy.dp + centerCorrect)
+                            .graphicsLayer {
+                                scaleX = 0.8f + 0.2f * p
+                                scaleY = 0.8f + 0.2f * p
+                            }
+                            .size(miniFabSize),
                     shape = CircleShape,
-                    containerColor = if ((index == primaryItems.lastIndex) && secondaryItems.isNotEmpty()) {
-                        secondLayerFabColor
-                    } else {
-                        fabColor
-                    },
-                    elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                    containerColor =
+                        if ((index == primaryItems.lastIndex) && secondaryItems.isNotEmpty()) {
+                            secondLayerFabColor
+                        } else {
+                            fabColor
+                        },
+                    elevation = FloatingActionButtonDefaults.elevation(0.dp),
                 ) {
                     val icon: ImageVector =
                         if ((index == primaryItems.lastIndex) && secondaryItems.isNotEmpty())
                             animatedSecondaryToggleIcon(
                                 secondaryExpanded = state.secondaryExpanded,
-                                delayOnCollapse = secondaryCollapseDuration(secondaryItems.size, config)
+                                delayOnCollapse =
+                                    secondaryCollapseDuration(secondaryItems.size, config),
                             )
                         else item.icon
 
@@ -222,17 +225,20 @@ fun JellyFab(
                                 item.onClick()
                             }
                         },
-                        modifier = Modifier
-                            .offset(current.x.dp + centerCorrect, current.y.dp + centerCorrect)
-                            .graphicsLayer {
-                                alpha = p
-                                scaleX = 0.8f + 0.2f * p
-                                scaleY = 0.8f + 0.2f * p
-                            }
-                            .size(miniFabSize),
+                        modifier =
+                            Modifier.offset(
+                                    current.x.dp + centerCorrect,
+                                    current.y.dp + centerCorrect,
+                                )
+                                .graphicsLayer {
+                                    alpha = p
+                                    scaleX = 0.8f + 0.2f * p
+                                    scaleY = 0.8f + 0.2f * p
+                                }
+                                .size(miniFabSize),
                         shape = CircleShape,
                         containerColor = secondLayerFabColor,
-                        elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                        elevation = FloatingActionButtonDefaults.elevation(0.dp),
                     ) {
                         Icon(item.icon, null, tint = Color.White)
                     }
@@ -248,44 +254,35 @@ fun JellyFab(
                     shadowOpacity = config.shadowOpacity,
                     shadowBlurFactor = config.shadowBlurFactor,
                     bulgeAngles = primaryAngles,
-                    bounceFactor = config.bounceFactor
+                    bounceFactor = config.bounceFactor,
                 )
 
                 val rotation by animateFloatAsState(if (state.expanded) 0f else 45f, tween(260))
 
                 Box(
-                    Modifier
-                        .size(fabSize)
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() }
-                        ) {
-                            when {
-                                !state.expanded -> state.expanded = true
-                                state.secondaryExpanded -> {
-                                    scope.launch {
-                                        state.secondaryExpanded = false
-                                        delay(
-                                            secondaryCollapseDuration(
-                                                secondaryItems.size,
-                                                config
-                                            )
-                                        )
-                                        state.expanded = false
-                                    }
+                    Modifier.size(fabSize).clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) {
+                        when {
+                            !state.expanded -> state.expanded = true
+                            state.secondaryExpanded -> {
+                                scope.launch {
+                                    state.secondaryExpanded = false
+                                    delay(secondaryCollapseDuration(secondaryItems.size, config))
+                                    state.expanded = false
                                 }
-                                else -> state.expanded = false
                             }
-                        },
-                    contentAlignment = Alignment.Center
+                            else -> state.expanded = false
+                        }
+                    },
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         CloseIcon,
                         null,
                         tint = Color.White,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .rotate(rotation)
+                        modifier = Modifier.size(32.dp).rotate(rotation),
                     )
                 }
             }
@@ -296,7 +293,7 @@ fun JellyFab(
 @Composable
 internal fun animatedSecondaryToggleIcon(
     secondaryExpanded: Boolean,
-    delayOnCollapse: Long = 360L
+    delayOnCollapse: Long = 360L,
 ): ImageVector {
     var icon by remember { mutableStateOf(MoreHorizontal) }
 
@@ -311,4 +308,3 @@ internal fun animatedSecondaryToggleIcon(
 
     return icon
 }
-

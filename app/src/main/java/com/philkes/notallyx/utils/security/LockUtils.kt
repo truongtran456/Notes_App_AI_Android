@@ -99,9 +99,7 @@ private fun showBiometricOrPinPrompt(
                         result: BiometricPrompt.AuthenticationResult?
                     ) {
                         super.onAuthenticationSucceeded(result)
-                        result?.cryptoObject?.cipher?.let { cipher ->
-                            onSuccess.invoke(cipher)
-                        }
+                        result?.cryptoObject?.cipher?.let { cipher -> onSuccess.invoke(cipher) }
                     }
 
                     override fun onAuthenticationFailed() {
@@ -148,9 +146,7 @@ private fun showBiometricOrPinPrompt(
                         result: BiometricPrompt.AuthenticationResult?
                     ) {
                         super.onAuthenticationSucceeded(result)
-                        result?.cryptoObject?.cipher?.let { cipher ->
-                            onSuccess.invoke(cipher)
-                        }
+                        result?.cryptoObject?.cipher?.let { cipher -> onSuccess.invoke(cipher) }
                     }
 
                     override fun onAuthenticationFailed() {

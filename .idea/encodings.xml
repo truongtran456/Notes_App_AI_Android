@@ -4,5 +4,6 @@
     <file url="file://$PROJECT_DIR$/app/src/main/java/com/philkes/notallyx/data/api/ApiClient.kt" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/app/src/main/java/com/philkes/notallyx/data/api/NoteAIService.kt" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/app/src/main/java/com/philkes/notallyx/data/api/models/AIModels.kt" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/app/src/main/java/com/philkes/notallyx/presentation/activity/note/EditListActivity.kt" charset="UTF-8" />
   </component>
 </project>

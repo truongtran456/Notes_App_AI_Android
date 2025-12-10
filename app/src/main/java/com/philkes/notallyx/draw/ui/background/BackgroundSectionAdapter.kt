@@ -11,109 +11,107 @@ class BackgroundSectionAdapter(
     private val sections: MutableList<BackgroundSection>,
     private val onItemClick: (BackgroundItem) -> Unit,
 ) : RecyclerView.Adapter<BackgroundSectionAdapter.SectionViewHolder>() {
-    
-    // Map để lưu adapter reference theo section type
+
+    // Map ?? l?u adapter reference theo section type
     private val adapterMap = mutableMapOf<BackgroundCategoryType, BackgroundItemAdapter>()
 
-    override fun onCreateViewHolder(
-        parent: ViewGroup,
-        viewType: Int,
-    ): SectionViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SectionViewHolder {
         val binding =
-            ItemBackgroundSectionBinding.inflate(
-                LayoutInflater.from(parent.context),
-                parent,
-                false,
-            )
+            ItemBackgroundSectionBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return SectionViewHolder(binding)
     }
 
     override fun getItemCount(): Int = sections.size
 
-    override fun onBindViewHolder(
-        holder: SectionViewHolder,
-        position: Int,
-    ) {
+    override fun onBindViewHolder(holder: SectionViewHolder, position: Int) {
         holder.bind(sections[position])
     }
 
     fun updateSections(newSections: List<BackgroundSection>) {
-        // ✅ Luôn update để đảm bảo sync state
+        // ? Lu�n update ?? ??m b?o sync state
         sections.clear()
         sections.addAll(newSections)
-        
-        // ✅ Update tất cả adapter con với items mới (QUAN TRỌNG!)
+
+        // ? Update t?t c? adapter con v?i items m?i (QUAN TR?NG!)
         newSections.forEach { section ->
             adapterMap[section.type]?.updateItems(section.items.toMutableList())
         }
-        
-        // ✅ Notify để rebind các section
+
+        // ? Notify ?? rebind c�c section
         notifyDataSetChanged()
     }
 
-    inner class SectionViewHolder(
-        private val binding: ItemBackgroundSectionBinding,
-    ) : RecyclerView.ViewHolder(binding.root) {
+    inner class SectionViewHolder(private val binding: ItemBackgroundSectionBinding) :
+        RecyclerView.ViewHolder(binding.root) {
 
         fun bind(section: BackgroundSection) {
             binding.tvTitle.text = section.title
 
             val context = binding.root.context
             val spacing = context.resources.getDimension(com.philkes.notallyx.R.dimen.dp_12).toInt()
-            val spanCount = 3.8f // Hiển thị ~3-4 items/hàng
+            val spanCount = 3.8f // Hi?n th? ~3-4 items/h�ng
 
-            // ✅ QUAN TRỌNG: Lấy hoặc tạo adapter từ map
-            val itemAdapter = adapterMap.getOrPut(section.type) {
-                BackgroundItemAdapter(section.items.toMutableList(), onItemClick)
-            }
-            
-            // ✅ QUAN TRỌNG: Luôn update adapter với section.items mới mỗi lần bind
-            // Điều này đảm bảo state được sync đúng (theo pattern trong tài liệu)
+            // ? QUAN TR?NG: L?y ho?c t?o adapter t? map
+            val itemAdapter =
+                adapterMap.getOrPut(section.type) {
+                    BackgroundItemAdapter(section.items.toMutableList(), onItemClick)
+                }
+
+            // ? QUAN TR?NG: Lu�n update adapter v?i section.items m?i m?i l?n bind
+            // ?i?u n�y ??m b?o state ???c sync ?�ng (theo pattern trong t�i li?u)
             itemAdapter.updateItems(section.items.toMutableList())
 
             binding.rvItems.apply {
-                // Chỉ set adapter và layout manager lần đầu
+                // Ch? set adapter v� layout manager l?n ??u
                 if (adapter == null) {
-                    setHasFixedSize(true) // Tối ưu performance
-                    setItemViewCacheSize(3) // Giảm cache để giảm memory (từ 5 xuống 3)
-                    isDrawingCacheEnabled = false // Tắt drawing cache để giảm memory
-                    setRecycledViewPool(RecyclerView.RecycledViewPool().apply {
-                        setMaxRecycledViews(0, 5) // Giới hạn số lượng view được recycle
-                    })
-                    
+                    setHasFixedSize(true) // T?i ?u performance
+                    setItemViewCacheSize(3) // Gi?m cache ?? gi?m memory (t? 5 xu?ng 3)
+                    isDrawingCacheEnabled = false // T?t drawing cache ?? gi?m memory
+                    setRecycledViewPool(
+                        RecyclerView.RecycledViewPool().apply {
+                            setMaxRecycledViews(0, 5) // Gi?i h?n s? l??ng view ???c recycle
+                        }
+                    )
+
                     adapter = itemAdapter
-                    
-                    // Setup layout manager với tính toán item width - cache kết quả
+
+                    // Setup layout manager v?i t�nh to�n item width - cache k?t qu?
                     var cachedItemWidth = 0
                     post {
-                        layoutManager = object : LinearLayoutManager(
-                        context,
-                            LinearLayoutManager.HORIZONTAL,
-                        false,
-                        ) {
-                            override fun checkLayoutParams(lp: RecyclerView.LayoutParams): Boolean {
-                                if (cachedItemWidth == 0) {
-                                    val parentWidth = width
-                                    if (parentWidth > 0) {
-                                        // Tính width mỗi item: (parentWidth - spacing) / spanCount
-                                        cachedItemWidth = ((parentWidth - (spanCount - 1) * spacing) / spanCount).toInt()
+                        layoutManager =
+                            object :
+                                LinearLayoutManager(
+                                    context,
+                                    LinearLayoutManager.HORIZONTAL,
+                                    false,
+                                ) {
+                                override fun checkLayoutParams(
+                                    lp: RecyclerView.LayoutParams
+                                ): Boolean {
+                                    if (cachedItemWidth == 0) {
+                                        val parentWidth = width
+                                        if (parentWidth > 0) {
+                                            // T�nh width m?i item: (parentWidth - spacing) /
+                                            // spanCount
+                                            cachedItemWidth =
+                                                ((parentWidth - (spanCount - 1) * spacing) /
+                                                        spanCount)
+                                                    .toInt()
+                                        }
                                     }
+                                    if (cachedItemWidth > 0) {
+                                        lp.width = cachedItemWidth
+                                    }
+                                    return true
                                 }
-                                if (cachedItemWidth > 0) {
-                                    lp.width = cachedItemWidth
-                                }
-                                return true
                             }
-                        }
                     }
-                    
-                if (itemDecorationCount == 0) {
-                    addSpaceDecoration(spacing, includeEdge = false)
+
+                    if (itemDecorationCount == 0) {
+                        addSpaceDecoration(spacing, includeEdge = false)
                     }
                 }
             }
         }
     }
 }
-
-

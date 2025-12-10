@@ -46,25 +46,31 @@ fun JellyBlob(
         val shadowSpread = 1.1f - 0.08f * bulgeInfluence
         val shadowAlpha = shadowOpacity + 0.1f * bulgeInfluence
         val shadowLift = -topBulge * baseR * 0.1f
-        val shadowPaint = AndroidPaint().apply {
-            isAntiAlias = true
-            style = AndroidPaint.Style.FILL
-            this.color = color.copy(alpha = shadowAlpha).toArgb()
-            maskFilter = BlurMaskFilter(baseR * shadowBlurFactor * shadowSpread, BlurMaskFilter.Blur.NORMAL)
-        }
+        val shadowPaint =
+            AndroidPaint().apply {
+                isAntiAlias = true
+                style = AndroidPaint.Style.FILL
+                this.color = color.copy(alpha = shadowAlpha).toArgb()
+                maskFilter =
+                    BlurMaskFilter(
+                        baseR * shadowBlurFactor * shadowSpread,
+                        BlurMaskFilter.Blur.NORMAL,
+                    )
+            }
         drawIntoCanvas { canvas ->
             canvas.nativeCanvas.drawCircle(
                 cx,
                 cy + baseR * 0.1f + shadowLift,
                 baseR * shadowSpread,
-                shadowPaint
+                shadowPaint,
             )
         }
         val sampleCount = 36
-        val pts = MutableList(sampleCount) { i ->
-            val a = -Math.PI / 2 + i * (2 * Math.PI / sampleCount)
-            Offset((cx + baseR * cos(a)).toFloat(), (cy + baseR * sin(a)).toFloat())
-        }
+        val pts =
+            MutableList(sampleCount) { i ->
+                val a = -Math.PI / 2 + i * (2 * Math.PI / sampleCount)
+                Offset((cx + baseR * cos(a)).toFloat(), (cy + baseR * sin(a)).toFloat())
+            }
         for ((idx, deg) in bulgeAngles.withIndex()) {
             val v = bulges.getOrNull(idx) ?: 0f
             if (v != 0f) {
@@ -82,17 +88,17 @@ fun JellyBlob(
                 }
             }
         }
-        val path = Path().apply {
-            moveTo(pts[0].x, pts[0].y)
-            for (i in 1 until pts.size) {
-                val prev = pts[i - 1]
-                val cur = pts[i]
-                val mid = Offset((prev.x + cur.x) / 2, (prev.y + cur.y) / 2)
-                quadraticTo(prev.x, prev.y, mid.x, mid.y)
+        val path =
+            Path().apply {
+                moveTo(pts[0].x, pts[0].y)
+                for (i in 1 until pts.size) {
+                    val prev = pts[i - 1]
+                    val cur = pts[i]
+                    val mid = Offset((prev.x + cur.x) / 2, (prev.y + cur.y) / 2)
+                    quadraticTo(prev.x, prev.y, mid.x, mid.y)
+                }
+                close()
             }
-            close()
-        }
         drawPath(path, color)
     }
 }
-

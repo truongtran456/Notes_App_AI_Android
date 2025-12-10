@@ -18,4 +18,3 @@ data class JellyFabConfig(
     val secondaryLayerSpacingMultiplier: Float = 1.8f,
     val layerDistance: Dp = 80.dp,
 )
-

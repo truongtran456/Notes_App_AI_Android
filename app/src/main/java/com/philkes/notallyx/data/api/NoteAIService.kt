@@ -3,6 +3,7 @@ package com.philkes.notallyx.data.api
 import com.philkes.notallyx.data.api.models.AsyncJobResponse
 import com.philkes.notallyx.data.api.models.JobStatusResponse
 import com.philkes.notallyx.data.api.models.SummaryResponse
+import com.philkes.notallyx.data.api.models.TranslateResponse
 import com.philkes.notallyx.data.api.models.UserNotesResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -34,8 +35,11 @@ interface NoteAIService {
     @POST("process")
     suspend fun processFile(
         @Part file: MultipartBody.Part,
+        @Part("text") text: RequestBody? = null,
         @Part("user_id") userId: RequestBody? = null,
         @Part("note_id") noteId: RequestBody? = null,
+        @Part("content_type") contentType: RequestBody? = null,
+        @Part("checked_vocab_items") checkedVocabItems: RequestBody? = null,
     ): Response<SummaryResponse>
 
     @FormUrlEncoded
@@ -44,6 +48,8 @@ interface NoteAIService {
         @Field("text") text: String,
         @Field("user_id") userId: String? = null,
         @Field("note_id") noteId: String? = null,
+        @Field("content_type") contentType: String? = null,
+        @Field("checked_vocab_items") checkedVocabItems: String? = null,
     ): Response<SummaryResponse>
 
     @Multipart
@@ -53,6 +59,8 @@ interface NoteAIService {
         @Part files: List<MultipartBody.Part>,
         @Part("user_id") userId: RequestBody? = null,
         @Part("note_id") noteId: RequestBody? = null,
+        @Part("content_type") contentType: RequestBody? = null,
+        @Part("checked_vocab_items") checkedVocabItems: RequestBody? = null,
     ): Response<SummaryResponse>
 
     // ==================== ASYNCHRONOUS ENDPOINTS ====================
@@ -105,4 +113,13 @@ interface NoteAIService {
 
     @DELETE("notes/{note_id}")
     suspend fun deleteNote(@Path("note_id") noteId: String): Response<Map<String, Any>>
+
+    // ==================== TRANSLATION ENDPOINT ====================
+
+    @FormUrlEncoded
+    @POST("translate")
+    suspend fun translateText(
+        @Field("text") text: String,
+        @Field("target_language") targetLanguage: String = "Vietnamese",
+    ): Response<TranslateResponse>
 }
