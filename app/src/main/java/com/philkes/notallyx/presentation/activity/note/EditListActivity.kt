@@ -1,9 +1,15 @@
 package com.philkes.notallyx.presentation.activity.note
 
 import android.os.Bundle
+import android.view.View
+import androidx.lifecycle.lifecycleScope
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.philkes.notallyx.R
+import com.philkes.notallyx.data.api.models.AIResult
+import com.philkes.notallyx.data.api.models.SummaryResponse
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.preferences.getAiUserId
+import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
 import com.philkes.notallyx.presentation.setOnNextAction
 import com.philkes.notallyx.presentation.showToast
@@ -22,12 +28,19 @@ import com.philkes.notallyx.presentation.viewmodel.preference.ListItemSort
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences
 import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
     private var adapter: ListItemAdapter? = null
     private lateinit var items: ListItemSortedList
     private lateinit var listManager: ListManager
+
+    // Cache for AI results
+    private var cachedVocabResult: SummaryResponse? = null
+    private var aiRepository: AIRepository? = null
 
     override fun finish() {
         notallyModel.setItems(items.toMutableList())
@@ -77,137 +90,173 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     override fun openTextFormattingMenu() {}
 
     override fun openAIActionsMenu() {
-        val noteText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
+        // Collect checked items (vocabulary words)
+        val checkedItems =
+            items
+                .toMutableList()
+                .filter { it.checked }
+                .map { it.body.toString().trim() }
+                .filter { it.isNotBlank() }
+
+        // Collect all items (for file attachments or unchecked items)
+        val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
+        val checkedVocabItems = checkedItems.joinToString("\n")
+
         val attachmentUris = getAttachedFileUris()
-        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
-        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
 
-        sheetView.findViewById<android.view.View>(R.id.ActionSummary).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
-                    .startWithAttachments(
-                        context = this,
-                        noteText = noteText.ifBlank { null },
-                        noteId = notallyModel.id,
-                        attachments = attachmentUris,
-                        initialSection =
-                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
-                                .AISection
-                                .SUMMARY,
-                    )
-            } else {
-                AISummaryActivity.start(
-                    this,
-                    noteText,
-                    notallyModel.id,
-                    AISummaryActivity.AISection.SUMMARY,
-                )
-            }
+        // Always process AI (backend will check cache and return cached result if content
+        // unchanged)
+        // This ensures we always have the latest result and backend cache is checked
+        processVocabAI(checkedVocabItems, attachmentUris)
+    }
+
+    /**
+     * Invalidate cache when checklist items change (checked/unchecked, added/deleted) This ensures
+     * fresh AI results when content changes
+     */
+    private fun invalidateVocabCache() {
+        cachedVocabResult = null
+    }
+
+    private fun processVocabAI(checkedVocabItems: String, attachmentUris: List<android.net.Uri>) {
+        if (checkedVocabItems.isBlank() && attachmentUris.isEmpty()) {
+            showToast(R.string.ai_error_empty_note)
+            return
         }
 
-        sheetView.findViewById<android.view.View>(R.id.ActionBullet).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
+        // Show loading dialog
+        val loadingDialog =
+            android.app.ProgressDialog(this).apply {
+                setMessage(getString(R.string.ai_processing))
+                setCancelable(false)
+                show()
             }
-            dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
-                    .startWithAttachments(
-                        context = this,
-                        noteText = noteText.ifBlank { null },
-                        noteId = notallyModel.id,
-                        attachments = attachmentUris,
-                        initialSection =
-                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
-                                .AISection
-                                .BULLET_POINTS,
-                    )
-            } else {
-                AISummaryActivity.start(
-                    this,
-                    noteText,
-                    notallyModel.id,
-                    AISummaryActivity.AISection.BULLET_POINTS,
-                )
-            }
+
+        if (aiRepository == null) {
+            aiRepository = AIRepository(this)
         }
 
-        sheetView.findViewById<android.view.View>(R.id.ActionQuestions).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
-                    .startWithAttachments(
-                        context = this,
-                        noteText = noteText.ifBlank { null },
-                        noteId = notallyModel.id,
-                        attachments = attachmentUris,
-                        initialSection =
-                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
-                                .AISection
-                                .QUESTIONS,
-                    )
-            } else {
-                AISummaryActivity.start(
-                    this,
-                    noteText,
-                    notallyModel.id,
-                    AISummaryActivity.AISection.QUESTIONS,
-                )
+        val userId = getAiUserId()
+        val noteId = if (notallyModel.id != -1L) notallyModel.id.toString() else null
+
+        lifecycleScope.launch {
+            try {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        if (attachmentUris.isNotEmpty()) {
+                            aiRepository!!.processCombinedInputs(
+                                noteText = checkedVocabItems.ifBlank { null },
+                                attachments = attachmentUris,
+                                userId = userId,
+                                noteId = noteId,
+                                contentType = "checklist",
+                                checkedVocabItems = checkedVocabItems,
+                                useCache = true, // Use backend cache
+                            )
+                        } else {
+                            aiRepository!!.processNoteText(
+                                noteText = checkedVocabItems,
+                                userId = userId,
+                                noteId = noteId,
+                                contentType = "checklist",
+                                checkedVocabItems = checkedVocabItems,
+                                useCache = true, // Use backend cache
+                            )
+                        }
+                    }
+
+                loadingDialog.dismiss()
+
+                when (result) {
+                    is AIResult.Success -> {
+                        cachedVocabResult = result.data
+                        showVocabActionsBottomSheet(checkedVocabItems, attachmentUris, result.data)
+                    }
+                    is AIResult.Error -> {
+                        showToast(result.message ?: getString(R.string.ai_error_generic))
+                    }
+                    is AIResult.Loading -> {
+                        // Should not happen in sync call
+                    }
+                }
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                showToast("Error: ${e.message ?: "Unknown error"}")
             }
         }
+    }
 
-        sheetView.findViewById<android.view.View>(R.id.ActionMCQ).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
-                    .startWithAttachments(
-                        context = this,
-                        noteText = noteText.ifBlank { null },
-                        noteId = notallyModel.id,
-                        attachments = attachmentUris,
-                        initialSection =
-                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
-                                .AISection
-                                .MCQ,
-                    )
-            } else {
-                AISummaryActivity.start(
-                    this,
-                    noteText,
-                    notallyModel.id,
-                    AISummaryActivity.AISection.MCQ,
-                )
-            }
-        }
+    private fun showVocabActionsBottomSheet(
+        checkedVocabItems: String,
+        attachmentUris: List<android.net.Uri>,
+        cachedResult: SummaryResponse,
+    ) {
+        val dialog = BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_vocab_actions, null)
 
-        sheetView.findViewById<android.view.View>(R.id.ActionFile).setOnClickListener {
+        // Summary Table
+        sheetView.findViewById<View>(R.id.ActionSummaryTable).setOnClickListener {
             dialog.dismiss()
-            com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity.start(
+            // Use cached result to display immediately
+            AISummaryActivity.startWithResult(
                 context = this,
-                noteText = noteText,
+                summaryResponse = cachedResult,
                 noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.VOCAB_SUMMARY_TABLE,
+                isVocabMode = true,
             )
         }
 
-        sheetView.findViewById<android.view.View>(R.id.ActionHistory).setOnClickListener {
+        // Vocab Story
+        sheetView.findViewById<View>(R.id.ActionVocabStory).setOnClickListener {
             dialog.dismiss()
-            com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity.start(
-                this,
-                userId = getAiUserId(),
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.VOCAB_STORY,
+                isVocabMode = true,
+            )
+        }
+
+        // Vocab MCQ
+        sheetView.findViewById<View>(R.id.ActionVocabMCQ).setOnClickListener {
+            dialog.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
+                isVocabMode = true,
+            )
+        }
+
+        // Flashcards
+        sheetView.findViewById<View>(R.id.ActionFlashcards).setOnClickListener {
+            dialog.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.VOCAB_FLASHCARDS,
+                isVocabMode = true,
+            )
+        }
+
+        // Mindmap
+        sheetView.findViewById<View>(R.id.ActionMindmap).setOnClickListener {
+            dialog.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.VOCAB_MINDMAP,
+                isVocabMode = true,
             )
         }
 
@@ -215,9 +264,25 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         dialog.show()
     }
 
+    private fun launchAIVocabSummary(
+        checkedVocabItems: String,
+        section: AISummaryActivity.AISection,
+    ) {
+        AISummaryActivity.start(
+            this,
+            checkedVocabItems,
+            notallyModel.id,
+            section,
+            useProcessEndpointForText = true,
+            contentType = "checklist",
+            checkedVocabItems = checkedVocabItems,
+        )
+    }
+
     private fun getAttachedFileUris(): List<android.net.Uri> {
         val uris = mutableListOf<android.net.Uri>()
 
+        // Files
         val filesRoot = notallyModel.filesRoot
         val fileAttachments = notallyModel.files.value ?: emptyList()
         if (filesRoot != null && fileAttachments.isNotEmpty()) {
@@ -229,6 +294,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             }
         }
 
+        // Images
         val imagesRoot = notallyModel.imageRoot
         val imageAttachments = notallyModel.images.value ?: emptyList()
         if (imagesRoot != null && imageAttachments.isNotEmpty()) {
@@ -240,7 +306,19 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             }
         }
 
-        return uris
+        // Audios
+        val audioRoot = notallyModel.audioRoot
+        val audioAttachments = notallyModel.audios.value ?: emptyList()
+        if (audioRoot != null && audioAttachments.isNotEmpty()) {
+            audioAttachments.forEach { audio ->
+                val file = java.io.File(audioRoot, audio.name)
+                if (file.exists()) {
+                    uris.add(this.getUriForFile(file))
+                }
+            }
+        }
+
+        return uris.distinct()
     }
 
     override fun highlightSearchResults(search: String): Int {
@@ -295,7 +373,15 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
     override fun setupListeners() {
         super.setupListeners()
-        binding.AddItem.setOnClickListener { listManager.add() }
+        binding.AddItem.setOnClickListener {
+            listManager.add()
+            // Invalidate cache when item is added
+            invalidateVocabCache()
+        }
+
+        // Invalidate cache when items change (checked/unchecked, deleted, etc.)
+        // This is handled by ListManager callbacks, but we can also add explicit invalidation
+        // when needed. For now, cache will be checked against backend content_hash.
     }
 
     override fun setStateFromModel(savedInstanceState: Bundle?) {
