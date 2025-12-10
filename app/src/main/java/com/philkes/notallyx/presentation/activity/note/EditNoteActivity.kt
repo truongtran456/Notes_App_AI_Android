@@ -20,19 +20,21 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.View.GONE
-import android.view.View.VISIBLE
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.updateLayoutParams
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.philkes.notallyx.R
+import com.philkes.notallyx.data.api.models.AIResult
+import com.philkes.notallyx.data.api.models.SummaryResponse
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.model.createNoteUrl
 import com.philkes.notallyx.data.model.getNoteIdFromUrl
@@ -40,10 +42,9 @@ import com.philkes.notallyx.data.model.getNoteTypeFromUrl
 import com.philkes.notallyx.data.model.isNoteUrl
 import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.data.preferences.getBackendNoteIdOrLocal
+import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.databinding.BottomTextFormattingMenuBinding
 import com.philkes.notallyx.databinding.RecyclerToggleBinding
-import com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
-import com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_EXCLUDE_NOTE_ID
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_ID
@@ -66,6 +67,9 @@ import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
 import com.philkes.notallyx.utils.wrapWithChooser
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
 
@@ -75,6 +79,8 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     private lateinit var textFormatMenu: View
 
     private var textFormattingAdapter: TextFormattingAdapter? = null
+    private val aiRepository by lazy { AIRepository(this) }
+    private var cachedAiResult: SummaryResponse? = null
 
     private var searchResultIndices: List<Pair<Int, Int>>? = null
 
@@ -339,13 +345,13 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                     .apply { isEnabled = binding.EnterBody.isActionModeOn }
         }
 
-        // CENTER: Empty (AI button moved to FAB á»Ÿ gÃ³c dÆ°á»›i bÃªn pháº£i)
+        // CENTER: Empty (AI button moved to FAB ? góc d??i bên ph?i)
         binding.BottomAppBarCenter.apply {
             visibility = GONE
             removeAllViews()
         }
-        
-        // Táº¡o FAB AI gradient á»Ÿ gÃ³c dÆ°á»›i bÃªn pháº£i
+
+        // T?o FAB AI gradient ? góc d??i bên ph?i
         setupAIFloatingButton()
 
         // RIGHT: Redo + Draw + More
@@ -434,117 +440,101 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     override fun openAIActionsMenu() {
         val noteText = binding.EnterBody.text?.toString().orEmpty()
         val attachmentUris = getAttachedFileUris()
-        val dialog = BottomSheetDialog(this)
-        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
 
-        sheetView.findViewById<View>(R.id.ActionSummary).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
-                    noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    backendNoteId = backendNoteId,
-                    attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.SUMMARY,
-                )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.SUMMARY)
-            }
+        if (noteText.isBlank() && attachmentUris.isEmpty()) {
+            showToast(R.string.ai_error_empty_note)
+            return
         }
 
-        sheetView.findViewById<View>(R.id.ActionBullet).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
-                    noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    backendNoteId = backendNoteId,
-                    attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.BULLET_POINTS,
-                )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.BULLET_POINTS)
-            }
+        val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
+        val userId = getAiUserId()
+
+        // N?u ?ã có cache, hi?n th? bottom sheet ?? ch?n ch?c n?ng
+        cachedAiResult?.let {
+            showAIFunctionSelectionBottomSheet(it)
+            return
         }
 
-        sheetView.findViewById<View>(R.id.ActionQuestions).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
+        // Ch?y AI m?t l?n, dùng cache (backend + local)
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result =
+                aiRepository.processCombinedInputs(
                     noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    backendNoteId = backendNoteId,
                     attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.QUESTIONS,
+                    userId = userId,
+                    noteId = backendNoteId,
+                    useCache = true, // s? l?y t? DB backend n?u có
                 )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.QUESTIONS)
+            withContext(Dispatchers.Main) {
+                when (result) {
+                    is AIResult.Success -> {
+                        cachedAiResult = result.data
+                        showAIFunctionSelectionBottomSheet(result.data)
+                    }
+                    is AIResult.Error -> {
+                        showToast(result.message)
+                    }
+                    else -> {}
+                }
             }
         }
+    }
 
-        sheetView.findViewById<View>(R.id.ActionMCQ).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
-                    noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    backendNoteId = backendNoteId,
-                    attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.MCQ,
-                )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.MCQ)
-            }
-        }
+    private fun showAIFunctionSelectionBottomSheet(summaryResponse: SummaryResponse) {
+        val bottomSheet = BottomSheetDialog(this)
+        val bottomSheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
+        bottomSheet.setContentView(bottomSheetView)
 
-        sheetView.findViewById<View>(R.id.ActionFile).setOnClickListener {
-            dialog.dismiss()
-            val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
-            AIFileProcessActivity.start(
+        // ?n các m?c không c?n thi?t cho note Text
+        bottomSheetView.findViewById<View>(R.id.ActionFile)?.visibility = GONE
+        bottomSheetView.findViewById<View>(R.id.ActionHistory)?.visibility = GONE
+
+        // X? lý click cho t?ng m?c ch?c n?ng
+        bottomSheetView.findViewById<View>(R.id.ActionSummary)?.setOnClickListener {
+            bottomSheet.dismiss()
+            AISummaryActivity.startWithResult(
                 context = this,
-                noteText = noteText,
+                summaryResponse = summaryResponse,
                 noteId = notallyModel.id,
-                backendNoteId = backendNoteId,
+                showAllSections = false, // Ch? hi?n th? 1 section
+                initialSection = AISummaryActivity.AISection.SUMMARY,
             )
         }
 
-        sheetView.findViewById<View>(R.id.ActionHistory).setOnClickListener {
-            dialog.dismiss()
-            AIHistoryActivity.start(this, userId = getAiUserId())
+        bottomSheetView.findViewById<View>(R.id.ActionBullet)?.setOnClickListener {
+            bottomSheet.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = summaryResponse,
+                noteId = notallyModel.id,
+                showAllSections = false, // Ch? hi?n th? 1 section
+                initialSection = AISummaryActivity.AISection.BULLET_POINTS,
+            )
         }
 
-        dialog.setContentView(sheetView)
-        dialog.show()
-    }
+        bottomSheetView.findViewById<View>(R.id.ActionQuestions)?.setOnClickListener {
+            bottomSheet.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = summaryResponse,
+                noteId = notallyModel.id,
+                showAllSections = false, // Ch? hi?n th? 1 section
+                initialSection = AISummaryActivity.AISection.QUESTIONS,
+            )
+        }
 
-    private fun launchAISummary(noteText: String, section: AISummaryActivity.AISection) {
-        // Use backend_note_id if available, otherwise use local note_id
-        val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
-        AISummaryActivity.start(this, noteText, notallyModel.id, section, backendNoteId)
+        bottomSheetView.findViewById<View>(R.id.ActionMCQ)?.setOnClickListener {
+            bottomSheet.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = summaryResponse,
+                noteId = notallyModel.id,
+                showAllSections = false, // Ch? hi?n th? 1 section
+                initialSection = AISummaryActivity.AISection.MCQ,
+            )
+        }
+
+        bottomSheet.show()
     }
 
     private fun getAttachedFileUris(): List<Uri> {

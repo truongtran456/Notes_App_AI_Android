@@ -139,14 +139,15 @@ class AIRepository(private val context: Context) {
         userId: String? = null,
         noteId: String? = null,
         contentType: String? = null,
+        checkedVocabItems: String? = null,
         useCache: Boolean = true,
     ): AIResult<SummaryResponse> =
         withContext(Dispatchers.IO) {
             try {
-                // For vocab content, check cache first to avoid redundant API calls
+                // For vocab/checklist content, check cache first to avoid redundant API calls
                 // when user switches between different vocab functions (story, MCQ, flashcards,
                 // etc.)
-                if (useCache && contentType == "vocab") {
+                if (useCache && (contentType == "vocab" || contentType == "checklist")) {
                     val cached = getNoteFromCache(userId, noteId, checkVocabData = true)
                     if (cached != null) {
                         Log.d(TAG, "Using cached vocab result for note: $noteId")
@@ -155,6 +156,9 @@ class AIRepository(private val context: Context) {
                 }
 
                 Log.d(TAG, "Processing text note via /process: ${noteText.take(100)}...")
+                if (checkedVocabItems != null) {
+                    Log.d(TAG, "With checked vocab items: ${checkedVocabItems.take(100)}...")
+                }
 
                 val response =
                     service.processText(
@@ -162,6 +166,7 @@ class AIRepository(private val context: Context) {
                         userId = userId,
                         noteId = noteId,
                         contentType = contentType,
+                        checkedVocabItems = checkedVocabItems,
                     )
 
                 if (response.isSuccessful && response.body() != null) {
@@ -184,6 +189,9 @@ class AIRepository(private val context: Context) {
         fileUri: Uri,
         userId: String? = null,
         noteId: String? = null,
+        text: String? = null,
+        contentType: String? = null,
+        checkedVocabItems: String? = null,
     ): AIResult<SummaryResponse> =
         withContext(Dispatchers.IO) {
             try {
@@ -196,10 +204,22 @@ class AIRepository(private val context: Context) {
                 val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
                 val filePart = MultipartBody.Part.createFormData("file", file.name, requestFile)
 
+                val textPart = text?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val userIdPart = userId?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val noteIdPart = noteId?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val contentTypePart = contentType?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val checkedVocabItemsPart =
+                    checkedVocabItems?.toRequestBody("text/plain".toMediaTypeOrNull())
 
-                val response = service.processFile(filePart, userIdPart, noteIdPart)
+                val response =
+                    service.processFile(
+                        filePart,
+                        textPart,
+                        userIdPart,
+                        noteIdPart,
+                        contentTypePart,
+                        checkedVocabItemsPart,
+                    )
 
                 // Cleanup temp file
                 file.delete()
@@ -390,6 +410,7 @@ class AIRepository(private val context: Context) {
         userId: String?,
         noteId: String?,
         contentType: String? = null,
+        checkedVocabItems: String? = null,
         useCache: Boolean = true,
     ): AIResult<SummaryResponse> =
         withContext(Dispatchers.IO) {
@@ -428,6 +449,10 @@ class AIRepository(private val context: Context) {
                     contentType
                         ?.takeIf { it.isNotBlank() }
                         ?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val checkedVocabItemsBody =
+                    checkedVocabItems
+                        ?.takeIf { it.isNotBlank() }
+                        ?.toRequestBody("text/plain".toMediaTypeOrNull())
 
                 val fileParts =
                     attachments.map { uri ->
@@ -449,6 +474,7 @@ class AIRepository(private val context: Context) {
                         userIdBody,
                         noteIdBody,
                         contentTypeBody,
+                        checkedVocabItemsBody,
                     )
 
                 if (response.isSuccessful && response.body() != null) {

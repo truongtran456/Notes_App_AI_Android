@@ -143,7 +143,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="@string/ai_raw_text"
+                            android:text="Processed input (cleaned)"
                             android:textAppearance="?attr/textAppearanceTitleMedium"
                             android:textColor="?attr/colorPrimary" />
 
@@ -161,7 +161,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="@string/ai_raw_text_desc"
+                        android:text="Text đã được xử lý từ đầu vào (text/file/audio)."
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?android:attr/textColorSecondary" />
 

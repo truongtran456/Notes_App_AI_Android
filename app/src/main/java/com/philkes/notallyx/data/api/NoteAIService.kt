@@ -35,8 +35,11 @@ interface NoteAIService {
     @POST("process")
     suspend fun processFile(
         @Part file: MultipartBody.Part,
+        @Part("text") text: RequestBody? = null,
         @Part("user_id") userId: RequestBody? = null,
         @Part("note_id") noteId: RequestBody? = null,
+        @Part("content_type") contentType: RequestBody? = null,
+        @Part("checked_vocab_items") checkedVocabItems: RequestBody? = null,
     ): Response<SummaryResponse>
 
     @FormUrlEncoded
@@ -46,6 +49,7 @@ interface NoteAIService {
         @Field("user_id") userId: String? = null,
         @Field("note_id") noteId: String? = null,
         @Field("content_type") contentType: String? = null,
+        @Field("checked_vocab_items") checkedVocabItems: String? = null,
     ): Response<SummaryResponse>
 
     @Multipart
@@ -56,6 +60,7 @@ interface NoteAIService {
         @Part("user_id") userId: RequestBody? = null,
         @Part("note_id") noteId: RequestBody? = null,
         @Part("content_type") contentType: RequestBody? = null,
+        @Part("checked_vocab_items") checkedVocabItems: RequestBody? = null,
     ): Response<SummaryResponse>
 
     // ==================== ASYNCHRONOUS ENDPOINTS ====================

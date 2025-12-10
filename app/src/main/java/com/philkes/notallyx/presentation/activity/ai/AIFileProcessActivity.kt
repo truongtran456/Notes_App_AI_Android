@@ -28,6 +28,8 @@ class AIFileProcessActivity : AppCompatActivity() {
         private const val EXTRA_ATTACH_URIS = "extra_attach_uris"
         private const val EXTRA_INITIAL_SECTION = "extra_initial_section"
         private const val EXTRA_SHOW_ALL = "extra_show_all"
+        private const val EXTRA_CONTENT_TYPE = "extra_content_type"
+        private const val EXTRA_CHECKED_VOCAB_ITEMS = "extra_checked_vocab_items"
 
         fun start(context: Context, noteText: String, noteId: Long, backendNoteId: String? = null) {
             val intent =
@@ -49,6 +51,8 @@ class AIFileProcessActivity : AppCompatActivity() {
             initialSection: AISummaryActivity.AISection,
             showAllSections: Boolean = false,
             backendNoteId: String? = null,
+            contentType: String? = null,
+            checkedVocabItems: String? = null,
         ) {
             val intent =
                 Intent(context, AIFileProcessActivity::class.java).apply {
@@ -58,6 +62,8 @@ class AIFileProcessActivity : AppCompatActivity() {
                     putExtra(EXTRA_INITIAL_SECTION, initialSection.name)
                     putExtra(EXTRA_SHOW_ALL, showAllSections)
                     backendNoteId?.let { putExtra(EXTRA_BACKEND_NOTE_ID, it) }
+                    contentType?.let { putExtra(EXTRA_CONTENT_TYPE, it) }
+                    checkedVocabItems?.let { putExtra(EXTRA_CHECKED_VOCAB_ITEMS, it) }
                 }
             context.startActivity(intent)
         }
@@ -84,6 +90,8 @@ class AIFileProcessActivity : AppCompatActivity() {
     private var noteId: Long = -1L
     private var backendNoteId: String? = null
     private var pendingContentHash: String? = null
+    private var contentType: String? = null
+    private var checkedVocabItems: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -97,10 +105,16 @@ class AIFileProcessActivity : AppCompatActivity() {
         backendNoteId = intent.getStringExtra(EXTRA_BACKEND_NOTE_ID)
         initialAttachments = intent.getParcelableArrayListExtra(EXTRA_ATTACH_URIS)
         showAllSections = intent.getBooleanExtra(EXTRA_SHOW_ALL, false)
+        contentType = intent.getStringExtra(EXTRA_CONTENT_TYPE)
+        checkedVocabItems = intent.getStringExtra(EXTRA_CHECKED_VOCAB_ITEMS)
         initialSection =
             intent.getStringExtra(EXTRA_INITIAL_SECTION)?.let {
                 runCatching { AISummaryActivity.AISection.valueOf(it) }.getOrNull()
             } ?: AISummaryActivity.AISection.SUMMARY
+
+        // Detect vocab/checklist mode
+        isVocabMode =
+            contentType == "vocab" || contentType == "checklist" || checkedVocabItems != null
         isVocabMode = initialSection.isVocabSection()
 
         setupToolbar()
@@ -171,7 +185,8 @@ class AIFileProcessActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val shouldUseCache = shouldUseLocalCache(uris)
-            val contentType = if (isVocabMode) "vocab" else null
+            // S? d?ng contentType t? intent (có th? là "checklist" ho?c "vocab")
+            val contentTypeToUse = contentType ?: (if (isVocabMode) "vocab" else null)
 
             when (
                 val result =
@@ -180,7 +195,8 @@ class AIFileProcessActivity : AppCompatActivity() {
                         attachments = uris,
                         userId = userId,
                         noteId = noteIdString,
-                        contentType = contentType,
+                        contentType = contentTypeToUse,
+                        checkedVocabItems = checkedVocabItems,
                         useCache = shouldUseCache,
                     )
             ) {

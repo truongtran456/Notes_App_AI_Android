@@ -46,6 +46,8 @@ class AISummaryActivity : AppCompatActivity() {
     private var noteId: Long = -1L
     private var backendNoteId: String? = null
     private var useProcessEndpoint: Boolean = false
+    private var contentType: String? = null
+    private var checkedVocabItems: String? = null
     private var currentMCQDifficulty: String = "easy"
     private var summaryResponse: SummaryResponse? = null
     private var initialSection: AISection = AISection.SUMMARY
@@ -71,6 +73,8 @@ class AISummaryActivity : AppCompatActivity() {
         const val EXTRA_BACKEND_NOTE_ID = "backend_note_id"
         const val EXTRA_INITIAL_SECTION = "initial_section"
         const val EXTRA_USE_PROCESS = "use_process_endpoint"
+        const val EXTRA_CONTENT_TYPE = "content_type"
+        const val EXTRA_CHECKED_VOCAB_ITEMS = "checked_vocab_items"
         private const val EXTRA_PRECOMPUTED_RESULT = "precomputed_result"
         private const val EXTRA_SHOW_ALL_SECTIONS = "show_all_sections"
 
@@ -81,6 +85,8 @@ class AISummaryActivity : AppCompatActivity() {
             initialSection: AISection = AISection.SUMMARY,
             backendNoteId: String? = null,
             useProcessEndpointForText: Boolean = false,
+            contentType: String? = null,
+            checkedVocabItems: String? = null,
         ) {
             val intent =
                 Intent(context, AISummaryActivity::class.java).apply {
@@ -91,6 +97,8 @@ class AISummaryActivity : AppCompatActivity() {
                     if (useProcessEndpointForText) {
                         putExtra(EXTRA_USE_PROCESS, true)
                     }
+                    contentType?.let { putExtra(EXTRA_CONTENT_TYPE, it) }
+                    checkedVocabItems?.let { putExtra(EXTRA_CHECKED_VOCAB_ITEMS, it) }
                 }
             context.startActivity(intent)
         }
@@ -182,6 +190,8 @@ class AISummaryActivity : AppCompatActivity() {
         noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1L)
         backendNoteId = intent.getStringExtra(EXTRA_BACKEND_NOTE_ID)
         useProcessEndpoint = intent.getBooleanExtra(EXTRA_USE_PROCESS, false)
+        contentType = intent.getStringExtra(EXTRA_CONTENT_TYPE)
+        checkedVocabItems = intent.getStringExtra(EXTRA_CHECKED_VOCAB_ITEMS)
         forceShowAllSections = intent.getBooleanExtra(EXTRA_SHOW_ALL_SECTIONS, false)
         initialSection =
             intent.getStringExtra(EXTRA_INITIAL_SECTION)?.let {
@@ -320,7 +330,8 @@ class AISummaryActivity : AppCompatActivity() {
                             noteText = noteContent,
                             userId = userId,
                             noteId = noteIdToUse,
-                            contentType = "vocab",
+                            contentType = contentType ?: "vocab",
+                            checkedVocabItems = checkedVocabItems,
                             useCache = shouldUseCache,
                         )
                     } else {
@@ -410,6 +421,7 @@ class AISummaryActivity : AppCompatActivity() {
 
         val isVocabMode = useProcessEndpoint
 
+        // Always show header with processed_text at the top of each section
         val displayText = buildDisplayProcessedText(response, isVocabMode)
         if (displayText != null) {
             binding.RawTextCard.isVisible = true
@@ -424,7 +436,18 @@ class AISummaryActivity : AppCompatActivity() {
             binding.ExpandRawTextButton.isVisible = textLength > 200
             binding.ExpandRawTextButton.text = getString(R.string.show_more)
         } else {
-            binding.RawTextCard.isVisible = false
+            // Even if no processed_text, try to show raw_text as fallback
+            val fallbackText = response.rawText
+            if (!fallbackText.isNullOrBlank()) {
+                binding.RawTextCard.isVisible = true
+                binding.RawTextContent.text = fallbackText
+                binding.RawTextContent.maxLines = 10
+                val textLength = fallbackText.length
+                binding.ExpandRawTextButton.isVisible = textLength > 200
+                binding.ExpandRawTextButton.text = getString(R.string.show_more)
+            } else {
+                binding.RawTextCard.isVisible = false
+            }
         }
 
         // ----- TEXT NOTE UI (non-vocab mode) -----
@@ -464,7 +487,7 @@ class AISummaryActivity : AppCompatActivity() {
                 binding.MCQCard.isVisible = false
             }
         } else {
-            // Vocab mode (checklist): ?n toàn b? ph?n summary/text m?c ??nh
+            // Vocab mode (checklist): ?n to?n b? ph?n summary/text m?c ??nh
             updateOneSentenceCard(null)
             updateParagraphCard(null)
             updateBulletPointsCard(null)
@@ -479,7 +502,7 @@ class AISummaryActivity : AppCompatActivity() {
         val summaryTable = response.summaryTable ?: response.review?.summaryTable
 
         if (!isVocabMode) {
-            // N?u không ? ch? ?? vocab, ch? hi?n th? n?u có (ví d? l?ch s?)
+            // N?u kh?ng ? ch? ?? vocab, ch? hi?n th? n?u c? (v? d? l?ch s?)
             updateVocabStoryCard(vocabStory)
             updateVocabMCQCard(vocabMcqs)
             updateFlashcardsCard(flashcards)
@@ -531,7 +554,7 @@ class AISummaryActivity : AppCompatActivity() {
                         updateMindmapCard(mindmap)
                     }
                     else -> {
-                        // fallback: hi?n th? t?t c? n?u không kh?p case
+                        // fallback: hi?n th? t?t c? n?u kh?ng kh?p case
                         updateSummaryTableCard(summaryTable)
                         updateVocabStoryCard(vocabStory)
                         updateVocabMCQCard(vocabMcqs)
@@ -664,7 +687,7 @@ class AISummaryActivity : AppCompatActivity() {
 
     private fun createBulletPointView(text: String): TextView {
         return TextView(this).apply {
-            this.text = "? $text"
+            this.text = "\u2022 $text"
             textSize = 15f
             setPadding(0, 4.dpToPx(), 0, 4.dpToPx())
             setTextIsSelectable(true)
@@ -736,24 +759,30 @@ class AISummaryActivity : AppCompatActivity() {
         response: SummaryResponse,
         isVocabMode: Boolean = false,
     ): CharSequence? {
-        val sources = response.sources
-        if (!sources.isNullOrEmpty()) {
+        // For vocab mode, prioritize getting vocab words from summaryTable (most accurate)
+        if (isVocabMode) {
             val vocabItemsList = mutableListOf<String>()
-            sources.forEachIndexed { index, source ->
-                val body = source.processedText ?: source.rawText
-                if (!body.isNullOrBlank()) {
-                    val cleaned = body.replace("\\n", "\n").trim()
-                    if (cleaned.isNotEmpty()) {
-                        if (isVocabMode) {
-                            // Format vocab: split by lines and get vocab items
-                            // Also handle space-separated words if no newlines
+
+            // First priority: Get words from summaryTable
+            response.summaryTable?.forEach { row ->
+                row.word?.takeIf { it.isNotBlank() }?.let { vocabItemsList.add(it) }
+            }
+
+            // Second priority: Get from sources (checked items or file attachments)
+            if (vocabItemsList.isEmpty() && !response.sources.isNullOrEmpty()) {
+                response.sources.forEach { source ->
+                    val body = source.processedText ?: source.rawText
+                    if (!body.isNullOrBlank()) {
+                        val cleaned = body.replace("\\n", "\n").trim()
+                        if (cleaned.isNotEmpty()) {
+                            // Split by newlines (each line is a vocab item)
                             val items =
                                 if (cleaned.contains("\n")) {
                                     cleaned.split("\n").map { it.trim() }.filter { it.isNotBlank() }
                                 } else {
-                                    // If no newlines, try to split by common separators or spaces
+                                    // If no newlines, try to split by comma or space
                                     cleaned
-                                        .split(Regex("[,\\s]+"))
+                                        .split(Regex("[,;\\s]+"))
                                         .map { it.trim() }
                                         .filter { it.isNotBlank() }
                                 }
@@ -762,15 +791,41 @@ class AISummaryActivity : AppCompatActivity() {
                     }
                 }
             }
-            if (isVocabMode && vocabItemsList.isNotEmpty()) {
-                // Create SpannableString with bold vocab words separated by " - "
+
+            // Third priority: Get from processed_text
+            if (vocabItemsList.isEmpty()) {
+                val primary = response.processedText ?: response.rawText
+                if (primary != null) {
+                    val cleaned = primary.replace("\\n", "\n").trim()
+                    if (cleaned.isNotEmpty()) {
+                        val items =
+                            if (cleaned.contains("\n")) {
+                                cleaned.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+                            } else {
+                                cleaned
+                                    .split(Regex("[,;\\s]+"))
+                                    .map { it.trim() }
+                                    .filter { it.isNotBlank() }
+                            }
+                        vocabItemsList.addAll(items)
+                    }
+                }
+            }
+
+            // Remove duplicates and create formatted text
+            val uniqueVocabItems = vocabItemsList.distinct()
+            if (uniqueVocabItems.isNotEmpty()) {
                 android.util.Log.d(
                     "AISummaryActivity",
-                    "buildDisplayProcessedText: vocabItems count=${vocabItemsList.size}",
+                    "buildDisplayProcessedText: vocabItems count=${uniqueVocabItems.size}",
                 )
-                return createBoldVocabText(vocabItemsList)
+                return createBoldVocabText(uniqueVocabItems)
             }
-            // For non-vocab mode, return as before
+        }
+
+        // For non-vocab mode, return as before
+        val sources = response.sources
+        if (!sources.isNullOrEmpty()) {
             val builder = StringBuilder()
             sources.forEachIndexed { index, source ->
                 val typeLabel =
@@ -803,21 +858,6 @@ class AISummaryActivity : AppCompatActivity() {
         val primary = response.processedText ?: response.rawText
         if (primary != null) {
             val cleaned = primary.replace("\\n", "\n").trim()
-            if (isVocabMode) {
-                // Format vocab: split by lines and get vocab items
-                // Also handle space-separated words if no newlines
-                val vocabItems =
-                    if (cleaned.contains("\n")) {
-                        cleaned.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-                    } else {
-                        // If no newlines, split by spaces (but keep multi-word phrases together if
-                        // possible)
-                        cleaned.split(Regex("\\s+")).map { it.trim() }.filter { it.isNotBlank() }
-                    }
-                if (vocabItems.isNotEmpty()) {
-                    return createBoldVocabText(vocabItems)
-                }
-            }
             return cleaned.ifBlank { null }
         }
         return null
@@ -924,6 +964,11 @@ class AISummaryActivity : AppCompatActivity() {
                             if (answered) return@setOnClickListener
 
                             answered = true
+                            // Lock all options after first choice
+                            for (i in 0 until optionsContainer.childCount) {
+                                (optionsContainer.getChildAt(i) as? MaterialButton)?.isEnabled =
+                                    false
+                            }
 
                             if (key == mcq.answer) {
                                 setBackgroundColor(
@@ -1090,6 +1135,11 @@ class AISummaryActivity : AppCompatActivity() {
                             if (answered) return@setOnClickListener
 
                             answered = true
+                            // Lock all options after first choice
+                            for (i in 0 until optionsContainer.childCount) {
+                                (optionsContainer.getChildAt(i) as? MaterialButton)?.isEnabled =
+                                    false
+                            }
 
                             if (key == quiz.answer) {
                                 setBackgroundColor(
@@ -1173,144 +1223,101 @@ class AISummaryActivity : AppCompatActivity() {
         binding.FlashcardsContainer.removeAllViews()
         if (items.isEmpty()) return
 
-        // Group all flashcards together, format meaning with each word on a new line
-        val meaningBuilder = StringBuilder()
+        // Display each flashcard separately for better readability
         items.forEachIndexed { index, card ->
+            val flashcardView =
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
+                }
+
+            // Front side (word)
             val word = card.word ?: card.front ?: ""
             if (word.isNotBlank()) {
-                if (index > 0) {
-                    meaningBuilder.append("\n")
+                flashcardView.addView(
+                    TextView(this).apply {
+                        text = "• $word"
+                        textSize = 16f
+                        setTypeface(null, Typeface.BOLD)
+                        setTextColor(
+                            ContextCompat.getColor(this@AISummaryActivity, android.R.color.black)
+                        )
+                        setPadding(0, 0, 0, 8.dpToPx())
+                        setTextIsSelectable(true)
+                    }
+                )
+            }
+
+            fun addField(label: String, value: String?) {
+                if (value.isNullOrBlank()) return
+                val text = "$label: $value"
+                val spannable = SpannableString(text)
+                spannable.setSpan(
+                    StyleSpan(Typeface.BOLD),
+                    0,
+                    label.length + 1,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+                flashcardView.addView(
+                    TextView(this).apply {
+                        setText(spannable)
+                        textSize = 14f
+                        setPadding(0, 4.dpToPx(), 0, 4.dpToPx())
+                        setTextIsSelectable(true)
+                    }
+                )
+            }
+
+            // Back side (meaning, example, etc.)
+            card.back?.let { back ->
+                back.meaning?.let { addField(getString(R.string.meaning), it) }
+                back.example?.let { addField(getString(R.string.example), it) }
+                back.usageNote?.let { addField(getString(R.string.note), it) }
+                back.synonyms
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { addField("Synonyms", it.joinToString(", ")) }
+                back.antonyms
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { addField("Antonyms", it.joinToString(", ")) }
+                back.quickTip?.let { addField("Quick Tip", it) }
+            }
+
+            // SRS Schedule
+            card.srsSchedule?.let { schedule ->
+                val srsInfo = buildString {
+                    schedule.initialPrompt?.let { append("Prompt: $it\n") }
+                    schedule.intervals?.let { intervals ->
+                        append("Review intervals: ${intervals.joinToString(", ")} days\n")
+                    }
+                    schedule.recallTask?.let { append("Task: $it") }
                 }
-                meaningBuilder.append("• ").append(word).append(": ")
-                if (!card.back?.meaning.isNullOrBlank()) {
-                    meaningBuilder.append(card.back?.meaning)
+                if (srsInfo.isNotBlank()) {
+                    addField("SRS Schedule", srsInfo)
                 }
             }
-        }
 
-        // Create a single container for all flashcard content
-        binding.FlashcardsContainer.addView(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 12.dpToPx(), 0, 12.dpToPx())
-
-                fun addLine(label: String, value: String?) {
-                    if (value.isNullOrBlank()) return
-                    val text = "$label: $value"
-                    val spannable = markdownBoldToSpannable(text)
-                    // Make label bold
-                    spannable.setSpan(
-                        StyleSpan(Typeface.BOLD),
-                        0,
-                        label.length + 1,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
-                    addView(
-                        TextView(context).apply {
-                            setText(spannable)
-                            textSize = 13f
-                            setPadding(0, 4.dpToPx(), 0, 0)
-                            setTextIsSelectable(true)
-                        }
-                    )
-                }
-
-                // Meaning: each word on a new line
-                if (meaningBuilder.isNotEmpty()) {
-                    val meaningText = meaningBuilder.toString()
-                    val fullText = "${getString(R.string.meaning)}:\n$meaningText"
-                    val spannable = SpannableString(fullText)
-
-                    // Make "Meaning:" label bold
-                    val labelLength = getString(R.string.meaning).length + 1
-                    spannable.setSpan(
-                        StyleSpan(Typeface.BOLD),
-                        0,
-                        labelLength,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
-
-                    // Make each word bold (format: "• word: definition")
-                    val pattern = Regex("•\\s+([^:]+):")
-                    pattern.findAll(meaningText).forEach { match ->
-                        val wordStart = labelLength + 1 + match.range.first
-                        val wordEnd = labelLength + 1 + match.range.last - 1
-                        if (wordStart >= 0 && wordEnd < spannable.length && wordStart < wordEnd) {
-                            spannable.setSpan(
-                                StyleSpan(Typeface.BOLD),
-                                wordStart,
-                                wordEnd,
-                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            // Add divider between flashcards (except last)
+            if (index < items.size - 1) {
+                flashcardView.addView(
+                    View(this).apply {
+                        layoutParams =
+                            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
+                                .apply {
+                                    topMargin = 8.dpToPx()
+                                    bottomMargin = 8.dpToPx()
+                                }
+                        setBackgroundColor(
+                            ContextCompat.getColor(
+                                this@AISummaryActivity,
+                                android.R.color.darker_gray,
                             )
-                        }
+                        )
                     }
-
-                    addView(
-                        TextView(context).apply {
-                            setText(spannable)
-                            textSize = 13f
-                            setPadding(0, 4.dpToPx(), 0, 0)
-                            setTextIsSelectable(true)
-                        }
-                    )
-                }
-
-                // Example: combine all examples
-                val allExamples = items.mapNotNull { it.back?.example }.filter { it.isNotBlank() }
-                if (allExamples.isNotEmpty()) {
-                    addLine(getString(R.string.example), allExamples.joinToString("\n"))
-                }
-
-                // Note: combine all usage notes
-                val allNotes = items.mapNotNull { it.back?.usageNote }.filter { it.isNotBlank() }
-                if (allNotes.isNotEmpty()) {
-                    addLine(getString(R.string.note), allNotes.joinToString("\n"))
-                }
-
-                // Synonyms: combine all synonyms
-                val allSynonyms = items.flatMap { it.back?.synonyms.orEmpty() }.distinct()
-                if (allSynonyms.isNotEmpty()) {
-                    addLine("Synonyms", allSynonyms.joinToString(", "))
-                }
-
-                // Antonyms: combine all antonyms
-                val allAntonyms = items.flatMap { it.back?.antonyms.orEmpty() }.distinct()
-                if (allAntonyms.isNotEmpty()) {
-                    addLine("Antonyms", allAntonyms.joinToString(", "))
-                }
-
-                // Quick Tips: combine all quick tips
-                val allQuickTips = items.mapNotNull { it.back?.quickTip }.filter { it.isNotBlank() }
-                if (allQuickTips.isNotEmpty()) {
-                    addLine("Quick Tips", allQuickTips.joinToString("\n\n"))
-                }
-
-                // SRS Schedule info (if available)
-                val srsSchedules =
-                    items
-                        .mapNotNull { it.srsSchedule }
-                        .filter {
-                            !it.initialPrompt.isNullOrBlank() ||
-                                !it.intervals.isNullOrEmpty() ||
-                                !it.recallTask.isNullOrBlank()
-                        }
-                if (srsSchedules.isNotEmpty()) {
-                    val srsInfo = buildString {
-                        srsSchedules.forEachIndexed { index, schedule ->
-                            if (index > 0) append("\n")
-                            schedule.initialPrompt?.let { append("Prompt: $it\n") }
-                            schedule.intervals?.let { intervals ->
-                                append("Review intervals: ${intervals.joinToString(", ")} days\n")
-                            }
-                            schedule.recallTask?.let { append("Task: $it") }
-                        }
-                    }
-                    if (srsInfo.isNotBlank()) {
-                        addLine("SRS Schedule", srsInfo)
-                    }
-                }
+                )
             }
-        )
+
+            binding.FlashcardsContainer.addView(flashcardView)
+        }
     }
 
     private fun createFlashcardView(card: Flashcard): View {
@@ -1347,7 +1354,7 @@ class AISummaryActivity : AppCompatActivity() {
                 if (!meaning.isNullOrBlank()) {
                     // Check if meaning contains multiple word definitions (format: "word:
                     // definition")
-                    val wordPattern = Regex("([A-Za-z]+(?:\\s+[A-Za-z]+)*):\\s*([^•]+)")
+                    val wordPattern = Regex("([A-Za-z]+(?:\\s+[A-Za-z]+)*):\\s*([^?]+)")
                     val matches = wordPattern.findAll(meaning)
                     if (matches.count() > 1) {
                         // Multiple words - format each on a new line
@@ -1357,7 +1364,7 @@ class AISummaryActivity : AppCompatActivity() {
                                 meaningBuilder.append("\n")
                             }
                             meaningBuilder
-                                .append("• ")
+                                .append("? ")
                                 .append(match.groupValues[1])
                                 .append(": ")
                                 .append(match.groupValues[2].trim())
@@ -1376,7 +1383,7 @@ class AISummaryActivity : AppCompatActivity() {
                         )
 
                         // Make each word bold
-                        val pattern = Regex("•\\s+([^:]+):")
+                        val pattern = Regex("?\\s+([^:]+):")
                         pattern.findAll(meaningText).forEach { match ->
                             val wordStart = labelLength + 1 + match.range.first
                             val wordEnd = labelLength + 1 + match.range.last - 1
@@ -1425,111 +1432,154 @@ class AISummaryActivity : AppCompatActivity() {
 
         fun addSection(title: String, description: String?, words: List<String>?) {
             if (words.isNullOrEmpty() && description.isNullOrBlank()) return
-            binding.MindmapContainer.addView(
+
+            val sectionContainer =
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(0, 8.dpToPx(), 0, 12.dpToPx())
+                }
+
+            // Section title with bullet
+            sectionContainer.addView(
                 TextView(this).apply {
-                    text = title
+                    text = "• $title"
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
-                    setPadding(0, 8.dpToPx(), 0, 0)
+                    setTextColor(
+                        ContextCompat.getColor(this@AISummaryActivity, android.R.color.black)
+                    )
+                    setPadding(0, 0, 0, 4.dpToPx())
                 }
             )
+
+            // Description
             description?.let {
-                binding.MindmapContainer.addView(
+                sectionContainer.addView(
                     TextView(this).apply {
                         text = markdownBoldToSpannable(it)
                         textSize = 13f
-                        setPadding(0, 2.dpToPx(), 0, 0)
+                        setPadding(0, 2.dpToPx(), 0, 4.dpToPx())
                         setTextIsSelectable(true)
                     }
                 )
             }
+
+            // Words list
             if (!words.isNullOrEmpty()) {
-                binding.MindmapContainer.addView(
+                sectionContainer.addView(
                     TextView(this).apply {
                         text = words.joinToString(", ")
-                        textSize = 13f
-                        setPadding(0, 2.dpToPx(), 0, 0)
+                        textSize = 14f
+                        setPadding(0, 4.dpToPx(), 0, 0)
                         setTextIsSelectable(true)
                     }
                 )
             }
+
+            binding.MindmapContainer.addView(sectionContainer)
         }
 
         mindmap.byTopic.orEmpty().forEach { group ->
-            addSection("Topic: ${group.topic ?: ""}", group.description, group.words)
+            addSection("Ch? ??: ${group.topic ?: ""}", group.description, group.words)
         }
         mindmap.byDifficulty.orEmpty().forEach { group ->
-            addSection("Difficulty: ${group.level ?: ""}", group.description, group.words)
+            addSection("M?c ??: ${group.level ?: ""}", group.description, group.words)
         }
         mindmap.byPos.orEmpty().forEach { group ->
-            addSection("Part of speech: ${group.pos ?: ""}", null, group.words)
+            addSection("Lo?i t?: ${group.pos ?: ""}", null, group.words)
         }
         mindmap.byRelation.orEmpty().forEach { group ->
             val groupName = group.groupName ?: "Relation"
 
             // Handle synonyms with clusters
             if (groupName.lowercase() == "synonyms" && !group.clusters.isNullOrEmpty()) {
-                binding.MindmapContainer.addView(
+                val sectionContainer =
+                    LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(0, 8.dpToPx(), 0, 12.dpToPx())
+                    }
+
+                sectionContainer.addView(
                     TextView(this).apply {
-                        text = groupName
+                        text = "• $groupName"
                         textSize = 15f
                         setTypeface(null, Typeface.BOLD)
-                        setPadding(0, 8.dpToPx(), 0, 0)
+                        setTextColor(
+                            ContextCompat.getColor(this@AISummaryActivity, android.R.color.black)
+                        )
+                        setPadding(0, 0, 0, 4.dpToPx())
                     }
                 )
+
                 group.description?.let {
-                    binding.MindmapContainer.addView(
+                    sectionContainer.addView(
                         TextView(this).apply {
                             text = markdownBoldToSpannable(it)
                             textSize = 13f
-                            setPadding(0, 2.dpToPx(), 0, 0)
+                            setPadding(0, 2.dpToPx(), 0, 4.dpToPx())
                             setTextIsSelectable(true)
                         }
                     )
                 }
+
                 group.clusters.forEach { cluster ->
-                    binding.MindmapContainer.addView(
+                    sectionContainer.addView(
                         TextView(this).apply {
-                            text = "Cluster: ${cluster.joinToString(", ")}"
-                            textSize = 13f
-                            setPadding(0, 2.dpToPx(), 0, 0)
+                            text = "  Cluster: ${cluster.joinToString(", ")}"
+                            textSize = 14f
+                            setPadding(0, 2.dpToPx(), 0, 2.dpToPx())
                             setTextIsSelectable(true)
                         }
                     )
                 }
+
+                binding.MindmapContainer.addView(sectionContainer)
             }
             // Handle antonyms with pairs
             else if (groupName.lowercase() == "antonyms" && !group.pairs.isNullOrEmpty()) {
-                binding.MindmapContainer.addView(
+                val sectionContainer =
+                    LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(0, 8.dpToPx(), 0, 12.dpToPx())
+                    }
+
+                sectionContainer.addView(
                     TextView(this).apply {
-                        text = groupName
+                        text = "• $groupName"
                         textSize = 15f
                         setTypeface(null, Typeface.BOLD)
-                        setPadding(0, 8.dpToPx(), 0, 0)
+                        setTextColor(
+                            ContextCompat.getColor(this@AISummaryActivity, android.R.color.black)
+                        )
+                        setPadding(0, 0, 0, 4.dpToPx())
                     }
                 )
+
                 group.description?.let {
-                    binding.MindmapContainer.addView(
+                    sectionContainer.addView(
                         TextView(this).apply {
                             text = markdownBoldToSpannable(it)
                             textSize = 13f
-                            setPadding(0, 2.dpToPx(), 0, 0)
+                            setPadding(0, 2.dpToPx(), 0, 4.dpToPx())
                             setTextIsSelectable(true)
                         }
                     )
                 }
+
                 group.pairs.forEach { pair ->
                     if (pair.size >= 2) {
-                        binding.MindmapContainer.addView(
+                        sectionContainer.addView(
                             TextView(this).apply {
-                                text = "${pair[0]} ? ${pair[1]}"
-                                textSize = 13f
-                                setPadding(0, 2.dpToPx(), 0, 0)
+                                text = "  ${pair[0]} ? ${pair[1]}"
+                                textSize = 14f
+                                setPadding(0, 2.dpToPx(), 0, 2.dpToPx())
                                 setTextIsSelectable(true)
                             }
                         )
                     }
                 }
+
+                binding.MindmapContainer.addView(sectionContainer)
             }
             // Default: use words list
             else {
@@ -1544,120 +1594,98 @@ class AISummaryActivity : AppCompatActivity() {
         binding.SummaryTableContainer.removeAllViews()
         if (items.isEmpty()) return
 
-        // Group all items together, format meaning with each word on a new line
-        val meaningBuilder = StringBuilder()
+        // Display each vocab word as a separate card/item for better readability
         items.forEachIndexed { index, row ->
+            val wordCard =
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
+                    if (index < items.size - 1) {
+                        setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
+                    }
+                }
+
+            // Word title (bold)
             val word = row.word ?: ""
             if (word.isNotBlank()) {
-                if (index > 0) {
-                    meaningBuilder.append("\n")
-                }
-                meaningBuilder.append("• ").append(word).append(": ")
-                if (!row.definition.isNullOrBlank()) {
-                    meaningBuilder.append(row.definition)
-                }
-            }
-        }
-
-        // Create a single container for all summary table content
-        binding.SummaryTableContainer.addView(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(0, 10.dpToPx(), 0, 10.dpToPx())
-
-                fun addText(label: String, value: String?) {
-                    if (value.isNullOrBlank()) return
-                    val text = "$label: $value"
-                    val spannable = markdownBoldToSpannable(text)
-                    // Make label bold
-                    spannable.setSpan(
-                        StyleSpan(Typeface.BOLD),
-                        0,
-                        label.length + 1,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
-                    addView(
-                        TextView(context).apply {
-                            setText(spannable)
-                            textSize = 13f
-                            setPadding(0, 4.dpToPx(), 0, 0)
-                            setTextIsSelectable(true)
-                        }
-                    )
-                }
-
-                // Translation: combine all translations
-                val translations = items.mapNotNull { it.translation }.filter { it.isNotBlank() }
-                if (translations.isNotEmpty()) {
-                    addText(getString(R.string.translation), translations.joinToString(", "))
-                }
-
-                // Part of Speech: combine all parts of speech
-                val partsOfSpeech =
-                    items.mapNotNull { it.partOfSpeech }.filter { it.isNotBlank() }.distinct()
-                if (partsOfSpeech.isNotEmpty()) {
-                    addText("Part of Speech", partsOfSpeech.joinToString(", "))
-                }
-
-                // Meaning: each word on a new line
-                if (meaningBuilder.isNotEmpty()) {
-                    val meaningText = meaningBuilder.toString()
-                    val fullText = "${getString(R.string.meaning)}:\n$meaningText"
-                    val spannable = SpannableString(fullText)
-
-                    // Make "Meaning:" label bold
-                    val labelLength = getString(R.string.meaning).length + 1
-                    spannable.setSpan(
-                        StyleSpan(Typeface.BOLD),
-                        0,
-                        labelLength,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                    )
-
-                    // Make each word bold (format: "• word: definition")
-                    val pattern = Regex("•\\s+([^:]+):")
-                    pattern.findAll(meaningText).forEach { match ->
-                        val wordStart = labelLength + 1 + match.range.first // +1 for newline
-                        val wordEnd = labelLength + 1 + match.range.last - 1 // Exclude the colon
-                        if (wordStart >= 0 && wordEnd < spannable.length && wordStart < wordEnd) {
-                            spannable.setSpan(
-                                StyleSpan(Typeface.BOLD),
-                                wordStart,
-                                wordEnd,
-                                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
-                            )
-                        }
+                wordCard.addView(
+                    TextView(this).apply {
+                        text = "• $word"
+                        textSize = 16f
+                        setTypeface(null, Typeface.BOLD)
+                        setTextColor(
+                            ContextCompat.getColor(this@AISummaryActivity, android.R.color.black)
+                        )
+                        setPadding(0, 0, 0, 8.dpToPx())
+                        setTextIsSelectable(true)
                     }
-
-                    addView(
-                        TextView(context).apply {
-                            setText(spannable)
-                            textSize = 13f
-                            setPadding(0, 4.dpToPx(), 0, 0)
-                            setTextIsSelectable(true)
-                        }
-                    )
-                }
-
-                // Usage Note: combine all usage notes
-                val usageNotes = items.mapNotNull { it.usageNote }.filter { it.isNotBlank() }
-                if (usageNotes.isNotEmpty()) {
-                    addText("Usage Notes", usageNotes.joinToString("\n\n"))
-                }
-
-                // Structures: combine all structures
-                val allStructures = items.flatMap { it.commonStructures.orEmpty() }.distinct()
-                if (allStructures.isNotEmpty()) {
-                    addText("Structures", allStructures.joinToString(", "))
-                }
-
-                // Collocations: combine all collocations
-                val allCollocations = items.flatMap { it.collocations.orEmpty() }.distinct()
-                if (allCollocations.isNotEmpty()) {
-                    addText("Collocations", allCollocations.joinToString(", "))
-                }
+                )
             }
-        )
+
+            fun addField(label: String, value: String?) {
+                if (value.isNullOrBlank()) return
+                val text = "$label: $value"
+                val spannable = SpannableString(text)
+                spannable.setSpan(
+                    StyleSpan(Typeface.BOLD),
+                    0,
+                    label.length + 1,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+                wordCard.addView(
+                    TextView(this).apply {
+                        setText(spannable)
+                        textSize = 14f
+                        setPadding(0, 4.dpToPx(), 0, 4.dpToPx())
+                        setTextIsSelectable(true)
+                    }
+                )
+            }
+
+            // Translation
+            row.translation?.let { addField(getString(R.string.translation), it) }
+
+            // Part of Speech
+            row.partOfSpeech?.let { addField("Lo?i t?", it) }
+
+            // Definition
+            row.definition?.let { addField("??nh ngh?a", it) }
+
+            // Usage Note
+            row.usageNote?.let { addField("Cách dùng", it) }
+
+            // Common Structures
+            row.commonStructures
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { addField("C?u trúc", it.joinToString(", ")) }
+
+            // Collocations
+            row.collocations
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { addField("Collocations", it.joinToString(", ")) }
+
+            // Add divider between words (except last)
+            if (index < items.size - 1) {
+                wordCard.addView(
+                    View(this).apply {
+                        layoutParams =
+                            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
+                                .apply {
+                                    topMargin = 8.dpToPx()
+                                    bottomMargin = 8.dpToPx()
+                                }
+                        setBackgroundColor(
+                            ContextCompat.getColor(
+                                this@AISummaryActivity,
+                                android.R.color.darker_gray,
+                            )
+                        )
+                    }
+                )
+            }
+
+            binding.SummaryTableContainer.addView(wordCard)
+        }
     }
 
     private fun copyToClipboard(text: String) {
@@ -1741,11 +1769,11 @@ class AISummaryActivity : AppCompatActivity() {
             "Chinese" to "??",
             "Japanese" to "???",
             "Korean" to "???",
-            "French" to "Français",
+            "French" to "Fran?ais",
             "German" to "Deutsch",
-            "Spanish" to "Español",
+            "Spanish" to "Espa?ol",
             "Italian" to "Italiano",
-            "Portuguese" to "Português",
+            "Portuguese" to "Portugu?s",
             "Russian" to "???????",
             "Arabic" to "???????",
             "Thai" to "???",
@@ -1764,7 +1792,7 @@ class AISummaryActivity : AppCompatActivity() {
 
         try {
             androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Ch?n ngôn ng? d?ch / Select Translation Language")
+                .setTitle("Ch?n ng?n ng? d?ch / Select Translation Language")
                 .setSingleChoiceItems(
                     supportedLanguages.map { "${it.second} (${it.first})" }.toTypedArray(),
                     currentIndex,
@@ -1775,7 +1803,7 @@ class AISummaryActivity : AppCompatActivity() {
                     dialog.dismiss()
                     Toast.makeText(
                             this,
-                            "?ã ch?n: ${supportedLanguages[which].second}",
+                            "?? ch?n: ${supportedLanguages[which].second}",
                             Toast.LENGTH_SHORT,
                         )
                         .show()
@@ -1819,7 +1847,7 @@ class AISummaryActivity : AppCompatActivity() {
                     val newLangDisplay =
                         supportedLanguages.find { it.first == selectedLanguage }?.second
                             ?: selectedLanguage
-                    Toast.makeText(this, "Ngôn ng? d?ch: $newLangDisplay", Toast.LENGTH_SHORT)
+                    Toast.makeText(this, "Ng?n ng? d?ch: $newLangDisplay", Toast.LENGTH_SHORT)
                         .show()
                 }
                 true
@@ -1997,7 +2025,7 @@ class AISummaryActivity : AppCompatActivity() {
                     if (index > 0) {
                         meaningBuilder.append("\n")
                     }
-                    meaningBuilder.append("• ").append(word).append(": ")
+                    meaningBuilder.append("? ").append(word).append(": ")
                     if (!card.back?.meaning.isNullOrBlank()) {
                         meaningBuilder.append(card.back?.meaning)
                     }
