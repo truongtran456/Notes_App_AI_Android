@@ -1,7 +1,5 @@
 package com.philkes.notallyx.presentation.activity.note
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
 import android.content.Context.MODE_PRIVATE
 import android.content.Intent
@@ -9,9 +7,7 @@ import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.view.ViewAnimationUtils
 import android.view.WindowManager
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.AnticipateOvershootInterpolator
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.enableEdgeToEdge
@@ -59,22 +55,22 @@ class FullScreenDrawingActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Enable window transitions for Shared Element Transition
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.requestFeature(android.view.Window.FEATURE_ACTIVITY_TRANSITIONS)
             window.enterTransition = android.transition.Fade()
             window.exitTransition = android.transition.Fade()
         }
-        
+
         // Full screen mode
         window.setFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
         )
-        
+
         enableEdgeToEdge()
-        
+
         binding = ActivityFullScreenDrawingBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -85,7 +81,7 @@ class FullScreenDrawingActivity : AppCompatActivity() {
                 top = systemBars.top,
                 bottom = systemBars.bottom,
                 left = systemBars.left,
-                right = systemBars.right
+                right = systemBars.right,
             )
             insets
         }
@@ -93,102 +89,100 @@ class FullScreenDrawingActivity : AppCompatActivity() {
         setupToolbar()
         setupCanvas()
         setupDrawToolPicker()
-        
+
         // Start animations
         startEnterAnimations()
     }
 
     private fun setupToolbar() {
-        binding.btnBack.setOnClickListener {
-            finish()
-        }
-        
-        binding.btnUndo.setOnClickListener {
-            showToast("Undo")
-        }
-        
-        binding.btnRedo.setOnClickListener {
-            showToast("Redo")
-        }
-        
-        binding.btnGrid.setOnClickListener {
-            showToast("Grid")
-        }
-        
-        binding.btnSave.setOnClickListener {
-            saveAndFinish()
-        }
+        binding.btnBack.setOnClickListener { finish() }
+
+        binding.btnUndo.setOnClickListener { showToast("Undo") }
+
+        binding.btnRedo.setOnClickListener { showToast("Redo") }
+
+        binding.btnGrid.setOnClickListener { showToast("Grid") }
+
+        binding.btnSave.setOnClickListener { saveAndFinish() }
     }
-    
+
     private fun startEnterAnimations() {
-        binding.root.postDelayed({
-            if (binding.DrawingCanvas.alpha == 0f) {
-                binding.DrawingCanvas.alpha = 1f
-                binding.DrawingCanvas.scaleX = 1f
-                binding.DrawingCanvas.scaleY = 1f
-            }
-            
-            val currentAlpha = binding.DrawingCanvas.alpha
-            val currentScaleX = binding.DrawingCanvas.scaleX
-            val currentScaleY = binding.DrawingCanvas.scaleY
-            
-            if (currentAlpha < 1f || currentScaleX < 1f || currentScaleY < 1f) {
-                val canvasAnimator = ObjectAnimator.ofFloat(binding.DrawingCanvas, "alpha", currentAlpha, 1f)
-                canvasAnimator.duration = 1500
-                canvasAnimator.interpolator = DecelerateInterpolator()
-                
-                val scaleXAnimator = ObjectAnimator.ofFloat(binding.DrawingCanvas, "scaleX", currentScaleX, 1f)
-                scaleXAnimator.duration = 2500
-                scaleXAnimator.interpolator = DecelerateInterpolator()
-                
-                val scaleYAnimator = ObjectAnimator.ofFloat(binding.DrawingCanvas, "scaleY", currentScaleY, 1f)
-                scaleYAnimator.duration = 2500
-                scaleYAnimator.interpolator = DecelerateInterpolator()
-                
-                canvasAnimator.start()
-                scaleXAnimator.start()
-                scaleYAnimator.start()
-            }
-            
-            binding.DrawToolPickerView.post {
-                val toolbarHeight = binding.DrawToolPickerView.height
-                val translationY = if (toolbarHeight > 0) toolbarHeight.toFloat() else 300f
-                
-                if (binding.DrawToolPickerView.translationY == 0f) {
-                    binding.DrawToolPickerView.translationY = translationY
+        binding.root.postDelayed(
+            {
+                if (binding.DrawingCanvas.alpha == 0f) {
+                    binding.DrawingCanvas.alpha = 1f
+                    binding.DrawingCanvas.scaleX = 1f
+                    binding.DrawingCanvas.scaleY = 1f
                 }
-                if (binding.DrawToolPickerView.alpha == 0f) {
-                    binding.DrawToolPickerView.alpha = 0f
+
+                val currentAlpha = binding.DrawingCanvas.alpha
+                val currentScaleX = binding.DrawingCanvas.scaleX
+                val currentScaleY = binding.DrawingCanvas.scaleY
+
+                if (currentAlpha < 1f || currentScaleX < 1f || currentScaleY < 1f) {
+                    val canvasAnimator =
+                        ObjectAnimator.ofFloat(binding.DrawingCanvas, "alpha", currentAlpha, 1f)
+                    canvasAnimator.duration = 1500
+                    canvasAnimator.interpolator = DecelerateInterpolator()
+
+                    val scaleXAnimator =
+                        ObjectAnimator.ofFloat(binding.DrawingCanvas, "scaleX", currentScaleX, 1f)
+                    scaleXAnimator.duration = 2500
+                    scaleXAnimator.interpolator = DecelerateInterpolator()
+
+                    val scaleYAnimator =
+                        ObjectAnimator.ofFloat(binding.DrawingCanvas, "scaleY", currentScaleY, 1f)
+                    scaleYAnimator.duration = 2500
+                    scaleYAnimator.interpolator = DecelerateInterpolator()
+
+                    canvasAnimator.start()
+                    scaleXAnimator.start()
+                    scaleYAnimator.start()
                 }
-                
-                val slideAnimator = ObjectAnimator.ofFloat(
-                    binding.DrawToolPickerView, 
-                    "translationY", 
-                    binding.DrawToolPickerView.translationY, 
-                    0f
-                )
-                slideAnimator.duration = 1500
-                slideAnimator.interpolator = AnticipateOvershootInterpolator(1.8f)
-                
-                val fadeAnimator = ObjectAnimator.ofFloat(
-                    binding.DrawToolPickerView, 
-                    "alpha", 
-                    binding.DrawToolPickerView.alpha, 
-                    1f
-                )
-                fadeAnimator.duration = 1500
-                fadeAnimator.interpolator = DecelerateInterpolator()
-                
-                slideAnimator.start()
-                fadeAnimator.start()
-            }
-            
-            binding.blurOverlay.visibility = View.VISIBLE
-            val blurAnimator = ObjectAnimator.ofFloat(binding.blurOverlay, "alpha", 0f, 0.3f)
-            blurAnimator.duration = 400
-            blurAnimator.interpolator = DecelerateInterpolator()
-            blurAnimator.start()
-        }, 100)
+
+                binding.DrawToolPickerView.post {
+                    val toolbarHeight = binding.DrawToolPickerView.height
+                    val translationY = if (toolbarHeight > 0) toolbarHeight.toFloat() else 300f
+
+                    if (binding.DrawToolPickerView.translationY == 0f) {
+                        binding.DrawToolPickerView.translationY = translationY
+                    }
+                    if (binding.DrawToolPickerView.alpha == 0f) {
+                        binding.DrawToolPickerView.alpha = 0f
+                    }
+
+                    val slideAnimator =
+                        ObjectAnimator.ofFloat(
+                            binding.DrawToolPickerView,
+                            "translationY",
+                            binding.DrawToolPickerView.translationY,
+                            0f,
+                        )
+                    slideAnimator.duration = 1500
+                    slideAnimator.interpolator = AnticipateOvershootInterpolator(1.8f)
+
+                    val fadeAnimator =
+                        ObjectAnimator.ofFloat(
+                            binding.DrawToolPickerView,
+                            "alpha",
+                            binding.DrawToolPickerView.alpha,
+                            1f,
+                        )
+                    fadeAnimator.duration = 1500
+                    fadeAnimator.interpolator = DecelerateInterpolator()
+
+                    slideAnimator.start()
+                    fadeAnimator.start()
+                }
+
+                binding.blurOverlay.visibility = View.VISIBLE
+                val blurAnimator = ObjectAnimator.ofFloat(binding.blurOverlay, "alpha", 0f, 0.3f)
+                blurAnimator.duration = 400
+                blurAnimator.interpolator = DecelerateInterpolator()
+                blurAnimator.start()
+            },
+            100,
+        )
     }
 
     private fun setupCanvas() {
@@ -214,8 +208,7 @@ class FullScreenDrawingActivity : AppCompatActivity() {
 
         binding.DrawToolPickerView.listener =
             object : DrawToolPickerView.OnItemClickListener {
-                override fun onDoneClick() {
-                }
+                override fun onDoneClick() {}
 
                 override fun onItemClick(tool: DrawToolBrush) {
                     currentDrawTool = tool
@@ -267,11 +260,7 @@ class FullScreenDrawingActivity : AppCompatActivity() {
 
                     showMoreColor { colorInt ->
                         val newColorHex = colorInt.rawColor()
-                        val updatedBrush =
-                            currentBrush.copy(
-                                color = newColorHex,
-                                isSelected = true,
-                            )
+                        val updatedBrush = currentBrush.copy(color = newColorHex, isSelected = true)
 
                         val tools = binding.DrawToolPickerView.tools
                         val index = tools.indexOfFirst { it.id == currentBrush.id }
@@ -330,10 +319,8 @@ class FullScreenDrawingActivity : AppCompatActivity() {
     private fun saveAndFinish() {
         val strokes = binding.DrawingCanvas.getStrokes()
         val strokesJson = gson.toJson(strokes, strokesType)
-        
-        val resultIntent = Intent().apply {
-            putExtra(RESULT_STROKES, strokesJson)
-        }
+
+        val resultIntent = Intent().apply { putExtra(RESULT_STROKES, strokesJson) }
         setResult(RESULT_OK, resultIntent)
         finish()
     }
@@ -345,9 +332,6 @@ class FullScreenDrawingActivity : AppCompatActivity() {
     private fun applySavedBackgroundToCanvas() {
         drawingBackgroundDrawableResId?.let {
             binding.DrawingCanvas.setCanvasBackgroundDrawable(it)
-        } ?: run {
-            binding.DrawingCanvas.setCanvasBackgroundColor(drawingBackgroundColor)
-        }
+        } ?: run { binding.DrawingCanvas.setCanvasBackgroundColor(drawingBackgroundColor) }
     }
 }
-

@@ -33,7 +33,11 @@ class AIRepository(private val context: Context) {
     private val service: NoteAIService = ApiClient.getService()
 
     // ==================== CACHE CHECK ====================
-    private suspend fun getNoteFromCache(userId: String?, noteId: String?): SummaryResponse? =
+    private suspend fun getNoteFromCache(
+        userId: String?,
+        noteId: String?,
+        checkVocabData: Boolean = false,
+    ): SummaryResponse? =
         withContext(Dispatchers.IO) {
             if (userId.isNullOrBlank() || noteId.isNullOrBlank()) {
                 return@withContext null
@@ -43,11 +47,38 @@ class AIRepository(private val context: Context) {
                 val response = service.getNoteById(noteId, userId)
                 if (response.isSuccessful && response.body() != null) {
                     val cachedNote = response.body()!!
-                    if (
+
+                    // Check for regular note data
+                    val hasRegularData =
                         !cachedNote.summary.isNullOrBlank() ||
-                            !cachedNote.processedText.isNullOrBlank()
-                    ) {
-                        Log.d(TAG, "Found cached note: $noteId")
+                            !cachedNote.processedText.isNullOrBlank() ||
+                            cachedNote.summaries != null ||
+                            !cachedNote.questions.isNullOrEmpty() ||
+                            cachedNote.mcqs != null
+
+                    // Check for vocab data (for checklist notes)
+                    val hasVocabData =
+                        if (checkVocabData) {
+                            val review = cachedNote.review
+                            review?.vocabStory != null ||
+                                !review?.vocabMcqs.isNullOrEmpty() ||
+                                !review?.flashcards.isNullOrEmpty() ||
+                                review?.mindmap != null ||
+                                !review?.summaryTable.isNullOrEmpty() ||
+                                cachedNote.vocabStory != null ||
+                                !cachedNote.vocabMcqs.isNullOrEmpty() ||
+                                !cachedNote.flashcards.isNullOrEmpty() ||
+                                cachedNote.mindmap != null ||
+                                !cachedNote.summaryTable.isNullOrEmpty()
+                        } else {
+                            false
+                        }
+
+                    if (hasRegularData || hasVocabData) {
+                        Log.d(
+                            TAG,
+                            "Found cached note: $noteId (regular=$hasRegularData, vocab=$hasVocabData)",
+                        )
                         return@withContext cachedNote
                     }
                 }
@@ -94,12 +125,73 @@ class AIRepository(private val context: Context) {
             }
         }
 
+    /**
+     * Process a pure text note via /process (text) endpoint. This is used for special flows like
+     * vocabulary checklist where the backend has its own cache and logic based on (user_id,
+     * note_id, text content).
+     *
+     * For vocab content type, we check cache first to avoid redundant API calls. The backend will
+     * also check cache based on content hash, but frontend check saves a network round-trip when
+     * switching between vocab functions.
+     */
+    suspend fun processNoteText(
+        noteText: String,
+        userId: String? = null,
+        noteId: String? = null,
+        contentType: String? = null,
+        checkedVocabItems: String? = null,
+        useCache: Boolean = true,
+    ): AIResult<SummaryResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                // For vocab/checklist content, check cache first to avoid redundant API calls
+                // when user switches between different vocab functions (story, MCQ, flashcards,
+                // etc.)
+                if (useCache && (contentType == "vocab" || contentType == "checklist")) {
+                    val cached = getNoteFromCache(userId, noteId, checkVocabData = true)
+                    if (cached != null) {
+                        Log.d(TAG, "Using cached vocab result for note: $noteId")
+                        return@withContext AIResult.Success(cached)
+                    }
+                }
+
+                Log.d(TAG, "Processing text note via /process: ${noteText.take(100)}...")
+                if (checkedVocabItems != null) {
+                    Log.d(TAG, "With checked vocab items: ${checkedVocabItems.take(100)}...")
+                }
+
+                val response =
+                    service.processText(
+                        text = noteText,
+                        userId = userId,
+                        noteId = noteId,
+                        contentType = contentType,
+                        checkedVocabItems = checkedVocabItems,
+                    )
+
+                if (response.isSuccessful && response.body() != null) {
+                    Log.d(TAG, "Process text (sync) success")
+                    AIResult.Success(response.body()!!)
+                } else {
+                    val errorMsg = response.errorBody()?.string() ?: "Unknown error"
+                    Log.e(TAG, "Process text failed: ${response.code()} - $errorMsg")
+                    AIResult.Error(errorMsg, response.code())
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Process text exception: ${e.message}", e)
+                AIResult.Error(e.message ?: "Network error")
+            }
+        }
+
     // ==================== PROCESS FILE (SYNC) ====================
 
     suspend fun processFile(
         fileUri: Uri,
         userId: String? = null,
         noteId: String? = null,
+        text: String? = null,
+        contentType: String? = null,
+        checkedVocabItems: String? = null,
     ): AIResult<SummaryResponse> =
         withContext(Dispatchers.IO) {
             try {
@@ -112,10 +204,22 @@ class AIRepository(private val context: Context) {
                 val requestFile = file.asRequestBody(mimeType.toMediaTypeOrNull())
                 val filePart = MultipartBody.Part.createFormData("file", file.name, requestFile)
 
+                val textPart = text?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val userIdPart = userId?.toRequestBody("text/plain".toMediaTypeOrNull())
                 val noteIdPart = noteId?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val contentTypePart = contentType?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val checkedVocabItemsPart =
+                    checkedVocabItems?.toRequestBody("text/plain".toMediaTypeOrNull())
 
-                val response = service.processFile(filePart, userIdPart, noteIdPart)
+                val response =
+                    service.processFile(
+                        filePart,
+                        textPart,
+                        userIdPart,
+                        noteIdPart,
+                        contentTypePart,
+                        checkedVocabItemsPart,
+                    )
 
                 // Cleanup temp file
                 file.delete()
@@ -305,6 +409,8 @@ class AIRepository(private val context: Context) {
         attachments: List<Uri>,
         userId: String?,
         noteId: String?,
+        contentType: String? = null,
+        checkedVocabItems: String? = null,
         useCache: Boolean = true,
     ): AIResult<SummaryResponse> =
         withContext(Dispatchers.IO) {
@@ -313,7 +419,12 @@ class AIRepository(private val context: Context) {
             }
 
             if (useCache) {
-                val cached = getNoteFromCache(userId, noteId)
+                val cached =
+                    getNoteFromCache(
+                        userId = userId,
+                        noteId = noteId,
+                        checkVocabData = contentType == "vocab",
+                    )
                 if (cached != null) {
                     Log.d(TAG, "Using cached result for combined note: $noteId")
                     return@withContext AIResult.Success(cached)
@@ -334,6 +445,14 @@ class AIRepository(private val context: Context) {
                     noteId
                         ?.takeIf { it.isNotBlank() }
                         ?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val contentTypeBody =
+                    contentType
+                        ?.takeIf { it.isNotBlank() }
+                        ?.toRequestBody("text/plain".toMediaTypeOrNull())
+                val checkedVocabItemsBody =
+                    checkedVocabItems
+                        ?.takeIf { it.isNotBlank() }
+                        ?.toRequestBody("text/plain".toMediaTypeOrNull())
 
                 val fileParts =
                     attachments.map { uri ->
@@ -344,8 +463,19 @@ class AIRepository(private val context: Context) {
                         MultipartBody.Part.createFormData("files", file.name, requestFile)
                     }
 
-                Log.d(TAG, "Calling API for combined processing: noteId=$noteId")
-                val response = service.processCombined(textBody, fileParts, userIdBody, noteIdBody)
+                Log.d(
+                    TAG,
+                    "Calling API for combined processing: noteId=$noteId, contentType=$contentType",
+                )
+                val response =
+                    service.processCombined(
+                        textBody,
+                        fileParts,
+                        userIdBody,
+                        noteIdBody,
+                        contentTypeBody,
+                        checkedVocabItemsBody,
+                    )
 
                 if (response.isSuccessful && response.body() != null) {
                     Log.d(TAG, "Combined processing success")
@@ -443,4 +573,36 @@ class AIRepository(private val context: Context) {
     suspend fun checkServerConnection(): Boolean {
         return ApiClient.checkConnection()
     }
+
+    // ==================== TRANSLATION ====================
+
+    suspend fun translateText(
+        text: String,
+        targetLanguage: String = "Vietnamese",
+    ): AIResult<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Translating text to $targetLanguage: ${text.take(100)}...")
+
+                val response = service.translateText(text = text, targetLanguage = targetLanguage)
+
+                if (response.isSuccessful && response.body() != null) {
+                    val translatedText = response.body()!!.translatedText
+                    if (translatedText.isNullOrBlank()) {
+                        Log.e(TAG, "Translation returned empty text")
+                        AIResult.Error("Translation returned empty result")
+                    } else {
+                        Log.d(TAG, "Translation success")
+                        AIResult.Success(translatedText)
+                    }
+                } else {
+                    val errorMsg = response.errorBody()?.string() ?: "Unknown error"
+                    Log.e(TAG, "Translation failed: ${response.code()} - $errorMsg")
+                    AIResult.Error(errorMsg, response.code())
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Translation exception: ${e.message}", e)
+                AIResult.Error(e.message ?: "Network error")
+            }
+        }
 }

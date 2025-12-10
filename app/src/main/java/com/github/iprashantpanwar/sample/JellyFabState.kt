@@ -9,9 +9,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
 @Stable
-class JellyFabState internal constructor(
+class JellyFabState
+internal constructor(
     internal val expandedState: MutableState<Boolean>,
-    internal val secondaryExpandedState: MutableState<Boolean>
+    internal val secondaryExpandedState: MutableState<Boolean>,
 ) {
     /** Whether the primary jelly menu is expanded. */
     var expanded: Boolean by expandedState
@@ -26,13 +27,11 @@ class JellyFabState internal constructor(
 @Composable
 fun rememberJellyFabState(
     initialExpanded: Boolean = false,
-    initialSecondaryExpanded: Boolean = false
+    initialSecondaryExpanded: Boolean = false,
 ): JellyFabState = remember {
     JellyFabState(
         expandedState = mutableStateOf(initialExpanded),
-        secondaryExpandedState = mutableStateOf(
-            if (initialExpanded) initialSecondaryExpanded else false
-        )
+        secondaryExpandedState =
+            mutableStateOf(if (initialExpanded) initialSecondaryExpanded else false),
     )
 }
-

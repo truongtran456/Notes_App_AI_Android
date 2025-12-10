@@ -13,14 +13,12 @@ import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
 import android.text.style.URLSpan
 import android.text.style.UnderlineSpan
-import android.util.Log
 import android.view.ActionMode
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.View.GONE
-import android.view.View.VISIBLE
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.activity.result.ActivityResultLauncher
@@ -49,7 +47,6 @@ import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companio
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_TITLE
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_TYPE
 import com.philkes.notallyx.presentation.add
-import com.philkes.notallyx.presentation.addIconButton
 import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.setControlsContrastColorForAllViews
 import com.philkes.notallyx.presentation.setOnNextAction
@@ -316,12 +313,11 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     override fun initBottomMenu() {
         super.initBottomMenu()
     }
-    
+
     override fun openAddItemMenu() {
-        AddNoteBottomSheet(this, colorInt)
-            .show(supportFragmentManager, AddNoteBottomSheet.TAG)
+        AddNoteBottomSheet(this, colorInt).show(supportFragmentManager, AddNoteBottomSheet.TAG)
     }
-    
+
     override fun openTextFormattingMenu() {
         if (binding.EnterBody.isActionModeOn) {
             initBottomTextFormattingMenu()
@@ -330,7 +326,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
             binding.EnterBody.setSelection(binding.EnterBody.length())
         }
     }
-    
+
     override fun openMoreMenu() {
         MoreNoteBottomSheet(this, createFolderActions(), colorInt)
             .show(supportFragmentManager, MoreNoteBottomSheet.TAG)

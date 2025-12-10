@@ -14,13 +14,12 @@ import kotlinx.coroutines.launch
 internal suspend fun playDoubleBounce(
     target: Animatable<Float, AnimationVector1D>,
     outward: Boolean,
-    soft: Boolean = false
+    soft: Boolean = false,
 ) {
     val dir = if (outward) 1f else -1f
-    val seq = if (soft)
-        listOf(0f, 0.7f * dir, -0.3f * dir, 0.1f * dir, 0f)
-    else
-        listOf(0f, 1f * dir, -0.6f * dir, 0.3f * dir, 0f)
+    val seq =
+        if (soft) listOf(0f, 0.7f * dir, -0.3f * dir, 0.1f * dir, 0f)
+        else listOf(0f, 1f * dir, -0.6f * dir, 0.3f * dir, 0f)
 
     for (i in 1 until seq.size) {
         target.animateTo(seq[i], tween(90, easing = LinearOutSlowInEasing))
@@ -31,7 +30,7 @@ internal suspend fun expandPrimaryLayer(
     primaryProgress: List<Animatable<Float, AnimationVector1D>>,
     bulges: List<Animatable<Float, AnimationVector1D>>,
     config: JellyFabConfig,
-    bounceLastBulge: suspend (bulge: Animatable<Float, AnimationVector1D>) -> Unit
+    bounceLastBulge: suspend (bulge: Animatable<Float, AnimationVector1D>) -> Unit,
 ) = coroutineScope {
     primaryProgress.indices.forEach { i ->
         launch { primaryProgress[i].animateTo(1f, tween(400, easing = FastOutSlowInEasing)) }
@@ -55,7 +54,7 @@ internal suspend fun collapsePrimaryLayer(
     bulges: List<Animatable<Float, AnimationVector1D>>,
     config: JellyFabConfig,
     bounceTopBulge: suspend (bulge: Animatable<Float, AnimationVector1D>) -> Unit,
-    bounceSideBulge: suspend (bulge: Animatable<Float, AnimationVector1D>) -> Unit
+    bounceSideBulge: suspend (bulge: Animatable<Float, AnimationVector1D>) -> Unit,
 ) = coroutineScope {
     for (i in primaryProgress.indices) {
         launch {
@@ -76,20 +75,23 @@ internal suspend fun collapsePrimaryLayer(
 
 internal suspend fun expandSecondaryLayer(
     secondaryProgress: List<Animatable<Float, AnimationVector1D>>,
-    config: JellyFabConfig
+    config: JellyFabConfig,
 ) = coroutineScope {
     secondaryProgress.indices.forEach { i ->
         launch {
             delay(i * config.secondaryExpandStagger)
             secondaryProgress[i].animateTo(1.06f, tween(320, easing = FastOutSlowInEasing))
-            secondaryProgress[i].animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            secondaryProgress[i].animateTo(
+                1f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+            )
         }
     }
 }
 
 internal suspend fun collapseSecondaryLayer(
     secondaryProgress: List<Animatable<Float, AnimationVector1D>>,
-    config: JellyFabConfig
+    config: JellyFabConfig,
 ) = coroutineScope {
     for (i in secondaryProgress.indices.reversed()) {
         launch {
@@ -105,19 +107,15 @@ internal suspend fun collapseSecondaryThenPrimary(
     bulges: List<Animatable<Float, AnimationVector1D>>,
     config: JellyFabConfig,
     bounceTop: suspend (Animatable<Float, AnimationVector1D>) -> Unit,
-    bounceSide: suspend (Animatable<Float, AnimationVector1D>) -> Unit
+    bounceSide: suspend (Animatable<Float, AnimationVector1D>) -> Unit,
 ) = coroutineScope {
     collapseSecondaryLayer(secondaryProgress, config)
     delay(secondaryCollapseDuration(secondaryProgress.size, config))
     collapsePrimaryLayer(primaryProgress, bulges, config, bounceTop, bounceSide)
 }
 
-internal fun secondaryCollapseDuration(
-    secondaryCount: Int,
-    config: JellyFabConfig
-): Long {
+internal fun secondaryCollapseDuration(secondaryCount: Int, config: JellyFabConfig): Long {
     if (secondaryCount <= 0) return 0L
     val tailStagger = (secondaryCount - 1) * config.secondaryCollapseStagger
     return tailStagger + 200L
 }
-
