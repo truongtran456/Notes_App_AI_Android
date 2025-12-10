@@ -15,6 +15,8 @@ import androidx.core.text.getSpans
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.NotallyDatabase
 import com.philkes.notallyx.data.dao.BaseNoteDao
@@ -30,6 +32,7 @@ import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.model.attachmentsDifferFrom
 import com.philkes.notallyx.data.model.copy
 import com.philkes.notallyx.data.model.deepCopy
+import com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke
 import com.philkes.notallyx.presentation.activity.note.reminders.RemindersActivity.Companion.NEW_REMINDER_ID
 import com.philkes.notallyx.presentation.applySpans
 import com.philkes.notallyx.presentation.showToast
@@ -55,9 +58,6 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke
 
 typealias BackupFile = Pair<String?, File>
 
@@ -65,7 +65,7 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
 
     private val database = NotallyDatabase.getDatabase(app)
     private lateinit var baseNoteDao: BaseNoteDao
-    
+
     private val gson = Gson()
     private val strokesType = object : TypeToken<List<DrawingStroke>>() {}.type
 
@@ -94,9 +94,11 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
     val files = NotNullLiveData<List<FileAttachment>>(emptyList())
     val audios = NotNullLiveData<List<Audio>>(emptyList())
     val reminders = NotNullLiveData<List<Reminder>>(emptyList())
-    
-    // Drawing strokes để lưu drawing
+
+    // Drawing strokes ?? l?u drawing
     var drawingStrokes = ArrayList<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>()
+    var drawingBackgroundColor: Int = android.graphics.Color.WHITE
+    var drawingBackgroundDrawableResId: Int? = null
 
     val addingFiles = MutableLiveData<Progress>()
     val eventBus = MutableLiveData<Event<List<FileError>>>()
@@ -255,17 +257,21 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
                 files.value = baseNote.files
                 audios.value = baseNote.audios
                 reminders.value = baseNote.reminders
-                
-                // Load drawing strokes từ JSON
+
+                // Load drawing strokes t? JSON
                 drawingStrokes.clear()
                 if (!baseNote.drawingStrokesJson.isNullOrEmpty()) {
                     try {
-                        val strokes = gson.fromJson<List<DrawingStroke>>(baseNote.drawingStrokesJson, strokesType)
+                        val strokes =
+                            gson.fromJson<List<DrawingStroke>>(
+                                baseNote.drawingStrokesJson,
+                                strokesType,
+                            )
                         if (strokes != null) {
                             drawingStrokes.addAll(strokes)
                         }
                     } catch (e: Exception) {
-                        // Nếu parse lỗi, bỏ qua
+                        // N?u parse l?i, b? qua
                         e.printStackTrace()
                     }
                 }
@@ -342,19 +348,20 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
         val spans = getFilteredSpans(body)
         val body = this.body.toString()
         val nonEmptyItems = this.items.filter { item -> item.body.isNotEmpty() }
-        
-        // Serialize drawing strokes thành JSON
-        val drawingStrokesJson = if (drawingStrokes.isNotEmpty()) {
-            try {
-                gson.toJson(drawingStrokes)
-            } catch (e: Exception) {
-                e.printStackTrace()
+
+        // Serialize drawing strokes th�nh JSON
+        val drawingStrokesJson =
+            if (drawingStrokes.isNotEmpty()) {
+                try {
+                    gson.toJson(drawingStrokes)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
+            } else {
                 null
             }
-        } else {
-            null
-        }
-        
+
         return BaseNote(
             id,
             type,

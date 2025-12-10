@@ -15,6 +15,7 @@ data class BackgroundItem(
     val category: BackgroundCategoryType,
     val isCustomAdd: Boolean = false,
     var isSelected: Boolean = false,
+    val drawableResId: Int? = null, // Resource ID c?a ?nh background
 )
 
 data class BackgroundSection(
@@ -22,5 +23,3 @@ data class BackgroundSection(
     val title: String,
     val items: MutableList<BackgroundItem>,
 )
-
-

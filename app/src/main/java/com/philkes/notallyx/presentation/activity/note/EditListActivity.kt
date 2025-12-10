@@ -1,30 +1,14 @@
 package com.philkes.notallyx.presentation.activity.note
 
-import android.content.res.ColorStateList
-import android.graphics.Color
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
-import android.widget.FrameLayout
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
-import com.google.android.material.bottomsheet.BottomSheetDialog
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.color.MaterialColors
 import com.philkes.notallyx.R
-import com.philkes.notallyx.data.api.models.AIResult
-import com.philkes.notallyx.data.api.models.SummaryResponse
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.preferences.getAiUserId
-import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
-import com.philkes.notallyx.presentation.addIconButton
-import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.setOnNextAction
 import com.philkes.notallyx.presentation.showToast
 import com.philkes.notallyx.presentation.view.note.action.AddBottomSheet
 import com.philkes.notallyx.presentation.view.note.action.MoreListActions
-import com.philkes.notallyx.presentation.view.note.action.MoreListBottomSheet
 import com.philkes.notallyx.presentation.view.note.listitem.ListItemAdapter
 import com.philkes.notallyx.presentation.view.note.listitem.ListItemVH
 import com.philkes.notallyx.presentation.view.note.listitem.ListManager
@@ -38,18 +22,12 @@ import com.philkes.notallyx.presentation.viewmodel.preference.ListItemSort
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences
 import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
-import com.philkes.notallyx.utils.log
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
     private var adapter: ListItemAdapter? = null
     private lateinit var items: ListItemSortedList
     private lateinit var listManager: ListManager
-    private val aiRepository by lazy { AIRepository(this) }
-    private var cachedVocabResult: SummaryResponse? = null
 
     override fun finish() {
         notallyModel.setItems(items.toMutableList())
@@ -89,252 +67,152 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     }
 
     override fun initBottomMenu() {
-        // B? c?c thanh d??i t??ng t? EditNoteActivity:
-        // LEFT: +, Undo
-        binding.BottomAppBarLeft.apply {
-            removeAllViews()
-
-            addIconButton(R.string.adding_files, R.drawable.add, marginStart = 0) {
-                AddBottomSheet(this@EditListActivity, colorInt)
-                    .show(supportFragmentManager, AddBottomSheet.TAG)
-            }
-
-            undo =
-                addIconButton(R.string.undo, R.drawable.undo, marginStart = 2) {
-                        try {
-                            changeHistory.undo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            application.log(TAG, throwable = e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canUndo.value }
-        }
-
-        // CENTER: n?t AI nh?
-        binding.BottomAppBarCenter.apply {
-            visibility = android.view.View.GONE
-            removeAllViews()
-        }
-
-        // T?o FAB AI gradient ? góc d??i bên ph?i
-        setupAIFloatingButton()
-
-        // RIGHT: Redo + Draw + More
-        binding.BottomAppBarRight.apply {
-            removeAllViews()
-
-            redo =
-                addIconButton(R.string.redo, R.drawable.redo, marginStart = 0) {
-                        try {
-                            changeHistory.redo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            application.log(TAG, throwable = e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canRedo.value }
-
-            addIconButton(R.string.draw, R.drawable.ic_pen_pencil, marginStart = 0) {
-                openDrawingScreen()
-            }
-
-            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
-                MoreListBottomSheet(this@EditListActivity, createFolderActions(), colorInt)
-                    .show(supportFragmentManager, MoreListBottomSheet.TAG)
-            }
-        }
-
-        setBottomAppBarColor(colorInt)
+        super.initBottomMenu()
     }
 
-    private fun ensureAICenterButtonForList() {
-        if (binding.BottomAppBarCenter.childCount > 0) return
-        val button =
-            MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle)
-                .apply {
-                    text = getString(R.string.ai_action_button_label)
-                    icon = ContextCompat.getDrawable(this@EditListActivity, R.drawable.ai_sparkle)
-                    iconPadding = 8.dp
-                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-                    minWidth = 0
-                    minimumWidth = 0
-                    setInsetTop(0)
-                    setInsetBottom(0)
-                    setPaddingRelative(20.dp, 6.dp, 20.dp, 6.dp)
-                    cornerRadius = resources.getDimensionPixelSize(R.dimen.dp_20)
-                    val primary =
-                        MaterialColors.getColor(
-                            this,
-                            com.google.android.material.R.attr.colorPrimary,
-                            0,
-                        )
-                    val onPrimary =
-                        MaterialColors.getColor(
-                            this,
-                            com.google.android.material.R.attr.colorOnPrimary,
-                            Color.WHITE,
-                        )
-                    setBackgroundTintList(ColorStateList.valueOf(primary))
-                    setTextColor(onPrimary)
-                    iconTint = ColorStateList.valueOf(onPrimary)
-                    strokeWidth = resources.getDimensionPixelSize(R.dimen.dp_1)
-                    strokeColor =
-                        ColorStateList.valueOf(
-                            MaterialColors.getColor(
-                                this,
-                                com.google.android.material.R.attr.colorPrimaryContainer,
-                                primary,
-                            )
-                        )
-                    setOnClickListener { openAIActionsMenu() }
-                }
-        val params =
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER,
-            )
-        binding.BottomAppBarCenter.addView(button, params)
+    override fun openAddItemMenu() {
+        AddBottomSheet(this, colorInt).show(supportFragmentManager, AddBottomSheet.TAG)
     }
+
+    override fun openTextFormattingMenu() {}
 
     override fun openAIActionsMenu() {
-        // L?y text t? c?c item checklist l?m input cho AI (t?m th?i ch? m? ph?n Summary)
-        // L?y checked items (ch? nh?ng items ?ã tick) cho checklist mode
-        val allItems = items.toMutableList()
-        val checkedItems = allItems.filter { it.checked }
-
-        // Text t? checked items (ch? nh?ng items ?ã tick) - dùng cho checklist mode
-        val checkedItemsText = checkedItems.joinToString("\n") { item -> item.body.toString() }
-
-        // Text t? t?t c? items (cho các ch?c n?ng không ph?i checklist)
-        val noteText = allItems.joinToString("\n") { item -> item.body.toString() }
-
-        // Format checked items thành JSON array ?? g?i lên API
-        val checkedVocabItemsJson =
-            if (checkedItems.isNotEmpty()) {
-                com.google.gson.Gson().toJson(checkedItems.map { it.body.toString() })
-            } else {
-                null
-            }
-
-        android.util.Log.d(
-            TAG,
-            "openAIActionsMenu: checkedItems=${checkedItems.size}, totalItems=${allItems.size}",
-        )
-        android.util.Log.d(TAG, "checkedVocabItemsJson: $checkedVocabItemsJson")
-
+        val noteText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
         val attachmentUris = getAttachedFileUris()
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
 
-        if (checkedItems.isEmpty() && noteText.isBlank() && attachmentUris.isEmpty()) {
-            showToast(R.string.ai_error_empty_note)
-            return
-        }
-
-        // N?u ?ã có cache vocab, hi?n th? bottom sheet ?? ch?n ch?c n?ng
-        cachedVocabResult?.let {
-            showVocabFunctionSelectionBottomSheet(it)
-            return
-        }
-
-        val userId = getAiUserId()
-        val noteId = notallyModel.id.toString()
-
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result =
-                aiRepository.processCombinedInputs(
-                    noteText = checkedItemsText.ifBlank { noteText.ifBlank { null } },
-                    attachments = attachmentUris,
-                    userId = userId,
-                    noteId = noteId,
-                    contentType = "checklist",
-                    checkedVocabItems = checkedVocabItemsJson,
-                    useCache = true,
+        sheetView.findViewById<android.view.View>(R.id.ActionSummary).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
+                    .startWithAttachments(
+                        context = this,
+                        noteText = noteText.ifBlank { null },
+                        noteId = notallyModel.id,
+                        attachments = attachmentUris,
+                        initialSection =
+                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
+                                .AISection
+                                .SUMMARY,
+                    )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.SUMMARY,
                 )
-            withContext(Dispatchers.Main) {
-                when (result) {
-                    is AIResult.Success -> {
-                        cachedVocabResult = result.data
-                        showVocabFunctionSelectionBottomSheet(result.data)
-                    }
-                    is AIResult.Error -> {
-                        showToast(result.message)
-                    }
-                    else -> {}
-                }
             }
         }
-    }
 
-    private fun showVocabFunctionSelectionBottomSheet(summaryResponse: SummaryResponse) {
-        val bottomSheet = BottomSheetDialog(this)
-        val bottomSheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_vocab_actions, null)
-        bottomSheet.setContentView(bottomSheetView)
+        sheetView.findViewById<android.view.View>(R.id.ActionBullet).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
+                    .startWithAttachments(
+                        context = this,
+                        noteText = noteText.ifBlank { null },
+                        noteId = notallyModel.id,
+                        attachments = attachmentUris,
+                        initialSection =
+                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
+                                .AISection
+                                .BULLET_POINTS,
+                    )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.BULLET_POINTS,
+                )
+            }
+        }
 
-        // X? lý click cho t?ng m?c ch?c n?ng vocab
-        bottomSheetView.findViewById<View>(R.id.ActionSummaryTable)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
+        sheetView.findViewById<android.view.View>(R.id.ActionQuestions).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
+                    .startWithAttachments(
+                        context = this,
+                        noteText = noteText.ifBlank { null },
+                        noteId = notallyModel.id,
+                        attachments = attachmentUris,
+                        initialSection =
+                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
+                                .AISection
+                                .QUESTIONS,
+                    )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.QUESTIONS,
+                )
+            }
+        }
+
+        sheetView.findViewById<android.view.View>(R.id.ActionMCQ).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
+                    .startWithAttachments(
+                        context = this,
+                        noteText = noteText.ifBlank { null },
+                        noteId = notallyModel.id,
+                        attachments = attachmentUris,
+                        initialSection =
+                            com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
+                                .AISection
+                                .MCQ,
+                    )
+            } else {
+                AISummaryActivity.start(
+                    this,
+                    noteText,
+                    notallyModel.id,
+                    AISummaryActivity.AISection.MCQ,
+                )
+            }
+        }
+
+        sheetView.findViewById<android.view.View>(R.id.ActionFile).setOnClickListener {
+            dialog.dismiss()
+            com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity.start(
                 context = this,
-                summaryResponse = summaryResponse,
+                noteText = noteText,
                 noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.VOCAB_SUMMARY_TABLE,
-                isVocabMode = true,
             )
         }
 
-        bottomSheetView.findViewById<View>(R.id.ActionVocabStory)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.VOCAB_STORY,
-                isVocabMode = true,
+        sheetView.findViewById<android.view.View>(R.id.ActionHistory).setOnClickListener {
+            dialog.dismiss()
+            com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity.start(
+                this,
+                userId = getAiUserId(),
             )
         }
 
-        bottomSheetView.findViewById<View>(R.id.ActionVocabMCQ)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
-                isVocabMode = true,
-            )
-        }
-
-        bottomSheetView.findViewById<View>(R.id.ActionFlashcards)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.VOCAB_FLASHCARDS,
-                isVocabMode = true,
-            )
-        }
-
-        bottomSheetView.findViewById<View>(R.id.ActionMindmap)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.VOCAB_MINDMAP,
-                isVocabMode = true,
-            )
-        }
-
-        bottomSheet.show()
+        dialog.setContentView(sheetView)
+        dialog.show()
     }
 
     private fun getAttachedFileUris(): List<android.net.Uri> {
@@ -490,7 +368,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
     companion object {
         private const val TAG = "EditListActivity"
-        private const val EXTRA_ITEM_POS = "notallyx.intent.extra.EXTRA_ITEM_POS"
+        private const val EXTRA_ITEM_POS = "notallyx.intent.extra.ITEM_POS"
         private const val EXTRA_SELECTION_START = "notallyx.intent.extra.EXTRA_SELECTION_START"
         private const val EXTRA_SELECTION_END = "notallyx.intent.extra.EXTRA_SELECTION_END"
     }

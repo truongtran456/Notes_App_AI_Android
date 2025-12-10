@@ -16,31 +16,33 @@ import android.util.TypedValue
 import android.view.MenuItem
 import android.view.View
 import android.view.View.GONE
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams
 import android.view.ViewGroup.VISIBLE
-import android.widget.ImageView
 import android.view.inputmethod.InputMethodManager
+import android.widget.ImageView
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.ColorInt
 import androidx.annotation.RequiresApi
-import androidx.activity.enableEdgeToEdge
+import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
-import androidx.core.view.updatePadding
 import androidx.core.view.updateLayoutParams
+import androidx.core.view.updatePadding
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
-import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.philkes.notallyx.R
 import com.philkes.notallyx.common.datasource.AppSharePrefs
 import com.philkes.notallyx.common.datasource.AppSharePrefsImpl
@@ -62,13 +64,11 @@ import com.philkes.notallyx.presentation.activity.LockedActivity
 import com.philkes.notallyx.presentation.activity.main.fragment.DisplayLabelFragment.Companion.EXTRA_DISPLAYED_LABEL
 import com.philkes.notallyx.presentation.activity.note.SelectLabelsActivity.Companion.EXTRA_SELECTED_LABELS
 import com.philkes.notallyx.presentation.activity.note.reminders.RemindersActivity
-import android.widget.LinearLayout
 import com.philkes.notallyx.presentation.add
 import com.philkes.notallyx.presentation.addFastScroll
-import com.philkes.notallyx.presentation.addIconButton
 import com.philkes.notallyx.presentation.bindLabels
-import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.displayFormattedTimestamp
+import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.extractColor
 import com.philkes.notallyx.presentation.getQuantityString
 import com.philkes.notallyx.presentation.isLightColor
@@ -82,9 +82,7 @@ import com.philkes.notallyx.presentation.view.misc.NotNullLiveData
 import com.philkes.notallyx.presentation.view.note.ErrorAdapter
 import com.philkes.notallyx.presentation.view.note.action.Action
 import com.philkes.notallyx.presentation.view.note.action.AddActions
-import com.philkes.notallyx.presentation.view.note.action.AddBottomSheet
 import com.philkes.notallyx.presentation.view.note.action.MoreActions
-import com.philkes.notallyx.presentation.view.note.action.MoreNoteBottomSheet
 import com.philkes.notallyx.presentation.view.note.audio.AudioAdapter
 import com.philkes.notallyx.presentation.view.note.preview.PreviewFileAdapter
 import com.philkes.notallyx.presentation.view.note.preview.PreviewImageAdapter
@@ -104,6 +102,8 @@ import com.philkes.notallyx.utils.shareNote
 import com.philkes.notallyx.utils.showColorSelectDialog
 import com.philkes.notallyx.utils.wrapWithChooser
 import java.io.File
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -120,6 +120,7 @@ abstract class EditActivity(private val type: Type) :
     private lateinit var attachFilesActivityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var exportNotesActivityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var exportFileActivityResultLauncher: ActivityResultLauncher<Intent>
+    private lateinit var fullScreenDrawingActivityResultLauncher: ActivityResultLauncher<Intent>
 
     protected var search = Search()
 
@@ -140,19 +141,118 @@ abstract class EditActivity(private val type: Type) :
 
     private var currentDrawTool: DrawToolBrush? = null
     private var isDrawingModeActive: Boolean = false
-    private var canvasFixedHeight: Int = 0 // Chiều cao canvas khi ở draw mode
+    private var canvasFixedHeight: Int = 0
 
     protected var colorInt: Int = -1
     protected var inputMethodManager: InputMethodManager? = null
 
-    override fun finish() {
-        lifecycleScope.launch(Dispatchers.Main) {
-            if (notallyModel.isEmpty()) {
-                notallyModel.deleteBaseNote(checkAutoSave = false)
-            } else if (notallyModel.isModified()) {
-                saveNote()
+    // Store animations to cancel on destroy
+    private val activeAnimators = mutableListOf<android.animation.Animator>()
+    private val postRunnables = mutableListOf<Runnable>()
+
+    override fun onDestroy() {
+        // Cancel all active animations
+        activeAnimators.forEach { animator ->
+            try {
+                if (animator.isRunning) {
+                    animator.cancel()
+                }
+            } catch (e: Exception) {
+                // Ignore errors during cleanup
             }
-            super.finish()
+        }
+        activeAnimators.clear()
+
+        // Cancel all post operations
+        try {
+            postRunnables.forEach { runnable -> binding.root.removeCallbacks(runnable) }
+        } catch (e: Exception) {
+            // Ignore errors if binding is already destroyed
+        }
+        postRunnables.clear()
+
+        // Clear references
+        try {
+            binding.DrawingCanvas.setBrush(null)
+            binding.DrawingCanvas.setOnColorPickedListener {}
+        } catch (e: Exception) {
+            // Ignore errors if view is already destroyed
+        }
+
+        super.onDestroy()
+    }
+
+    override fun finish() {
+        if (isFinishing || isDestroyed) return
+
+        lifecycleScope.launch(Dispatchers.Main) {
+            if (isFinishing || isDestroyed) return@launch
+
+            try {
+                if (notallyModel.isEmpty()) {
+                    notallyModel.deleteBaseNote(checkAutoSave = false)
+                } else if (notallyModel.isModified()) {
+                    saveNote()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                if (!isDestroyed) {
+                    super.finish()
+                }
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == REQUEST_CODE_FULL_SCREEN_DRAWING && resultCode == RESULT_OK) {
+            val strokesJson = data?.getStringExtra(FullScreenDrawingActivity.RESULT_STROKES)
+            handleDrawingStrokesResult(strokesJson)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Ensure background is reapplied when returning to this screen
+        applySavedBackgroundToCanvas()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Persist current background state for this note
+        persistCurrentBackground()
+    }
+
+    private fun handleDrawingStrokesResult(strokesJson: String?) {
+        if (strokesJson == null) return
+
+        try {
+            val gson = Gson()
+            val strokesType =
+                object :
+                        TypeToken<
+                            List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>
+                        >() {}
+                    .type
+            val strokes =
+                gson.fromJson<List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>>(
+                    strokesJson,
+                    strokesType,
+                )
+            if (strokes != null) {
+                notallyModel.drawingStrokes = ArrayList(strokes)
+
+                if (!isDrawingModeActive) {
+                    showDrawingArea()
+                }
+                binding.DrawingCanvas.loadStrokes(strokes)
+                notallyModel.modifiedTimestamp = System.currentTimeMillis()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            showToast("Error loading drawing")
         }
     }
 
@@ -160,35 +260,48 @@ abstract class EditActivity(private val type: Type) :
         super.onSaveInstanceState(outState)
         outState.putLong("id", notallyModel.id)
         if (notallyModel.isModified()) {
-            lifecycleScope.launch { saveNote() }
+            lifecycleScope.launch {
+                if (!isDestroyed && !isFinishing) {
+                    saveNote()
+                }
+            }
         }
     }
 
     open suspend fun saveNote() {
-        // L?u strokes v�o notallyModel tr??c khi save
+        if (isDestroyed || isFinishing) return
+
+        // L?u strokes v?o notallyModel tr??c khi save
         if (isDrawingModeActive) {
-            val strokes = binding.DrawingCanvas.getStrokes()
-            notallyModel.drawingStrokes = ArrayList(strokes)
+            try {
+                val strokes = binding.DrawingCanvas.getStrokes()
+                notallyModel.drawingStrokes = ArrayList(strokes)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         notallyModel.modifiedTimestamp = System.currentTimeMillis()
         notallyModel.saveNote()
+        // Persist background after note is saved (ensures correct noteId key)
+        saveDrawingBackgroundPreference(
+            notallyModel.drawingBackgroundColor,
+            notallyModel.drawingBackgroundDrawableResId,
+        )
         WidgetProvider.sendBroadcast(application, longArrayOf(notallyModel.id))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Bật edge-to-edge mode để background full màn hình
+
         enableEdgeToEdge()
-        
+
         inputMethodManager =
             ContextCompat.getSystemService(baseContext, InputMethodManager::class.java)
         notallyModel.type = type
         initialiseBinding()
         setContentView(binding.root)
-        
-        // Xử lý window insets để padding đúng cho content
+
         setupWindowInsets()
 
         initChangeHistory()
@@ -196,9 +309,11 @@ abstract class EditActivity(private val type: Type) :
             val persistedId = savedInstanceState?.getLong("id")
             val selectedId = intent.getLongExtra(EXTRA_SELECTED_BASE_NOTE, 0L)
             val id = persistedId ?: selectedId
+
             if (persistedId == null) {
                 notallyModel.setState(id)
             }
+
             if (notallyModel.isNewNote && intent.action == Intent.ACTION_SEND) {
                 handleSharedNote()
             } else if (notallyModel.isNewNote) {
@@ -211,12 +326,15 @@ abstract class EditActivity(private val type: Type) :
             setupWindowInsets()
             setupListeners()
             setStateFromModel(savedInstanceState)
+            applySavedBackgroundToCanvas()
 
             configureUI()
             binding.ScrollView.apply {
                 visibility = View.VISIBLE
                 addFastScroll(this@EditActivity)
             }
+
+            setupInlineAIButton()
         }
 
         setupActivityResultLaunchers()
@@ -324,6 +442,14 @@ abstract class EditActivity(private val type: Type) :
                     }
                 }
             }
+        fullScreenDrawingActivityResultLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == RESULT_OK) {
+                    val strokesJson =
+                        result.data?.getStringExtra(FullScreenDrawingActivity.RESULT_STROKES)
+                    handleDrawingStrokesResult(strokesJson)
+                }
+            }
     }
 
     override fun onRequestPermissionsResult(
@@ -353,11 +479,7 @@ abstract class EditActivity(private val type: Type) :
     }
 
     protected open fun setupToolbars() {
-        // Khởi tạo toolbar vẽ (back + undo + redo + draw + search + pin)
         initDrawToolbar()
-
-        // Menu trên toolbar giờ chỉ dùng cho search/prev/next khi đang ở search mode.
-        // Mặc định không thêm search/pin ở menu nữa vì đã có icon riêng trong layout.
 
         search.results.mergeSkipFirst(search.resultPos).observe(this) { (amount, pos) ->
             val hasResults = amount > 0
@@ -381,25 +503,33 @@ abstract class EditActivity(private val type: Type) :
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
             val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            
-            // Padding cho toolbar để tránh status bar
+
             binding.Toolbar.updatePadding(top = statusBars.top)
-            
-            // Điều chỉnh margin bottom cho BottomAppBar để tránh navigation bar
-            binding.BottomAppBarLayout.updateLayoutParams<androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams> {
+
+            binding.BottomAppBarLayout.updateLayoutParams<
+                androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+            > {
                 bottomMargin = navBars.bottom
             }
-            
-            // Điều chỉnh margin bottom cho FAB AI để nằm trên bottom bar (giống MainFab)
-            binding.root.findViewWithTag<CardView>("ai_fab")?.let { fab ->
-                (fab.layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)?.let { params ->
-                    val bottomBarHeight = 56.dp // Chiều cao bottom bar
-                    val fabMargin = 16.dp // Margin từ bottom bar
-                    params.bottomMargin = bottomBarHeight + fabMargin + navBars.bottom
-                    fab.layoutParams = params
-                }
+
+            binding.JellyFabComposeView.updateLayoutParams<
+                androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+            > {
+                val fabMargin = 16.dp
+                bottomMargin = fabMargin + navBars.bottom
             }
-            
+
+            binding.root.findViewWithTag<CardView>("ai_fab")?.let { fab ->
+                (fab.layoutParams
+                        as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams)
+                    ?.let { params ->
+                        val fabSize = 56.dp
+                        val fabSpacing = 16.dp
+                        params.bottomMargin = fabSize + fabSpacing + navBars.bottom
+                        fab.layoutParams = params
+                    }
+            }
+
             insets
         }
     }
@@ -470,8 +600,6 @@ abstract class EditActivity(private val type: Type) :
             text = ""
             visibility = VISIBLE
         }
-
-        // Khi vào search mode, có thể ẩn bớt icon vẽ nếu bạn muốn (tuỳ chỉnh sau)
     }
 
     protected fun isInSearchMode(): Boolean = binding.EnterSearchKeyword.visibility == VISIBLE
@@ -485,149 +613,85 @@ abstract class EditActivity(private val type: Type) :
             visibility = GONE
             text = ""
         }
-        // Khôi phục lại menu search/pin mặc định
         setupToolbars()
         binding.Toolbar.navigationIcon = navigationIconBeforeSearch
         binding.Toolbar.setControlsContrastColorForAllViews(colorInt, overwriteBackground = false)
     }
 
     protected open fun initBottomMenu() {
-        binding.BottomAppBarLeft.apply {
-            removeAllViews()
-            addIconButton(R.string.adding_files, R.drawable.add, marginStart = 0) {
-                AddBottomSheet(this@EditActivity, colorInt)
-                    .show(supportFragmentManager, AddBottomSheet.TAG)
-            }
-        }
-        binding.BottomAppBarCenter.apply {
-            removeAllViews()
-            undo =
-                addIconButton(R.string.undo, R.drawable.undo, marginStart = 2) {
-                        try {
-                            changeHistory.undo()
-                        } catch (e: ChangeHistory.ChangeHistoryException) {
-                            application.log(TAG, throwable = e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canUndo.value }
-
-            redo =
-                addIconButton(R.string.redo, R.drawable.redo, marginStart = 2) {
-                        try {
-                            changeHistory.redo()
-                        } catch (e: ChangeHistory.ChangeHistoryException) {
-                            application.log(TAG, throwable = e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canRedo.value }
-            addIconButton(R.string.draw, R.drawable.ic_pen_pencil, marginStart = 2) {
-                openDrawingScreen()
-            }
-        }
-        binding.BottomAppBarRight.apply {
-            removeAllViews()
-            // Nút "more" được giữ lại ở right
-        }
-        setBottomAppBarColor(colorInt)
+        binding.BottomAppBarLayout.visibility = View.GONE
+        // AI FAB thay b?ng n�t inline tr�n header, kh�ng t?o FAB n?i n?a
+        setupJellyFab()
     }
-    
-    /**
-     * Setup FAB AI gradient ở góc dưới bên phải màn hình
-     * Dùng CardView để có elevation và corner radius tốt hơn
-     */
+
     protected fun setupAIFloatingButton() {
-        // Xóa FAB cũ nếu có (dùng tag để tìm)
         val existingFab = binding.root.findViewWithTag<CardView>("ai_fab")
-        existingFab?.let {
-            binding.root.removeView(it)
-        }
-        
-        // Tạo CardView để bọc nút AI
-        val cardView = CardView(this@EditActivity).apply {
-            tag = "ai_fab"
-            layoutParams = androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(
-                56.dp, // Kích thước chuẩn FAB
-                56.dp
-            ).apply {
-                // Đặt ở góc dưới bên phải, trên bottom bar
-                gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
-                // Margin: 16dp từ cạnh phải, margin bottom sẽ được tính trong setupWindowInsets()
-                setMargins(0, 0, 16.dp, 0)
+        existingFab?.let { binding.root.removeView(it) }
+
+        val cardView =
+            CardView(this@EditActivity).apply {
+                tag = "ai_fab"
+                layoutParams =
+                    androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams(56.dp, 56.dp)
+                        .apply {
+                            gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+                            setMargins(0, 0, 0, 0)
+                        }
+
+                radius = 28.dp.toFloat()
+                cardElevation = 6.dp.toFloat()
+                setContentPadding(0, 0, 0, 0)
+                setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
-            
-            // Corner radius = một nửa chiều rộng để tạo hình tròn hoàn hảo
-            radius = 28.dp.toFloat()
-            
-            // Elevation để nổi bật
-            cardElevation = 6.dp.toFloat()
-            
-            // Prevent card padding
-            setContentPadding(0, 0, 0, 0)
-            
-            // Prevent card background
-            setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
-        }
-        
-        // Tạo ImageView bên trong CardView
-        val aiButton = androidx.appcompat.widget.AppCompatImageView(this@EditActivity).apply {
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            
-            // Background gradient
-            setBackgroundResource(R.drawable.bg_ai_gradient)
-            
-            // Icon sparkles
-            setImageResource(R.drawable.ai_sparkle)
-            imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-            
-            // Scale type
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setPadding(14.dp, 14.dp, 14.dp, 14.dp)
-            
-            // Clickable
-            isClickable = true
-            isFocusable = true
-            
-            // Ripple effect - dùng TypedValue để lấy drawable
-            val typedValue = android.util.TypedValue()
-            this@EditActivity.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
-            foreground = ContextCompat.getDrawable(this@EditActivity, typedValue.resourceId)
-            
-            // Content description
-            contentDescription = this@EditActivity.getString(R.string.ai_assistant)
-            
-            // Click listener
-            setOnClickListener {
-                // Animation bounce khi click
-                animate()
-                    .scaleX(0.9f)
-                    .scaleY(0.9f)
-                    .setDuration(100)
-                    .withEndAction {
-                        animate()
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(100)
-                            .start()
-                    }
-                    .start()
-                
-                // Gọi method abstract để mở AI menu (EditNoteActivity/EditListActivity sẽ override)
-                openAIActionsMenu()
+
+        val aiButton =
+            androidx.appcompat.widget.AppCompatImageView(this@EditActivity).apply {
+                layoutParams =
+                    android.widget.FrameLayout.LayoutParams(
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                    )
+
+                setBackgroundResource(R.drawable.bg_ai_gradient)
+                setImageResource(R.drawable.ai_sparkle)
+                imageTintList =
+                    android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
+                isClickable = true
+                isFocusable = true
+
+                val typedValue = android.util.TypedValue()
+                this@EditActivity.theme.resolveAttribute(
+                    android.R.attr.selectableItemBackground,
+                    typedValue,
+                    true,
+                )
+                foreground = ContextCompat.getDrawable(this@EditActivity, typedValue.resourceId)
+
+                contentDescription = this@EditActivity.getString(R.string.ai_assistant)
+
+                setOnClickListener {
+                    animate()
+                        .scaleX(0.9f)
+                        .scaleY(0.9f)
+                        .setDuration(100)
+                        .withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(100).start() }
+                        .start()
+
+                    openAIActionsMenu()
+                }
             }
-        }
-        
-        // Thêm ImageView vào CardView
+
         cardView.addView(aiButton)
-        
-        // Animation khi view được add (bounce effect)
+
         cardView.alpha = 0f
         cardView.scaleX = 0f
         cardView.scaleY = 0f
-        cardView.post {
-            cardView.animate()
+        val postRunnable = Runnable {
+            if (isDestroyed || isFinishing) return@Runnable
+            cardView
+                .animate()
                 .alpha(1f)
                 .scaleX(1f)
                 .scaleY(1f)
@@ -635,122 +699,111 @@ abstract class EditActivity(private val type: Type) :
                 .setInterpolator(android.view.animation.OvershootInterpolator(2f))
                 .start()
         }
-        
-        // Thêm CardView vào CoordinatorLayout (root)
+        postRunnables.add(postRunnable)
+        cardView.post(postRunnable)
+
         binding.root.addView(cardView)
     }
-    
-    /**
-     * Setup nút AI gradient đẹp thay thế nút AI đen ở center (deprecated - dùng setupAIFloatingButton thay thế)
-     * Dùng CardView để có elevation và corner radius tốt hơn
-     */
-    @Deprecated("Use setupAIFloatingButton() instead")
-    protected fun android.widget.FrameLayout.setupAIGradientButton() {
-        // Tạo CardView để bọc nút AI
-        val cardView = CardView(context).apply {
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                56.dp, // Kích thước chuẩn FAB
-                56.dp,
-                android.view.Gravity.CENTER
-            )
-            
-            // Corner radius = một nửa chiều rộng để tạo hình tròn hoàn hảo
-            radius = 28.dp.toFloat()
-            
-            // Elevation để nổi bật
-            cardElevation = 6.dp.toFloat()
-            
-            // Prevent card padding
-            setContentPadding(0, 0, 0, 0)
-            
-            // Prevent card background
-            setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
+
+    protected open fun openAddItemMenu() {
+        // Override trong EditNoteActivity/EditListActivity
+    }
+
+    protected open fun openTextFormattingMenu() {
+        // Override trong EditNoteActivity
+    }
+
+    protected open fun openAddFilesMenu() {
+        attachFiles()
+    }
+
+    protected open fun linkNote() {}
+
+    private fun setupJellyFab() {
+        fun getAiFabView(): CardView? = null
+
+        binding.JellyFabComposeView.setContent {
+            androidx.compose.material3.MaterialTheme {
+                com.philkes.notallyx.presentation.compose.JellyFabMenu(
+                    onDrawClick = {
+                        try {
+                            openFullScreenDrawing()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    },
+                    onTextFormatClick = { openTextFormattingMenu() },
+                    onMoreClick = {},
+                    onAddFilesClick = { attachFiles() },
+                    onAddImagesClick = { addImages() },
+                    onRecordAudioClick = { recordAudio() },
+                    onLinkNoteClick =
+                        if (
+                            this is com.philkes.notallyx.presentation.activity.note.EditNoteActivity
+                        ) {
+                            { linkNote() }
+                        } else null,
+                    showLinkNote =
+                        this is com.philkes.notallyx.presentation.activity.note.EditNoteActivity,
+                    onMainFabClick = {},
+                )
+            }
         }
-        
-        // Tạo ImageView bên trong CardView
-        val aiButton = androidx.appcompat.widget.AppCompatImageView(this@EditActivity).apply {
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            
-            // Background gradient
+    }
+
+    private fun setupInlineAIButton() {
+        binding.InlineAiButton?.apply {
+            // Re-apply styling to ensure gradient + white icon
             setBackgroundResource(R.drawable.bg_ai_gradient)
-            
-            // Icon sparkles
             setImageResource(R.drawable.ai_sparkle)
             imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-            
-            // Scale type
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setPadding(14.dp, 14.dp, 14.dp, 14.dp)
-            
-            // Clickable
             isClickable = true
             isFocusable = true
-            
-            // Ripple effect - dùng TypedValue để lấy drawable
-            val typedValue = android.util.TypedValue()
-            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
-            foreground = ContextCompat.getDrawable(context, typedValue.resourceId)
-            
-            // Content description
-            contentDescription = context.getString(R.string.ai_assistant)
-            
-            // Click listener
             setOnClickListener {
-                // Animation bounce khi click
                 animate()
                     .scaleX(0.9f)
                     .scaleY(0.9f)
-                    .setDuration(100)
-                    .withEndAction {
-                        animate()
-                            .scaleX(1f)
-                            .scaleY(1f)
-                            .setDuration(100)
-                            .start()
-                    }
+                    .setDuration(80)
+                    .withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(80).start() }
                     .start()
-                
-                // Gọi method abstract để mở AI menu (EditNoteActivity/EditListActivity sẽ override)
                 openAIActionsMenu()
             }
         }
-        
-        // Thêm ImageView vào CardView
-        cardView.addView(aiButton)
-        
-        // Animation khi view được add (bounce effect)
-        cardView.alpha = 0f
-        cardView.scaleX = 0f
-        cardView.scaleY = 0f
-        cardView.post {
-            cardView.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(300)
-                .setInterpolator(android.view.animation.OvershootInterpolator(2f))
+    }
+
+    private fun hideAIFab(aiFabView: CardView?) {
+        if (isDestroyed || isFinishing) return
+        aiFabView?.let {
+            it.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction {
+                    if (!isDestroyed && !isFinishing) {
+                        it.visibility = View.INVISIBLE
+                    }
+                }
                 .start()
         }
-        
-        // Thêm CardView vào FrameLayout
-        addView(cardView)
     }
-    
-    /**
-     * Abstract method để mở AI actions menu
-     * EditNoteActivity và EditListActivity sẽ override method này
-     */
+
+    private fun showAIFab(aiFabView: CardView?) {
+        if (isDestroyed || isFinishing) return
+        aiFabView?.let {
+            it.visibility = View.VISIBLE
+            it.alpha = 0f
+            it.animate().alpha(1f).setDuration(200).start()
+        }
+    }
+
     protected abstract fun openAIActionsMenu()
 
     protected fun openDrawingScreen() {
-        // Load v� merge brushes: default brushes + custom brushes t? SharedPreferences
+        // Load v? merge brushes: default brushes + custom brushes t? SharedPreferences
         val defaultBrushes = ArrayList(drawTools)
         val savedCustomBrushes = appSharePrefs.drawToolBrushes
 
-        // Merge: th�m custom brushes v�o cu?i danh s�ch
+        // Merge: th?m custom brushes v?o cu?i danh s?ch
         val toolsToShow = ArrayList(defaultBrushes)
         toolsToShow.addAll(savedCustomBrushes)
 
@@ -758,21 +811,21 @@ abstract class EditActivity(private val type: Type) :
         binding.DrawToolPickerView.listener =
             object : DrawToolPickerView.OnItemClickListener {
                 override fun onDoneClick() {
-                    // ?�ng DrawToolPickerView (?n ?i)
+                    // ??ng DrawToolPickerView (?n ?i)
                     hideDrawingToolPicker()
                 }
 
                 override fun onItemClick(tool: DrawToolBrush) {
-                    // B??C 1: L?u brush ?� ch?n
+                    // B??C 1: L?u brush ?? ch?n
                     currentDrawTool = tool
 
-                    // B??C 2: T? ??ng hi?n th? divider v� canvas n?u ch?a hi?n th?
+                    // B??C 2: T? ??ng hi?n th? divider v? canvas n?u ch?a hi?n th?
                     if (!isDrawingModeActive) {
                         showDrawingArea()
                     }
 
-                    // B??C 3: �p d?ng brush config v�o canvas ngay l?p t?c
-                    // ?i?u n�y ??m b?o khi user touch canvas, n� s? v? v?i brush ?� ch?n
+                    // B??C 3: ?p d?ng brush config v?o canvas ngay l?p t?c
+                    // ?i?u n?y ??m b?o khi user touch canvas, n? s? v? v?i brush ?? ch?n
                     binding.DrawingCanvas.setBrush(tool)
 
                     log(
@@ -781,11 +834,11 @@ abstract class EditActivity(private val type: Type) :
                 }
 
                 override fun onSave(tool: DrawToolBrush) {
-                    // L?u pen custom v�o SharedPreferences (ch? l?u custom brushes)
+                    // L?u pen custom v?o SharedPreferences (ch? l?u custom brushes)
                     val currentCustomBrushes = appSharePrefs.drawToolBrushes
                     val existingIndex = currentCustomBrushes.indexOfFirst { it.id == tool.id }
 
-                    // ??m b?o tool l� custom type
+                    // ??m b?o tool l? custom type
                     val customTool = tool.copy(type = DrawToolPenType.CUSTOM)
 
                     if (existingIndex >= 0) {
@@ -798,7 +851,7 @@ abstract class EditActivity(private val type: Type) :
 
                     appSharePrefs.drawToolBrushes = currentCustomBrushes
 
-                    // Reload v� merge l?i brushes ?? hi?n th?
+                    // Reload v? merge l?i brushes ?? hi?n th?
                     val defaultBrushes = ArrayList(drawTools)
                     val updatedTools = ArrayList(defaultBrushes)
                     updatedTools.addAll(currentCustomBrushes)
@@ -808,12 +861,12 @@ abstract class EditActivity(private val type: Type) :
                 }
 
                 override fun onDelete(tool: DrawToolBrush) {
-                    // X�a pen custom kh?i SharedPreferences
+                    // X?a pen custom kh?i SharedPreferences
                     val currentCustomBrushes = appSharePrefs.drawToolBrushes
                     currentCustomBrushes.removeAll { it.id == tool.id }
                     appSharePrefs.drawToolBrushes = currentCustomBrushes
 
-                    // Reload v� merge l?i brushes ?? hi?n th?
+                    // Reload v? merge l?i brushes ?? hi?n th?
                     val defaultBrushes = ArrayList(drawTools)
                     val updatedTools = ArrayList(defaultBrushes)
                     updatedTools.addAll(currentCustomBrushes)
@@ -828,24 +881,23 @@ abstract class EditActivity(private val type: Type) :
                         binding.DrawToolPickerView.tools.firstOrNull { it.isSelected }
                             ?: currentDrawTool
                             ?: run {
-                                // N?u kh�ng c� brush n�o ???c ch?n, hi?n th? th�ng b�o
-                                showToast("Vui l�ng ch?n b�t v? tr??c")
+                                showToast("Please select a brush first")
                                 return
                             }
 
-                    // M? color picker (ColorPickerDialog s? t? ??ng l?u/load m�u cu?i c�ng t?
+                    // M? color picker (ColorPickerDialog s? t? ??ng l?u/load m?u cu?i c?ng t?
                     // preference)
                     showMoreColor { colorInt ->
                         val newColorHex = colorInt.rawColor()
 
-                        // Update brush v?i m�u m?i
+                        // Update brush v?i m?u m?i
                         val updatedBrush =
                             currentBrush.copy(
                                 color = newColorHex,
                                 isSelected = true, // Gi? selected state
                             )
 
-                        // Update brush trong tools list (n?u brush c� trong list)
+                        // Update brush trong tools list (n?u brush c? trong list)
                         val tools = binding.DrawToolPickerView.tools
                         val index = tools.indexOfFirst { it.id == currentBrush.id }
                         if (index >= 0) {
@@ -856,16 +908,15 @@ abstract class EditActivity(private val type: Type) :
                         // Update currentDrawTool
                         currentDrawTool = updatedBrush
 
-                        // G?i callback ?? update UI v� canvas
-                        // ?i?u n�y s? trigger onItemClick() ?? �p d?ng brush m?i v�o canvas
+                        // G?i callback ?? update UI v? canvas
+                        // ?i?u n?y s? trigger onItemClick() ?? ?p d?ng brush m?i v?o canvas
                         binding.DrawToolPickerView.listener?.onItemClick(updatedBrush)
                     }
                 }
 
                 override fun onEyeDropperClick() {
-                    // B?t eyedropper tool ?? pick color t? canvas
                     if (!isDrawingModeActive) {
-                        showToast("Vui l�ng ch?n b�t v? tr??c")
+                        showToast("Please select a brush first")
                         return
                     }
 
@@ -874,15 +925,12 @@ abstract class EditActivity(private val type: Type) :
 
                 override fun onBackgroundClick() {
                     // M? bottom sheet ch?n background cho canvas
-                    val initialColor = Color.WHITE
+                    val initialColor = notallyModel.drawingBackgroundColor
                     val sheet = BackgroundBottomSheet.newInstance(initialColor)
                     sheet.setListener(
                         object : BackgroundBottomSheet.Listener {
-                            override fun onBackgroundSelected(colorInt: Int) {
-                                // ??i n?n logic b�n trong canvas
-                                binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
-                                // ??i lu�n background view ?? user th?y r�
-                                binding.DrawingCanvas.setBackgroundColor(colorInt)
+                            override fun onBackgroundSelected(colorInt: Int, drawableResId: Int?) {
+                                applyAndPersistBackground(colorInt, drawableResId)
                             }
                         }
                     )
@@ -890,11 +938,224 @@ abstract class EditActivity(private val type: Type) :
                 }
             }
 
-        // �p d?ng tools v�o DrawToolPickerView
+        // ?p d?ng tools v?o DrawToolPickerView
         binding.DrawToolPickerView.applyTools(toolsToShow)
 
         // Hi?n th? DrawToolPickerView
         showDrawingToolPicker()
+    }
+
+    /**
+     * Hi?n th? canvas v� bottom bar ngay trong EditActivity Toolbar gi? nguy�n, ch? show canvas v�
+     * bottom bar v?i animation
+     */
+    private fun openFullScreenDrawing() {
+        if (!isDrawingModeActive) {
+            showDrawingArea()
+        }
+
+        if (
+            notallyModel.drawingStrokes.isNotEmpty() && binding.DrawingCanvas.getStrokes().isEmpty()
+        ) {
+            binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
+        }
+
+        if (binding.DrawToolPickerView.listener == null) {
+            val drawTools = DrawToolData.getDefault()
+            val defaultBrushes = ArrayList(drawTools)
+            val savedCustomBrushes = appSharePrefs.drawToolBrushes
+
+            val toolsToShow = ArrayList(defaultBrushes)
+            toolsToShow.addAll(savedCustomBrushes)
+
+            binding.DrawToolPickerView.listener =
+                object : DrawToolPickerView.OnItemClickListener {
+                    override fun onDoneClick() {
+                        hideDrawingArea()
+                    }
+
+                    override fun onItemClick(tool: DrawToolBrush) {
+                        currentDrawTool = tool
+
+                        if (!isDrawingModeActive) {
+                            showDrawingArea()
+                        }
+
+                        binding.DrawingCanvas.setBrush(tool)
+                    }
+
+                    override fun onSave(tool: DrawToolBrush) {
+                        val currentCustomBrushes = appSharePrefs.drawToolBrushes
+                        val existingIndex = currentCustomBrushes.indexOfFirst { it.id == tool.id }
+                        val customTool = tool.copy(type = DrawToolPenType.CUSTOM)
+
+                        if (existingIndex >= 0) {
+                            currentCustomBrushes[existingIndex] = customTool
+                        } else {
+                            currentCustomBrushes.add(customTool)
+                        }
+
+                        appSharePrefs.drawToolBrushes = currentCustomBrushes
+
+                        val defaultBrushes = ArrayList(drawTools)
+                        val updatedTools = ArrayList(defaultBrushes)
+                        updatedTools.addAll(currentCustomBrushes)
+                        binding.DrawToolPickerView.applyTools(updatedTools)
+
+                        showToast(getString(R.string.saved_to_device))
+                    }
+
+                    override fun onDelete(tool: DrawToolBrush) {
+                        val currentCustomBrushes = appSharePrefs.drawToolBrushes
+                        currentCustomBrushes.removeAll { it.id == tool.id }
+                        appSharePrefs.drawToolBrushes = currentCustomBrushes
+
+                        val defaultBrushes = ArrayList(drawTools)
+                        val updatedTools = ArrayList(defaultBrushes)
+                        updatedTools.addAll(currentCustomBrushes)
+                        binding.DrawToolPickerView.applyTools(updatedTools)
+
+                        showToast(getString(R.string.deleted))
+                    }
+
+                    override fun onPaletteClick() {
+                        val currentBrush =
+                            binding.DrawToolPickerView.tools.firstOrNull { it.isSelected }
+                                ?: currentDrawTool
+                                ?: run {
+                                    showToast("Please select a brush first")
+                                    return
+                                }
+
+                        showMoreColor { colorInt ->
+                            val newColorHex = colorInt.rawColor()
+                            val updatedBrush =
+                                currentBrush.copy(color = newColorHex, isSelected = true)
+
+                            val tools = binding.DrawToolPickerView.tools
+                            val index = tools.indexOfFirst { it.id == currentBrush.id }
+                            if (index >= 0) {
+                                tools[index] = updatedBrush
+                                binding.DrawToolPickerView.applyTools(tools)
+                            }
+
+                            currentDrawTool = updatedBrush
+                            binding.DrawToolPickerView.listener?.onItemClick(updatedBrush)
+                        }
+                    }
+
+                    override fun onEyeDropperClick() {
+                        if (!isDrawingModeActive) {
+                            showToast("Please select a brush first")
+                            return
+                        }
+                        enableEyeDropperMode()
+                    }
+
+                    override fun onBackgroundClick() {
+                        val initialColor = notallyModel.drawingBackgroundColor
+                        val sheet = BackgroundBottomSheet.newInstance(initialColor)
+                        sheet.setListener(
+                            object : BackgroundBottomSheet.Listener {
+                                override fun onBackgroundSelected(
+                                    colorInt: Int,
+                                    drawableResId: Int?,
+                                ) {
+                                    applyAndPersistBackground(colorInt, drawableResId)
+                                }
+                            }
+                        )
+                        sheet.show(supportFragmentManager, "BackgroundBottomSheet")
+                    }
+                }
+
+            binding.DrawToolPickerView.applyTools(toolsToShow)
+        }
+
+        val postRunnable = Runnable {
+            if (isDestroyed || isFinishing) return@Runnable
+
+            val marginPx = dpToPx(20)
+            val bottomBarHeight = measureBottomBarHeight()
+            val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
+            val contentHeight =
+                computeContentHeightFromStrokes(notallyModel.drawingStrokes, dpToPx(50))
+            val targetHeight = max(availableHeight, contentHeight)
+            applyCanvasLayout(targetHeight, marginPx)
+
+            binding.JellyFabComposeView.visibility = View.GONE
+            binding.root.findViewWithTag<CardView>("ai_fab")?.let { aiFab -> hideAIFab(aiFab) }
+
+            val scrollRunnable = Runnable {
+                if (!isDestroyed && !isFinishing) {
+                    binding.ScrollView.smoothScrollTo(0, binding.DrawingCanvas.top)
+                }
+            }
+            postRunnables.add(scrollRunnable)
+            binding.ScrollView.post(scrollRunnable)
+
+            startDrawingModeAnimations()
+        }
+        postRunnables.add(postRunnable)
+        binding.root.post(postRunnable)
+    }
+
+    /** Animation cho canvas v� bottom bar khi m? drawing mode */
+    private fun startDrawingModeAnimations() {
+        if (isDestroyed || isFinishing) return
+
+        binding.DrawingCanvas.apply {
+            alpha = 0f
+            scaleX = 0.8f
+            scaleY = 0.8f
+            visibility = View.VISIBLE
+
+            android.animation.ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+                duration = 1500
+                interpolator = android.view.animation.DecelerateInterpolator()
+                activeAnimators.add(this)
+                start()
+            }
+            android.animation.ObjectAnimator.ofFloat(this, "scaleX", 0.8f, 1f).apply {
+                duration = 2500
+                interpolator = android.view.animation.DecelerateInterpolator()
+                activeAnimators.add(this)
+                start()
+            }
+            android.animation.ObjectAnimator.ofFloat(this, "scaleY", 0.8f, 1f).apply {
+                duration = 2500
+                interpolator = android.view.animation.DecelerateInterpolator()
+                activeAnimators.add(this)
+                start()
+            }
+        }
+
+        val postRunnable = Runnable {
+            if (isDestroyed || isFinishing) return@Runnable
+
+            val toolbarHeight = binding.DrawToolPickerView.height.toFloat()
+            binding.DrawToolPickerView.apply {
+                translationY = toolbarHeight
+                alpha = 0f
+                visibility = View.VISIBLE
+
+                android.animation.ObjectAnimator.ofFloat(this, "translationY", toolbarHeight, 0f)
+                    .apply {
+                        duration = 1500
+                        interpolator = android.view.animation.AnticipateOvershootInterpolator(2.0f)
+                        activeAnimators.add(this)
+                        start()
+                    }
+                android.animation.ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+                    duration = 1500
+                    interpolator = android.view.animation.DecelerateInterpolator()
+                    activeAnimators.add(this)
+                    start()
+                }
+            }
+        }
+        postRunnables.add(postRunnable)
+        binding.DrawToolPickerView.post(postRunnable)
     }
 
     private fun showDrawingToolPicker() {
@@ -903,172 +1164,327 @@ abstract class EditActivity(private val type: Type) :
 
     private fun hideDrawingToolPicker() {
         binding.DrawToolPickerView.visibility = View.GONE
+        showFABs()
+    }
+
+    private fun showFABs() {
+        binding.JellyFabComposeView.visibility = View.VISIBLE
+        val aiFabView = binding.root.findViewWithTag<CardView>("ai_fab")
+        aiFabView?.let { aiFab -> showAIFab(aiFab) }
     }
 
     private fun initDrawToolbar() {
-        // Toolbar luôn hiển thị layout mới (back + undo + redo + draw + search + pin)
         val toolbar = binding.Toolbar
         val ivBack = toolbar.findViewById<ImageView>(R.id.ivBack)
         val ivUndo = toolbar.findViewById<ImageView>(R.id.ivUndo)
         val ivRedo = toolbar.findViewById<ImageView>(R.id.ivRedo)
-        val ivDraw = toolbar.findViewById<ImageView>(R.id.ivDraw)
-        val ivSearch = toolbar.findViewById<ImageView>(R.id.ivSearch)
+        val ivBackground = toolbar.findViewById<ImageView>(R.id.ivBackground)
         val ivPin = toolbar.findViewById<ImageView>(R.id.ivPin)
+        val ivMore = toolbar.findViewById<ImageView>(R.id.ivMore)
 
         ivBack.setOnClickListener { finish() }
 
         ivUndo.setOnClickListener {
             try {
                 changeHistory.undo()
-            } catch (e: ChangeHistory.ChangeHistoryException) {
+            } catch (
+                e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
                 application.log(TAG, throwable = e)
             }
+        }
+        changeHistory.canUndo.observe(this) { canUndo ->
+            ivUndo.isEnabled = canUndo
+            ivUndo.alpha = if (canUndo) 1f else 0.5f
         }
 
         ivRedo.setOnClickListener {
             try {
                 changeHistory.redo()
-            } catch (e: ChangeHistory.ChangeHistoryException) {
+            } catch (
+                e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
                 application.log(TAG, throwable = e)
             }
         }
-
-        ivDraw.setOnClickListener {
-            openDrawingScreen()
+        changeHistory.canRedo.observe(this) { canRedo ->
+            ivRedo.isEnabled = canRedo
+            ivRedo.alpha = if (canRedo) 1f else 0.5f
         }
 
-        // Search icon: mở search như toolbar cũ
-        ivSearch.setOnClickListener {
-            startSearch()
+        ivBackground.setOnClickListener {
+            if (isDrawingModeActive) {
+                val initialColor = Color.WHITE
+                val sheet = BackgroundBottomSheet.newInstance(initialColor)
+                sheet.setListener(
+                    object : BackgroundBottomSheet.Listener {
+                        override fun onBackgroundSelected(colorInt: Int, drawableResId: Int?) {
+                            if (drawableResId != null) {
+                                binding.DrawingCanvas.setCanvasBackgroundDrawable(drawableResId)
+                            } else {
+                                binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
+                            }
+                        }
+                    }
+                )
+                sheet.show(supportFragmentManager, "BackgroundBottomSheet")
+            } else {
+                changeColor()
+            }
         }
 
-        // Pin icon: giữ logic pin/unpin gốc
-        ivPin.setOnClickListener {
-            pin()
-        }
+        ivPin.setOnClickListener { pin() }
+
+        ivMore.setOnClickListener { openMoreMenu() }
     }
 
+    protected open fun openMoreMenu() {}
+
     private fun showDrawingArea() {
-        // Hi?n th? divider v� canvas
+        if (isDestroyed || isFinishing) return
+
         binding.DrawingDivider.visibility = View.VISIBLE
         binding.DrawingCanvas.visibility = View.VISIBLE
+        applySavedBackgroundToCanvas()
+        binding.DrawingCanvas.isEnabled = true
         isDrawingModeActive = true
 
-        // Load strokes t? notallyModel n?u c�
         if (notallyModel.drawingStrokes.isNotEmpty()) {
             binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
         }
 
-        // Set divider position (v? tr� ???ng ph�n c�ch - relative trong canvas)
-        binding.ScrollView.post {
-            // T�nh v? tr� divider relative trong canvas
+        val postRunnable = Runnable {
+            if (isDestroyed || isFinishing) return@Runnable
+
             val dividerTop = binding.DrawingDivider.top
             val canvasTop = binding.DrawingCanvas.top
             val dividerYRelative = (dividerTop - canvasTop).toFloat()
             binding.DrawingCanvas.setDividerY(dividerYRelative)
 
-            // Tính chiều cao màn hình hiện tại (chiều cao ScrollView - toolbar - padding)
-            val screenHeight = binding.ScrollView.height
-            val toolbarHeight = binding.Toolbar.height
-            val availableHeight = screenHeight - toolbarHeight
-            
-            // Nếu đã có chiều cao đã mở rộng từ lần trước, dùng nó; nếu không thì dùng chiều cao màn hình
-            val targetHeight = if (canvasFixedHeight > 0) {
-                canvasFixedHeight // Dùng chiều cao đã mở rộng từ lần trước
-            } else {
-                availableHeight.coerceAtLeast(400) // Tối thiểu 400dp
-            }
-            
-            // Set canvas height cố định
-            val layoutParams = binding.DrawingCanvas.layoutParams
-            layoutParams.height = targetHeight
-            binding.DrawingCanvas.layoutParams = layoutParams
-            
-            // Disable scroll hoàn toàn của ScrollView khi đang ở draw mode
-            // Sử dụng custom NonScrollableNestedScrollView để chặn scroll hoàn toàn
-            if (binding.ScrollView is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView) {
-                (binding.ScrollView as com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView).setScrollEnabled(false)
+            val marginPx = dpToPx(20)
+            val bottomBarHeight = measureBottomBarHeight()
+            val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
+            applyCanvasLayout(availableHeight, marginPx)
+
+            if (
+                binding.ScrollView
+                    is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView
+            ) {
+                (binding.ScrollView
+                        as
+                        com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView)
+                    .setScrollEnabled(false)
             }
 
-            // Scroll ??n canvas ?? user th?y ngay
             binding.ScrollView.smoothScrollTo(0, binding.DrawingCanvas.top)
+        }
+        postRunnables.add(postRunnable)
+        binding.ScrollView.post(postRunnable)
+    }
+
+    private fun applyAndPersistBackground(colorInt: Int, drawableResId: Int?) {
+        notallyModel.drawingBackgroundColor = colorInt
+        notallyModel.drawingBackgroundDrawableResId = drawableResId
+
+        if (drawableResId != null) {
+            binding.DrawingCanvas.setCanvasBackgroundDrawable(drawableResId)
+        } else {
+            binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
+        }
+        persistCurrentBackground()
+    }
+
+    private fun applySavedBackgroundToCanvas() {
+        // Load persisted preference (per note). If not found, fallback to draft key (id=0) then
+        // migrate.
+        loadDrawingBackgroundPreference()?.let { (color, drawableResId) ->
+            notallyModel.drawingBackgroundColor = color
+            notallyModel.drawingBackgroundDrawableResId = drawableResId
+        }
+
+        notallyModel.drawingBackgroundDrawableResId?.let { resId ->
+            binding.DrawingCanvas.setCanvasBackgroundDrawable(resId)
+        }
+            ?: run {
+                binding.DrawingCanvas.setCanvasBackgroundColor(notallyModel.drawingBackgroundColor)
+            }
+    }
+
+    private fun persistCurrentBackground() {
+        saveDrawingBackgroundPreference(
+            notallyModel.drawingBackgroundColor,
+            notallyModel.drawingBackgroundDrawableResId,
+        )
+    }
+
+    private fun saveDrawingBackgroundPreference(colorInt: Int, drawableResId: Int?) {
+        val prefs = getSharedPreferences(DRAWING_BG_PREFS, MODE_PRIVATE)
+        val noteId = notallyModel.id
+        with(prefs.edit()) {
+            putInt(bgColorKey(noteId), colorInt)
+            if (drawableResId != null) {
+                putInt(bgResKey(noteId), drawableResId)
+            } else {
+                remove(bgResKey(noteId))
+            }
+            // Also save draft when note is new (id == 0) so it persists until first save
+            if (noteId == 0L) {
+                putInt(bgColorKey(0L), colorInt)
+                if (drawableResId != null) {
+                    putInt(bgResKey(0L), drawableResId)
+                } else {
+                    remove(bgResKey(0L))
+                }
+            }
+            apply()
         }
     }
 
+    private fun loadDrawingBackgroundPreference(): Pair<Int, Int?>? {
+        val prefs = getSharedPreferences(DRAWING_BG_PREFS, MODE_PRIVATE)
+        val noteId = notallyModel.id
+
+        fun readFor(id: Long): Pair<Int, Int?>? {
+            val colorKey = bgColorKey(id)
+            if (!prefs.contains(colorKey)) return null
+            val color = prefs.getInt(colorKey, Color.WHITE)
+            val drawable = if (prefs.contains(bgResKey(id))) prefs.getInt(bgResKey(id), 0) else null
+            return color to drawable
+        }
+
+        // Try current note id
+        val current = readFor(noteId)
+        if (current != null) return current
+
+        // Fallback to draft (id=0) then migrate to current id if available
+        val draft = readFor(0L)
+        if (draft != null && noteId != 0L) {
+            saveDrawingBackgroundPreference(draft.first, draft.second)
+            // remove draft after migration
+            with(prefs.edit()) {
+                remove(bgColorKey(0L))
+                remove(bgResKey(0L))
+                apply()
+            }
+            return draft
+        }
+        return draft
+    }
+
+    private fun bgColorKey(id: Long) = "bg_color_$id"
+
+    private fun bgResKey(id: Long) = "bg_res_$id"
+
     private fun hideDrawingArea() {
-        // L?u strokes v�o notallyModel tr??c khi ?n (n?u c� strokes)
         val strokes = binding.DrawingCanvas.getStrokes()
         if (strokes.isNotEmpty()) {
             notallyModel.drawingStrokes = ArrayList(strokes)
         } else {
-            // N?u kh�ng c� strokes, x�a strokes c?
             notallyModel.drawingStrokes.clear()
         }
 
-        // QUAN TRỌNG: Clear brush để không thể vẽ được nữa khi đóng bộ vẽ
         binding.DrawingCanvas.setBrush(null)
         currentDrawTool = null
-
-        // Mở rộng canvas x2 chiều cao trước khi ẩn (để có khoảng trắng cho lần vẽ tiếp)
-        binding.ScrollView.post {
-            // Lấy chiều cao canvas hiện tại (chiều cao đã set khi vào draw mode)
-            val currentHeight = binding.DrawingCanvas.height
-            if (currentHeight > 0) {
-                val layoutParams = binding.DrawingCanvas.layoutParams
-                // Mở rộng x2 chiều cao
-                val expandedHeight = currentHeight * 2
-                layoutParams.height = expandedHeight
-                binding.DrawingCanvas.layoutParams = layoutParams
-                
-                // Lưu lại chiều cao đã mở rộng để lần sau mở lại sẽ dùng chiều cao này
-                canvasFixedHeight = expandedHeight
-            }
-            
-            // Enable lại scroll của ScrollView
-            if (binding.ScrollView is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView) {
-                (binding.ScrollView as com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView).setScrollEnabled(true)
-            }
-        }
-
-        // ?n divider v� canvas
-        binding.DrawingDivider.visibility = View.GONE
-        binding.DrawingCanvas.visibility = View.GONE
-        isDrawingModeActive = false
         binding.DrawingCanvas.setZoomModeEnabled(false)
         binding.DrawingCanvas.setEyeDropperMode(false)
-        // ?n DrawToolPickerView lu�n
-        hideDrawingToolPicker()
+        binding.DrawingCanvas.isEnabled = false
 
+        // Re-enable scroll
+        if (
+            binding.ScrollView
+                is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView
+        ) {
+            (binding.ScrollView
+                    as com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView)
+                .setScrollEnabled(true)
+        }
+
+        // Keep canvas visible on note screen
+        binding.DrawingDivider.visibility = View.VISIBLE
+        binding.DrawingCanvas.visibility = View.VISIBLE
+
+        // Hide tool picker and show FABs back
+        hideDrawingToolPicker()
+        showFABs()
+
+        isDrawingModeActive = false
     }
 
-    /** B?t ch? ?? eyedropper ?? pick color t? canvas */
     private fun enableEyeDropperMode() {
         binding.DrawingCanvas.setEyeDropperMode(true)
         binding.DrawingCanvas.setOnColorPickedListener { color ->
-            // �p d?ng m�u v�o brush hi?n t?i
             currentDrawTool?.let { tool ->
                 val colorHex = String.format("#%06X", 0xFFFFFF and color)
                 val updatedTool = tool.copy(color = colorHex)
                 currentDrawTool = updatedTool
                 binding.DrawingCanvas.setBrush(updatedTool)
-                showToast("?� ch?n m�u: $colorHex")
+                showToast("Color selected: $colorHex")
             }
         }
-        showToast("Tap tr�n canvas ?? ch?n m�u")
+        showToast("Tap on canvas to pick color")
     }
 
-    /** Toggle zoom mode cho canvas */
     private fun toggleZoomMode() {
         val isZoomMode = binding.DrawingCanvas.isZoomModeEnabled()
         binding.DrawingCanvas.setZoomModeEnabled(!isZoomMode)
 
-        // Update UI icon n?u c?n (c� th? th�m visual feedback)
         if (!isZoomMode) {
-            showToast("?� b?t ch? ?? zoom - D�ng 2 ng�n tay ?? zoom, 1 ng�n ?? pan")
+            showToast("Zoom mode enabled")
         } else {
-            showToast("?� t?t ch? ?? zoom")
+            showToast("Zoom mode disabled")
         }
     }
+
+    private fun measureBottomBarHeight(): Int {
+        binding.DrawToolPickerView.measure(
+            View.MeasureSpec.makeMeasureSpec(binding.root.width, View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        return binding.DrawToolPickerView.measuredHeight
+    }
+
+    private fun computeAvailableCanvasHeight(bottomBarHeight: Int, marginPx: Int): Int {
+        val screenHeight = binding.root.height
+        val toolbarHeight = binding.Toolbar.height
+        return (screenHeight - toolbarHeight - bottomBarHeight - (marginPx * 2)).coerceAtLeast(0)
+    }
+
+    private fun computeContentHeightFromStrokes(
+        strokes: List<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingStroke>,
+        paddingPx: Int,
+    ): Int {
+        if (strokes.isEmpty()) return 0
+        var minTop = Float.MAX_VALUE
+        var maxBottom = Float.MIN_VALUE
+        strokes.forEach { stroke ->
+            minTop = min(minTop, stroke.rectTop)
+            maxBottom = max(maxBottom, stroke.rectBottom)
+        }
+        val contentHeight = (maxBottom - minTop).coerceAtLeast(0f)
+        return contentHeight.toInt() + paddingPx * 2
+    }
+
+    private fun applyCanvasLayout(availableHeight: Int, marginPx: Int) {
+        val layoutParams = binding.DrawingCanvas.layoutParams
+        layoutParams.height = availableHeight
+        binding.DrawingCanvas.layoutParams = layoutParams
+
+        if (binding.DrawingCanvas.layoutParams is ViewGroup.MarginLayoutParams) {
+            val marginParams = binding.DrawingCanvas.layoutParams as ViewGroup.MarginLayoutParams
+            marginParams.topMargin = marginPx
+            marginParams.bottomMargin = marginPx
+            marginParams.marginStart = marginPx
+            marginParams.marginEnd = marginPx
+            binding.DrawingCanvas.layoutParams = marginParams
+        } else {
+            val newParams = ViewGroup.MarginLayoutParams(layoutParams)
+            newParams.topMargin = marginPx
+            newParams.bottomMargin = marginPx
+            newParams.marginStart = marginPx
+            newParams.marginEnd = marginPx
+            binding.DrawingCanvas.layoutParams = newParams
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
 
     protected fun createFolderActions() =
         when (notallyModel.folder) {
@@ -1139,21 +1555,33 @@ abstract class EditActivity(private val type: Type) :
         )
         setColor()
 
-        // Load drawing strokes v�o canvas n?u c�
+        // Load drawing strokes v?o canvas n?u c?
         if (notallyModel.drawingStrokes.isNotEmpty()) {
             binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
-            // Hi?n th? divider v� canvas n?u c� strokes
+            // Hi?n th? divider v? canvas n?u c? strokes
             binding.DrawingDivider.visibility = View.VISIBLE
             binding.DrawingCanvas.visibility = View.VISIBLE
             isDrawingModeActive = true
 
             // Set divider position
-            binding.ScrollView.post {
+            val postRunnable = Runnable {
+                if (isDestroyed || isFinishing) return@Runnable
+
                 val dividerTop = binding.DrawingDivider.top
                 val canvasTop = binding.DrawingCanvas.top
                 val dividerYRelative = (dividerTop - canvasTop).toFloat()
                 binding.DrawingCanvas.setDividerY(dividerYRelative)
+
+                val marginPx = dpToPx(20)
+                val bottomBarHeight = measureBottomBarHeight()
+                val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
+                val contentHeight =
+                    computeContentHeightFromStrokes(notallyModel.drawingStrokes, dpToPx(50))
+                val targetHeight = max(availableHeight, contentHeight)
+                applyCanvasLayout(targetHeight, marginPx)
             }
+            postRunnables.add(postRunnable)
+            binding.ScrollView.post(postRunnable)
         }
     }
 
@@ -1245,6 +1673,7 @@ abstract class EditActivity(private val type: Type) :
                             .getAllColors()
                     }
                     .toMutableList()
+
             if (colors.none { it == notallyModel.color }) {
                 colors.add(notallyModel.color)
             }
@@ -1329,7 +1758,9 @@ abstract class EditActivity(private val type: Type) :
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
                     notallyModel.deleteBaseNote()
-                    super.finish()
+                    if (!isDestroyed) {
+                        super.finish()
+                    }
                 }
             }
             .setCancelButton()
@@ -1501,7 +1932,6 @@ abstract class EditActivity(private val type: Type) :
             root.setBackgroundColor(colorInt)
             RecyclerView.setBackgroundColor(colorInt)
             Toolbar.backgroundTintList = ColorStateList.valueOf(colorInt)
-            Toolbar.setControlsContrastColorForAllViews(colorInt)
         }
         setBottomAppBarColor(colorInt)
         fileAdapter.setColor(colorInt)
@@ -1549,12 +1979,11 @@ abstract class EditActivity(private val type: Type) :
 
     private fun bindPinned() {
         val icon: Int =
-        if (notallyModel.pinned) {
+            if (notallyModel.pinned) {
                 R.drawable.unpin
-        } else {
+            } else {
                 R.drawable.pin
             }
-        // Cập nhật icon cho ivPin trên toolbar mới
         val ivPin = binding.Toolbar.findViewById<ImageView>(R.id.ivPin)
         ivPin.setImageResource(icon)
     }
@@ -1570,6 +1999,8 @@ abstract class EditActivity(private val type: Type) :
     companion object {
         private const val TAG = "EditActivity"
         private const val REQUEST_AUDIO_PERMISSION = 36
+        private const val REQUEST_CODE_FULL_SCREEN_DRAWING = 1001
+        private const val DRAWING_BG_PREFS = "drawing_background_prefs"
 
         const val EXTRA_SELECTED_BASE_NOTE = "notallyx.intent.extra.SELECTED_BASE_NOTE"
         const val EXTRA_NOTE_ID = "notallyx.intent.extra.NOTE_ID"

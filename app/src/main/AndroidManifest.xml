@@ -90,6 +90,11 @@
         <activity android:name=".presentation.activity.note.PlayAudioActivity" />
 
         <activity 
+            android:name=".presentation.activity.note.FullScreenDrawingActivity"
+            android:theme="@style/AppTheme"
+            android:screenOrientation="portrait" />
+
+        <activity 
             android:name=".presentation.activity.ai.AISummaryActivity"
             android:label="@string/ai_summarize" />
 

@@ -23,17 +23,52 @@
                 android:paddingHorizontal="@dimen/dp_16"
                 android:paddingBottom="@dimen/dp_16">
 
+                <androidx.appcompat.widget.LinearLayoutCompat
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="@dimen/dp_12">
+
+                    <TextView
+                        android:id="@+id/tvColorTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Color"
+                        android:textColor="@color/color3D2A00"
+                        android:textSize="@dimen/sp_14" />
+
+                    <TextView
+                        android:id="@+id/tvCancelColor"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/cancel"
+                        android:visibility="gone"
+                        android:textColor="@color/primary"
+                        android:textSize="@dimen/sp_12"
+                        android:layout_marginEnd="@dimen/dp_8" />
+
+                    <androidx.appcompat.widget.AppCompatImageView
+                        android:id="@+id/ivEditColor"
+                        android:layout_width="@dimen/dp_24"
+                        android:layout_height="@dimen/dp_24"
+                        android:src="@drawable/ic_draw_edit_color_pen"
+                        android:contentDescription="@string/edit" />
+
+                </androidx.appcompat.widget.LinearLayoutCompat>
+
                 <com.philkes.notallyx.draw.ui.background.CustomColorView
                     android:id="@+id/customColorView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/dp_8" />
+                    android:layout_marginTop="@dimen/dp_4" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvBackgroundSections"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/dp_16" />
+                    android:layout_marginTop="@dimen/dp_8" />
 
             </androidx.appcompat.widget.LinearLayoutCompat>
         </androidx.core.widget.NestedScrollView>

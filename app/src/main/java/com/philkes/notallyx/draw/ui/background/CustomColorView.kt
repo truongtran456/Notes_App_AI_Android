@@ -3,16 +3,14 @@ package com.philkes.notallyx.draw.ui.background
 import android.content.Context
 import android.util.AttributeSet
 import androidx.viewpager2.widget.ViewPager2
-import com.philkes.notallyx.core.ui.widget.AbstractView
-import com.philkes.notallyx.databinding.ItemColorCustomLayoutBinding
 import com.philkes.notallyx.R
 import com.philkes.notallyx.common.extension.gone
 import com.philkes.notallyx.common.extension.show
+import com.philkes.notallyx.core.ui.widget.AbstractView
+import com.philkes.notallyx.databinding.ItemColorCustomLayoutBinding
 
-class CustomColorView @JvmOverloads constructor(
-    context: Context,
-    attrs: AttributeSet? = null,
-) : AbstractView(context, attrs) {
+class CustomColorView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+    AbstractView(context, attrs) {
 
     override fun layoutId(): Int = R.layout.item_color_custom_layout
 
@@ -21,9 +19,13 @@ class CustomColorView @JvmOverloads constructor(
 
     interface OnItemClickListener {
         fun onItemClick(colorIndex: Int)
+
         fun onAddClick(colorString: String)
+
         fun onMoreClick()
+
         fun onDeleteClick(colorIndex: Int)
+
         fun onUpdateColorClick(oldColor: ColorCustomItem, newColorString: String)
     }
 
@@ -79,10 +81,11 @@ class CustomColorView @JvmOverloads constructor(
         }
     }
 
-    private fun setupAction() = viewBinding().apply {
-        ivEditCustom.setOnClickListener { toggleEditMode(true) }
-        tvCancel.setOnClickListener { toggleEditMode(false) }
-    }
+    private fun setupAction() =
+        viewBinding().apply {
+            ivEditCustom.setOnClickListener { toggleEditMode(true) }
+            tvCancel.setOnClickListener { toggleEditMode(false) }
+        }
 
     private fun toggleEditMode(enable: Boolean) {
         isEditMode = enable
@@ -98,19 +101,26 @@ class CustomColorView @JvmOverloads constructor(
         pageAdapter.updateEditMode(enable)
     }
 
-    private fun setupViewPager() = viewBinding().apply {
-        viewPager.adapter = pageAdapter
-        viewPager.offscreenPageLimit = 1
-        viewPager.registerOnPageChangeCallback(
-            object : ViewPager2.OnPageChangeCallback() {
-                override fun onPageSelected(position: Int) {
-                    super.onPageSelected(position)
-                    indicator.animatePageSelected(position)
+    private fun setupViewPager() =
+        viewBinding().apply {
+            // Setup ViewPager2
+            viewPager.adapter = pageAdapter
+            viewPager.offscreenPageLimit = 1
+
+            // Setup Indicator
+            indicator.setViewPager(viewPager)
+            pageAdapter.registerAdapterDataObserver(indicator.adapterDataObserver)
+
+            // Listen to page changes
+            viewPager.registerOnPageChangeCallback(
+                object : ViewPager2.OnPageChangeCallback() {
+                    override fun onPageSelected(position: Int) {
+                        super.onPageSelected(position)
+                        indicator.animatePageSelected(position)
+                    }
                 }
-            },
-        )
-        indicator.setViewPager(viewPager)
-    }
+            )
+        }
 
     private fun divideIntoPages(
         items: List<ColorCustomItem>,
@@ -121,9 +131,7 @@ class CustomColorView @JvmOverloads constructor(
     }
 
     companion object {
-        // 2 h√†ng x 6 m√†u
+        // 2 h‡ng x 6 m‡u
         private const val ITEMS_PER_PAGE = 12
     }
 }
-
-

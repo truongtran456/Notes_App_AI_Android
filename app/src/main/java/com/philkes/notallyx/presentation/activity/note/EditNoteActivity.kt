@@ -13,7 +13,6 @@ import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
 import android.text.style.URLSpan
 import android.text.style.UnderlineSpan
-import android.util.Log
 import android.view.ActionMode
 import android.view.Gravity
 import android.view.Menu
@@ -26,32 +25,28 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.updateLayoutParams
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.philkes.notallyx.R
-import com.philkes.notallyx.data.api.models.AIResult
-import com.philkes.notallyx.data.api.models.SummaryResponse
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.model.createNoteUrl
 import com.philkes.notallyx.data.model.getNoteIdFromUrl
 import com.philkes.notallyx.data.model.getNoteTypeFromUrl
 import com.philkes.notallyx.data.model.isNoteUrl
 import com.philkes.notallyx.data.preferences.getAiUserId
-import com.philkes.notallyx.data.preferences.getBackendNoteIdOrLocal
-import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.databinding.BottomTextFormattingMenuBinding
 import com.philkes.notallyx.databinding.RecyclerToggleBinding
+import com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
+import com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_EXCLUDE_NOTE_ID
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_ID
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_TITLE
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_TYPE
 import com.philkes.notallyx.presentation.add
-import com.philkes.notallyx.presentation.addIconButton
 import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.setControlsContrastColorForAllViews
 import com.philkes.notallyx.presentation.setOnNextAction
@@ -67,9 +62,6 @@ import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
 import com.philkes.notallyx.utils.wrapWithChooser
 import java.io.File
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
 
@@ -79,8 +71,6 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     private lateinit var textFormatMenu: View
 
     private var textFormattingAdapter: TextFormattingAdapter? = null
-    private val aiRepository by lazy { AIRepository(this) }
-    private var cachedAiResult: SummaryResponse? = null
 
     private var searchResultIndices: List<Pair<Int, Int>>? = null
 
@@ -295,16 +285,20 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         }
         binding.EnterBody.setOnSelectionChange { selStart, selEnd ->
             if (selEnd - selStart > 0) {
-                if (!textFormatMenu.isEnabled) {
+                if (!::textFormatMenu.isInitialized || !textFormatMenu.isEnabled) {
                     initBottomTextFormattingMenu()
                 }
-                textFormatMenu.isEnabled = true
+                if (::textFormatMenu.isInitialized) {
+                    textFormatMenu.isEnabled = true
+                }
                 textFormattingAdapter?.updateTextFormattingToggles(selStart, selEnd)
             } else {
-                if (textFormatMenu.isEnabled) {
+                if (::textFormatMenu.isInitialized && textFormatMenu.isEnabled) {
                     initBottomMenu()
                 }
-                textFormatMenu.isEnabled = false
+                if (::textFormatMenu.isInitialized) {
+                    textFormatMenu.isEnabled = false
+                }
             }
         }
         binding.ContentLayout.setOnClickListener {
@@ -317,74 +311,25 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     override fun initBottomMenu() {
-        // LEFT: +, Undo
-        binding.BottomAppBarLeft.apply {
-            removeAllViews()
+        super.initBottomMenu()
+    }
 
-            addIconButton(R.string.add_item, R.drawable.add, marginStart = 0) {
-                AddNoteBottomSheet(this@EditNoteActivity, colorInt)
-                    .show(supportFragmentManager, AddNoteBottomSheet.TAG)
-            }
+    override fun openAddItemMenu() {
+        AddNoteBottomSheet(this, colorInt).show(supportFragmentManager, AddNoteBottomSheet.TAG)
+    }
 
-            undo =
-                addIconButton(R.string.undo, R.drawable.undo, marginStart = 2) {
-                        try {
-                            changeHistory.undo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            Log.e(TAG, "ChangeHistory error", e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canUndo.value }
-
-            textFormatMenu =
-                addIconButton(R.string.edit, R.drawable.text_format) {
-                        initBottomTextFormattingMenu()
-                    }
-                    .apply { isEnabled = binding.EnterBody.isActionModeOn }
+    override fun openTextFormattingMenu() {
+        if (binding.EnterBody.isActionModeOn) {
+            initBottomTextFormattingMenu()
+        } else {
+            binding.EnterBody.requestFocus()
+            binding.EnterBody.setSelection(binding.EnterBody.length())
         }
+    }
 
-        // CENTER: Empty (AI button moved to FAB ? góc d??i bên ph?i)
-        binding.BottomAppBarCenter.apply {
-            visibility = GONE
-            removeAllViews()
-        }
-
-        // T?o FAB AI gradient ? góc d??i bên ph?i
-        setupAIFloatingButton()
-
-        // RIGHT: Redo + Draw + More
-        binding.BottomAppBarRight.apply {
-            removeAllViews()
-            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
-                MoreNoteBottomSheet(this@EditNoteActivity, createFolderActions(), colorInt)
-                    .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
-            }
-
-            redo =
-                addIconButton(R.string.redo, R.drawable.redo, marginStart = 0) {
-                        try {
-                            changeHistory.redo()
-                        } catch (
-                            e:
-                                com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                            Log.e(TAG, "ChangeHistory error", e)
-                        }
-                    }
-                    .apply { isEnabled = changeHistory.canRedo.value }
-
-            addIconButton(R.string.draw, R.drawable.ic_pen_pencil, marginStart = 0) {
-                openDrawingScreen()
-            }
-
-            addIconButton(R.string.more, R.drawable.more_vert, marginStart = 0) {
-                MoreNoteBottomSheet(this@EditNoteActivity, createFolderActions(), colorInt)
-                    .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
-            }
-        }
-
-        setBottomAppBarColor(colorInt)
+    override fun openMoreMenu() {
+        MoreNoteBottomSheet(this, createFolderActions(), colorInt)
+            .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
     }
 
     private fun ensureAICenterButton() {
@@ -440,101 +385,105 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     override fun openAIActionsMenu() {
         val noteText = binding.EnterBody.text?.toString().orEmpty()
         val attachmentUris = getAttachedFileUris()
+        val dialog = BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
 
-        if (noteText.isBlank() && attachmentUris.isEmpty()) {
-            showToast(R.string.ai_error_empty_note)
-            return
-        }
-
-        val backendNoteId = getBackendNoteIdOrLocal(notallyModel.id)
-        val userId = getAiUserId()
-
-        // N?u ?ã có cache, hi?n th? bottom sheet ?? ch?n ch?c n?ng
-        cachedAiResult?.let {
-            showAIFunctionSelectionBottomSheet(it)
-            return
-        }
-
-        // Ch?y AI m?t l?n, dùng cache (backend + local)
-        lifecycleScope.launch(Dispatchers.IO) {
-            val result =
-                aiRepository.processCombinedInputs(
+        sheetView.findViewById<View>(R.id.ActionSummary).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
                     noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
                     attachments = attachmentUris,
-                    userId = userId,
-                    noteId = backendNoteId,
-                    useCache = true, // s? l?y t? DB backend n?u có
+                    initialSection = AISummaryActivity.AISection.SUMMARY,
                 )
-            withContext(Dispatchers.Main) {
-                when (result) {
-                    is AIResult.Success -> {
-                        cachedAiResult = result.data
-                        showAIFunctionSelectionBottomSheet(result.data)
-                    }
-                    is AIResult.Error -> {
-                        showToast(result.message)
-                    }
-                    else -> {}
-                }
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.SUMMARY)
             }
         }
+
+        sheetView.findViewById<View>(R.id.ActionBullet).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = AISummaryActivity.AISection.BULLET_POINTS,
+                )
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.BULLET_POINTS)
+            }
+        }
+
+        sheetView.findViewById<View>(R.id.ActionQuestions).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = AISummaryActivity.AISection.QUESTIONS,
+                )
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.QUESTIONS)
+            }
+        }
+
+        sheetView.findViewById<View>(R.id.ActionMCQ).setOnClickListener {
+            if (noteText.isBlank() && attachmentUris.isEmpty()) {
+                showToast(R.string.ai_error_empty_note)
+                return@setOnClickListener
+            }
+            dialog.dismiss()
+            if (attachmentUris.isNotEmpty()) {
+                AIFileProcessActivity.startWithAttachments(
+                    context = this,
+                    noteText = noteText.ifBlank { null },
+                    noteId = notallyModel.id,
+                    attachments = attachmentUris,
+                    initialSection = AISummaryActivity.AISection.MCQ,
+                )
+            } else {
+                launchAISummary(noteText, AISummaryActivity.AISection.MCQ)
+            }
+        }
+
+        sheetView.findViewById<View>(R.id.ActionFile).setOnClickListener {
+            dialog.dismiss()
+            AIFileProcessActivity.start(
+                context = this,
+                noteText = noteText,
+                noteId = notallyModel.id,
+            )
+        }
+
+        sheetView.findViewById<View>(R.id.ActionHistory).setOnClickListener {
+            dialog.dismiss()
+            AIHistoryActivity.start(this, userId = getAiUserId())
+        }
+
+        dialog.setContentView(sheetView)
+        dialog.show()
     }
 
-    private fun showAIFunctionSelectionBottomSheet(summaryResponse: SummaryResponse) {
-        val bottomSheet = BottomSheetDialog(this)
-        val bottomSheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
-        bottomSheet.setContentView(bottomSheetView)
-
-        // ?n các m?c không c?n thi?t cho note Text
-        bottomSheetView.findViewById<View>(R.id.ActionFile)?.visibility = GONE
-        bottomSheetView.findViewById<View>(R.id.ActionHistory)?.visibility = GONE
-
-        // X? lý click cho t?ng m?c ch?c n?ng
-        bottomSheetView.findViewById<View>(R.id.ActionSummary)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.SUMMARY,
-            )
-        }
-
-        bottomSheetView.findViewById<View>(R.id.ActionBullet)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.BULLET_POINTS,
-            )
-        }
-
-        bottomSheetView.findViewById<View>(R.id.ActionQuestions)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.QUESTIONS,
-            )
-        }
-
-        bottomSheetView.findViewById<View>(R.id.ActionMCQ)?.setOnClickListener {
-            bottomSheet.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = summaryResponse,
-                noteId = notallyModel.id,
-                showAllSections = false, // Ch? hi?n th? 1 section
-                initialSection = AISummaryActivity.AISection.MCQ,
-            )
-        }
-
-        bottomSheet.show()
+    private fun launchAISummary(noteText: String, section: AISummaryActivity.AISection) {
+        AISummaryActivity.start(this, noteText, notallyModel.id, section)
     }
 
     private fun getAttachedFileUris(): List<Uri> {
@@ -609,6 +558,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                 adapter = textFormattingAdapter
                 layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
             }
+            textFormatMenu = layout.root
             addView(layout.root)
         }
     }

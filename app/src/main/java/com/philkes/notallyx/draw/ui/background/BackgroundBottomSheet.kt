@@ -4,50 +4,53 @@ import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import android.view.ViewGroup
 import androidx.annotation.ColorInt
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.philkes.notallyx.R
 import com.philkes.notallyx.databinding.FragmentChangeBackgroundBottomSheetBinding
-import com.philkes.notallyx.common.ui.view.colorview.ColorPickerItem
-import androidx.recyclerview.widget.LinearLayoutManager
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class BackgroundBottomSheet : BottomSheetDialogFragment() {
 
     interface Listener {
-        fun onBackgroundSelected(@ColorInt colorInt: Int)
+        fun onBackgroundSelected(@ColorInt colorInt: Int, drawableResId: Int?)
     }
 
     private var _binding: FragmentChangeBackgroundBottomSheetBinding? = null
-    private val binding get() = _binding!!
+    private val binding
+        get() = _binding!!
 
     private var listener: Listener? = null
 
-    @ColorInt
-    private var selectedColor: Int = Color.WHITE
+    @ColorInt private var selectedColor: Int = Color.WHITE
 
-    @ColorInt
-    private var selectedBackgroundColor: Int? = null
+    @ColorInt private var selectedBackgroundColor: Int? = null
+    private var selectedBackgroundDrawableResId: Int? = null
 
     private lateinit var sectionAdapter: BackgroundSectionAdapter
     private var customColors: ArrayList<ColorCustomItem> = arrayListOf()
+    private val sections: MutableList<BackgroundSection> = mutableListOf()
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        _binding =
-            FragmentChangeBackgroundBottomSheetBinding.inflate(inflater, container, false)
+        _binding = FragmentChangeBackgroundBottomSheetBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        selectedColor =
-            arguments?.getInt(ARG_INITIAL_COLOR) ?: Color.WHITE
+        selectedColor = arguments?.getInt(ARG_INITIAL_COLOR) ?: Color.WHITE
 
         setupToolbar()
         setupColorPalettes()
@@ -55,17 +58,44 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun setupToolbar() {
-        binding.toolbar.ivBack.setOnClickListener {
-            dismiss()
-        }
+        binding.toolbar.ivBack.setOnClickListener { dismiss() }
         binding.toolbar.ivCheck.setOnClickListener {
             val colorToApply = selectedBackgroundColor ?: selectedColor
-            listener?.onBackgroundSelected(colorToApply)
+            listener?.onBackgroundSelected(colorToApply, selectedBackgroundDrawableResId)
             dismiss()
         }
     }
 
     private fun setupColorPalettes() {
+        // Hide the header of CustomColorView since we have our own header
+        val customHeader =
+            binding.customColorView.findViewById<androidx.appcompat.widget.LinearLayoutCompat>(
+                R.id.customID
+            )
+        customHeader?.visibility = GONE
+
+        // Setup edit icon click listener
+        binding.ivEditColor.setOnClickListener {
+            // Trigger edit mode in CustomColorView
+            binding.customColorView
+                .findViewById<androidx.appcompat.widget.AppCompatImageView>(R.id.ivEditCustom)
+                ?.performClick()
+            // Update our external UI
+            binding.ivEditColor.visibility = GONE
+            binding.tvCancelColor.visibility = VISIBLE
+        }
+
+        // Setup cancel button click listener
+        binding.tvCancelColor.setOnClickListener {
+            // Trigger cancel in CustomColorView
+            binding.customColorView
+                .findViewById<android.widget.TextView>(R.id.tvCancel)
+                ?.performClick()
+            // Update our external UI
+            binding.ivEditColor.visibility = View.VISIBLE
+            binding.tvCancelColor.visibility = GONE
+        }
+
         customColors = defaultColors()
         binding.customColorView.colors = customColors
         binding.customColorView.listener =
@@ -74,19 +104,24 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
                     updateCustomSelection(colorIndex)
                     val color = customColors.getOrNull(colorIndex) ?: return
                     selectedColor = parseColorSafely(color.colorString)
+                    // Mutual exclusive: clear background selections
+                    clearBackgroundSelections()
+                    selectedBackgroundColor = null
+                    selectedBackgroundDrawableResId = null
                 }
 
                 override fun onAddClick(colorString: String) {
                     customColors.add(
-                        ColorCustom(
-                            id = UUID.randomUUID().toString(),
-                            colorString = colorString,
-                        ),
+                        ColorCustom(id = UUID.randomUUID().toString(), colorString = colorString)
                     )
-                    // chá»n luÃ´n mÃ u vá»«a thÃªm
+                    // ch?n luôn màu v?a thêm
                     updateCustomSelection(customColors.lastIndex)
                     binding.customColorView.colors = customColors
                     selectedColor = parseColorSafely(colorString)
+                    // Mutual exclusive: clear background selections
+                    clearBackgroundSelections()
+                    selectedBackgroundColor = null
+                    selectedBackgroundDrawableResId = null
                 }
 
                 override fun onMoreClick() {
@@ -100,10 +135,7 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
                     }
                 }
 
-                override fun onUpdateColorClick(
-                    oldColor: ColorCustomItem,
-                    newColorString: String,
-                ) {
+                override fun onUpdateColorClick(oldColor: ColorCustomItem, newColorString: String) {
                     val index =
                         customColors.indexOfFirst {
                             it is ColorCustom && it.id == (oldColor as? ColorCustom)?.id
@@ -113,6 +145,10 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
                             (customColors[index] as ColorCustom).copy(colorString = newColorString)
                         binding.customColorView.colors = customColors
                         selectedColor = parseColorSafely(newColorString)
+                        // Mutual exclusive: clear background selections
+                        clearBackgroundSelections()
+                        selectedBackgroundColor = null
+                        selectedBackgroundDrawableResId = null
                     }
                 }
             }
@@ -121,33 +157,111 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
     private fun updateCustomSelection(selectedIndex: Int) {
         if (customColors.isEmpty()) return
         customColors =
-            customColors.mapIndexed { index, item ->
-                if (item is ColorCustom) {
-                    item.copy(isSelected = index == selectedIndex)
-                } else {
-                    item
+            customColors
+                .mapIndexed { index, item ->
+                    if (item is ColorCustom) {
+                        item.copy(isSelected = index == selectedIndex)
+                    } else {
+                        item
+                    }
                 }
-            }.toCollection(arrayListOf())
+                .toCollection(arrayListOf())
         binding.customColorView.colors = customColors
     }
 
+    private fun clearBackgroundSelections() {
+        if (sections.isEmpty()) return
+        sections.forEach { section -> section.items.forEach { it.isSelected = false } }
+        sectionAdapter.updateSections(sections)
+        selectedBackgroundDrawableResId = null
+        selectedBackgroundColor = null
+    }
+
+    private fun clearColorSelections() {
+        // Reset color selection state
+        customColors =
+            customColors
+                .map { item -> if (item is ColorCustom) item.copy(isSelected = false) else item }
+                .toCollection(arrayListOf())
+        binding.customColorView.colors = customColors
+        selectedColor = Color.WHITE
+        selectedBackgroundDrawableResId = null
+    }
+
     private fun setupBackgroundSections() {
-        val sections = createDefaultSections()
+        sections.clear()
+        sections.addAll(createDefaultSections())
 
         sectionAdapter =
-            BackgroundSectionAdapter(sections.toMutableList()) { item ->
-                // Clear previous selection
-                sections.forEach { section ->
-                    section.items.forEach { it.isSelected = false }
+            BackgroundSectionAdapter(sections.toMutableList()) { clickedItem ->
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    // Mutual exclusive: clear colors when selecting background
+                    clearColorSelections()
+                    selectedBackgroundColor = clickedItem.colorInt
+                    selectedColor = Color.WHITE
+                    selectedBackgroundDrawableResId = clickedItem.drawableResId
+
+                    // 1. Clear t?t c? selections tr??c (quan tr?ng!)
+                    sections.forEach { section ->
+                        section.items.forEach { bgItem -> bgItem.isSelected = false }
+                    }
+
+                    // 2. Tìm và set selected = true cho item ???c click
+                    var foundItem: BackgroundItem? = null
+                    var foundSectionIndex = -1
+                    var foundItemIndex = -1
+
+                    sections.forEachIndexed { sectionIndex, section ->
+                        section.items.forEachIndexed { itemIndex, bgItem ->
+                            if (bgItem.id == clickedItem.id) {
+                                bgItem.isSelected = true
+                                selectedBackgroundColor = bgItem.colorInt
+                                foundItem = bgItem
+                                foundSectionIndex = sectionIndex
+                                foundItemIndex = itemIndex
+                            }
+                        }
+                    }
+
+                    // 3. Update adapter v?i toàn b? sections m?i (QUAN TR?NG!)
+                    if (foundItem != null && foundSectionIndex >= 0 && foundItemIndex >= 0) {
+                        val updatedSections =
+                            sections.mapIndexed { sectionIndex, section ->
+                                val updatedItems =
+                                    section.items
+                                        .mapIndexed { itemIndex, item ->
+                                            if (
+                                                sectionIndex == foundSectionIndex &&
+                                                    itemIndex == foundItemIndex
+                                            ) {
+                                                item.copy(isSelected = true)
+                                            } else {
+                                                item.copy(isSelected = false)
+                                            }
+                                        }
+                                        .toMutableList()
+
+                                BackgroundSection(
+                                    type = section.type,
+                                    title = section.title,
+                                    items = updatedItems,
+                                )
+                            }
+
+                        sections.clear()
+                        sections.addAll(updatedSections)
+
+                        // ? Ch? update UI, apply th?t s? làm khi b?m tick
+                        sectionAdapter.updateSections(updatedSections)
+                    }
                 }
-                item.isSelected = true
-                selectedBackgroundColor = item.colorInt
-                sectionAdapter.updateSections(sections)
             }
 
         binding.rvBackgroundSections.apply {
-            layoutManager =
-                LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
+            setHasFixedSize(true) // T?i ?u performance
+            setItemViewCacheSize(3) // Cache 3 views
+            isDrawingCacheEnabled = false // T?t drawing cache
+            layoutManager = LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
             adapter = sectionAdapter
         }
     }
@@ -160,7 +274,7 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
         }
 
     private fun defaultColors(): ArrayList<ColorCustomItem> {
-        // Item Ä‘áº§u tiÃªn: Ã´ "More color"
+        // Item ??u tiên: ô "More color"
         val items = arrayListOf<ColorCustomItem>()
         items +=
             ColorCustom(
@@ -170,9 +284,9 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
                 isSelected = false,
             )
 
-        // CÃ¡c mÃ u máº·c Ä‘á»‹nh (10 mÃ u) Ä‘á»ƒ ra layout:
-        // HÃ ng 1: [More] + 5 mÃ u Ä‘áº§u
-        // HÃ ng 2: 5 mÃ u sau + [Add]
+        // Các màu m?c ??nh (10 màu) ?? ra layout:
+        // Hàng 1: [More] + 5 màu ??u
+        // Hàng 2: 5 màu sau + [Add]
         val rawColors =
             arrayListOf(
                 "#FFC48A",
@@ -196,7 +310,7 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
                 )
             }
 
-        // Item cuá»‘i: Ã´ "+" thÃªm mÃ u
+        // Item cu?i: ô "+" thêm màu
         items +=
             ColorCustom(
                 id = UUID.randomUUID().toString(),
@@ -209,63 +323,107 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun createDefaultSections(): List<BackgroundSection> {
-        val natureColors =
+        // Nature backgrounds - s? d?ng t?t c? 10 ?nh
+        val natureDrawables =
             listOf(
-                "#E3F5E1",
-                "#D1F0D8",
-                "#F2F8E9",
-                "#E1F0FF",
-            )
-        val pastelColors =
-            listOf(
-                "#CDEDEB",
-                "#FAD3CF",
-                "#FBE6C9",
-                "#D7ECFF",
-            )
-        val textureColors =
-            listOf(
-                "#E6E2DD",
-                "#F0EEE8",
-                "#E9E4DE",
-                "#F3EFE9",
-            )
-        val customColors =
-            listOf(
-                "#FFE3B8",
+                R.drawable.ic_draw_nature_1,
+                R.drawable.ic_draw_nature_2,
+                R.drawable.ic_draw_nature_3,
+                R.drawable.ic_draw_nature_4,
+                R.drawable.ic_draw_nature_5,
+                R.drawable.ic_draw_nature_6,
+                R.drawable.ic_draw_nature_7,
+                R.drawable.ic_draw_nature_8,
+                R.drawable.ic_draw_nature_9,
+                R.drawable.ic_draw_nature_10,
             )
 
-        fun toItems(colors: List<String>, type: BackgroundCategoryType): MutableList<BackgroundItem> =
-            colors.mapIndexed { index, hex ->
-                BackgroundItem(
-                    id = UUID.randomUUID().toString(),
-                    colorInt = parseColorSafely(hex),
-                    category = type,
-                    isSelected = false,
-                )
-            }.toMutableList()
+        // Pastel backgrounds - s? d?ng t?t c? 10 ?nh
+        val pastelDrawables =
+            listOf(
+                R.drawable.ic_draw_pastel_1,
+                R.drawable.ic_draw_pastel_2,
+                R.drawable.ic_draw_pastel_3,
+                R.drawable.ic_draw_pastel_4,
+                R.drawable.ic_draw_pastel_5,
+                R.drawable.ic_draw_pastel_6,
+                R.drawable.ic_draw_pastel_7,
+                R.drawable.ic_draw_pastel_8,
+                R.drawable.ic_draw_pastel_9,
+                R.drawable.ic_draw_pastel_10,
+            )
+
+        // Texture backgrounds - s? d?ng t?t c? 10 ?nh
+        val textureDrawables =
+            listOf(
+                R.drawable.ic_draw_texture_1,
+                R.drawable.ic_draw_texture_2,
+                R.drawable.ic_draw_texture_3,
+                R.drawable.ic_draw_texture_4,
+                R.drawable.ic_draw_texture_5,
+                R.drawable.ic_draw_texture_6,
+                R.drawable.ic_draw_texture_7,
+                R.drawable.ic_draw_texture_8,
+                R.drawable.ic_draw_texture_9,
+                R.drawable.ic_draw_texture_10,
+            )
+
+        // Custom colors - v?n dùng màu
+        val customColors = listOf("#FFE3B8")
+
+        fun toImageItems(
+            drawableResIds: List<Int>,
+            type: BackgroundCategoryType,
+        ): MutableList<BackgroundItem> =
+            drawableResIds
+                .mapIndexed { index, resId ->
+                    BackgroundItem(
+                        id = UUID.randomUUID().toString(),
+                        colorInt = Color.WHITE, // Màu m?c ??nh, không dùng khi có ?nh
+                        category = type,
+                        isSelected = false,
+                        drawableResId = resId,
+                    )
+                }
+                .toMutableList()
+
+        fun toColorItems(
+            colors: List<String>,
+            type: BackgroundCategoryType,
+        ): MutableList<BackgroundItem> =
+            colors
+                .mapIndexed { index, hex ->
+                    BackgroundItem(
+                        id = UUID.randomUUID().toString(),
+                        colorInt = parseColorSafely(hex),
+                        category = type,
+                        isSelected = false,
+                        drawableResId = null,
+                    )
+                }
+                .toMutableList()
 
         val sections =
             listOf(
                 BackgroundSection(
                     type = BackgroundCategoryType.NATURE,
                     title = "Nature",
-                    items = toItems(natureColors, BackgroundCategoryType.NATURE),
+                    items = toImageItems(natureDrawables, BackgroundCategoryType.NATURE),
                 ),
                 BackgroundSection(
                     type = BackgroundCategoryType.PASTEL,
                     title = "Pastel",
-                    items = toItems(pastelColors, BackgroundCategoryType.PASTEL),
+                    items = toImageItems(pastelDrawables, BackgroundCategoryType.PASTEL),
                 ),
                 BackgroundSection(
                     type = BackgroundCategoryType.TEXTURE,
                     title = "Texture",
-                    items = toItems(textureColors, BackgroundCategoryType.TEXTURE),
+                    items = toImageItems(textureDrawables, BackgroundCategoryType.TEXTURE),
                 ),
                 BackgroundSection(
                     type = BackgroundCategoryType.CUSTOM,
                     title = "Custom",
-                    items = toItems(customColors, BackgroundCategoryType.CUSTOM),
+                    items = toColorItems(customColors, BackgroundCategoryType.CUSTOM),
                 ),
             )
 
@@ -286,13 +444,8 @@ class BackgroundBottomSheet : BottomSheetDialogFragment() {
 
         fun newInstance(@ColorInt initialColor: Int): BackgroundBottomSheet {
             val fragment = BackgroundBottomSheet()
-            fragment.arguments =
-                Bundle().apply {
-                    putInt(ARG_INITIAL_COLOR, initialColor)
-                }
+            fragment.arguments = Bundle().apply { putInt(ARG_INITIAL_COLOR, initialColor) }
             return fragment
         }
     }
 }
-
-
