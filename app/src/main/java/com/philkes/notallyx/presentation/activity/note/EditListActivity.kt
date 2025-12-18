@@ -28,6 +28,8 @@ import com.philkes.notallyx.presentation.viewmodel.preference.ListItemSort
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences
 import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
+import java.security.MessageDigest
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -98,7 +100,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                 .map { it.body.toString().trim() }
                 .filter { it.isNotBlank() }
 
-        // Collect all items (for file attachments or unchecked items)
+        // Collect all items (for better content hash, including unchecked items)
         val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
         val checkedVocabItems = checkedItems.joinToString("\n")
 
@@ -107,7 +109,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         // Always process AI (backend will check cache and return cached result if content
         // unchanged)
         // This ensures we always have the latest result and backend cache is checked
-        processVocabAI(checkedVocabItems, attachmentUris)
+        processVocabAI(checkedVocabItems, attachmentUris, allItemsText)
     }
 
     /**
@@ -118,10 +120,41 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         cachedVocabResult = null
     }
 
-    private fun processVocabAI(checkedVocabItems: String, attachmentUris: List<android.net.Uri>) {
+    private fun processVocabAI(
+        checkedVocabItems: String,
+        attachmentUris: List<android.net.Uri>,
+        allItemsText: String,
+    ) {
         if (checkedVocabItems.isBlank() && attachmentUris.isEmpty()) {
             showToast(R.string.ai_error_empty_note)
             return
+        }
+
+        val userId = getAiUserId()
+        val localNoteId = notallyModel.id
+
+        // Check if content has changed by comparing hash
+        // This ensures we don't use old backend_note_id for new content
+        // Logic similar to AISummaryActivity.extractIntentData() and summarizeNote()
+        val currentHash = computeVocabContentHash(checkedVocabItems, attachmentUris, allItemsText)
+        val noteIdToUse = ensureBackendNoteIdForVocab(localNoteId, currentHash)
+
+        // N?u ?ã có cached result và hash kh?p, dùng l?i luôn không c?n g?i API
+        if (cachedVocabResult != null && localNoteId != -1L && currentHash != null) {
+            val storedHash =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                    this,
+                    localNoteId,
+                    "vocab",
+                )
+            if (currentHash == storedHash) {
+                android.util.Log.d(
+                    "EditListActivity",
+                    "processVocabAI: Using cached result, hash matches. noteId=$noteIdToUse",
+                )
+                showVocabActionsBottomSheet(checkedVocabItems, attachmentUris, cachedVocabResult!!)
+                return
+            }
         }
 
         // Show loading dialog
@@ -136,33 +169,21 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             aiRepository = AIRepository(this)
         }
 
-        val userId = getAiUserId()
-        val noteId = if (notallyModel.id != -1L) notallyModel.id.toString() else null
-
         lifecycleScope.launch {
             try {
+                // Luôn dùng /process/combined ?? ??ng b? v?i note Text và h? tr? file trong t??ng
+                // lai
                 val result =
                     withContext(Dispatchers.IO) {
-                        if (attachmentUris.isNotEmpty()) {
-                            aiRepository!!.processCombinedInputs(
-                                noteText = checkedVocabItems.ifBlank { null },
-                                attachments = attachmentUris,
-                                userId = userId,
-                                noteId = noteId,
-                                contentType = "checklist",
-                                checkedVocabItems = checkedVocabItems,
-                                useCache = true, // Use backend cache
-                            )
-                        } else {
-                            aiRepository!!.processNoteText(
-                                noteText = checkedVocabItems,
-                                userId = userId,
-                                noteId = noteId,
-                                contentType = "checklist",
-                                checkedVocabItems = checkedVocabItems,
-                                useCache = true, // Use backend cache
-                            )
-                        }
+                        aiRepository!!.processCombinedInputs(
+                            noteText = checkedVocabItems.ifBlank { null },
+                            attachments = attachmentUris,
+                            userId = userId,
+                            noteId = noteIdToUse,
+                            contentType = "checklist",
+                            checkedVocabItems = checkedVocabItems,
+                            useCache = true, // Backend will check cache based on content hash
+                        )
                     }
 
                 loadingDialog.dismiss()
@@ -170,6 +191,37 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                 when (result) {
                     is AIResult.Success -> {
                         cachedVocabResult = result.data
+
+                        // Save content hash và backend_note_id n?u có local noteId
+                        if (localNoteId != -1L && currentHash != null) {
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setNoteContentHash(
+                                    this@EditListActivity,
+                                    localNoteId,
+                                    "vocab",
+                                    currentHash,
+                                )
+
+                            val existingBackendNoteId =
+                                com.philkes.notallyx.data.preferences.AIUserPreferences
+                                    .getBackendNoteId(this@EditListActivity, localNoteId)
+                            if (
+                                existingBackendNoteId == null ||
+                                    existingBackendNoteId != noteIdToUse
+                            ) {
+                                com.philkes.notallyx.data.preferences.AIUserPreferences
+                                    .setBackendNoteId(
+                                        this@EditListActivity,
+                                        localNoteId,
+                                        noteIdToUse,
+                                    )
+                                android.util.Log.d(
+                                    "EditListActivity",
+                                    "processVocabAI: Saved backend_note_id=$noteIdToUse for localNoteId=$localNoteId",
+                                )
+                            }
+                        }
+
                         showVocabActionsBottomSheet(checkedVocabItems, attachmentUris, result.data)
                     }
                     is AIResult.Error -> {
@@ -247,17 +299,57 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             )
         }
 
-        // Mindmap
-        sheetView.findViewById<View>(R.id.ActionMindmap).setOnClickListener {
+        // Mindmap - ?n ch?c n?ng này (ch? có 6 ch?c n?ng)
+        sheetView.findViewById<View>(R.id.ActionMindmap).visibility = View.GONE
+
+        // Cloze
+        sheetView.findViewById<View>(R.id.ActionCloze).setOnClickListener {
             dialog.dismiss()
             AISummaryActivity.startWithResult(
                 context = this,
                 summaryResponse = cachedResult,
                 noteId = notallyModel.id,
                 showAllSections = false,
-                initialSection = AISummaryActivity.AISection.VOCAB_MINDMAP,
+                initialSection = AISummaryActivity.AISection.VOCAB_CLOZE,
                 isVocabMode = true,
             )
+        }
+
+        // Match pairs
+        sheetView.findViewById<View>(R.id.ActionMatchPairs).setOnClickListener {
+            dialog.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.VOCAB_MATCH,
+                isVocabMode = true,
+            )
+        }
+
+        // Overall Stats
+        sheetView.findViewById<View>(R.id.ActionOverallStats).setOnClickListener {
+            val localNoteId = notallyModel.id
+            val prefs = getSharedPreferences("quiz_results", MODE_PRIVATE)
+            val mcqDone = prefs.getBoolean("note_${localNoteId}_vocab_mcq_completed", false)
+            val clozeDone = prefs.getBoolean("note_${localNoteId}_cloze_completed", false)
+            val matchDone = prefs.getBoolean("note_${localNoteId}_match_pairs_completed", false)
+
+            if (mcqDone && clozeDone && matchDone) {
+                dialog.dismiss()
+                AISummaryActivity.startWithResult(
+                    context = this,
+                    summaryResponse = cachedResult,
+                    noteId = notallyModel.id,
+                    showAllSections = true,
+                    initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
+                    isVocabMode = true,
+                    statsOnly = true, // hi?n th? b?ng th?ng kê, ?n n?i dung khác
+                )
+            } else {
+                showToast(getString(R.string.ai_overall_not_ready))
+            }
         }
 
         dialog.setContentView(sheetView)
@@ -452,10 +544,124 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         adapter?.setBackgroundColor(colorInt)
     }
 
+    /**
+     * Compute hash for vocab content to detect content changes Similar to
+     * AISummaryActivity.computeContentHash() but for vocab mode
+     */
+    private fun computeVocabContentHash(
+        checkedContent: String,
+        attachmentUris: List<android.net.Uri>,
+        allItemsText: String,
+    ): String? {
+        val trimmedChecked = checkedContent.trim()
+        val hasAttachments = attachmentUris.isNotEmpty()
+        val trimmedAllItems = allItemsText.trim()
+
+        if (trimmedChecked.isBlank() && !hasAttachments && trimmedAllItems.isBlank()) return null
+
+        // Include checked items, all items (unchecked), and attachment metadata to detect changes
+        val attachmentsMeta =
+            if (hasAttachments) {
+                attachmentUris.joinToString("|") { uri -> uri.toString() }
+            } else {
+                ""
+            }
+
+        val payload = buildString {
+            append("vocab::")
+            append(trimmedChecked)
+            if (trimmedAllItems.isNotBlank()) {
+                append("::all_items::")
+                append(trimmedAllItems)
+            }
+            if (attachmentsMeta.isNotBlank()) {
+                append("::attachments::")
+                append(attachmentsMeta)
+            }
+        }
+
+        val digest = MessageDigest.getInstance("SHA-256")
+        val bytes = digest.digest(payload.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
     companion object {
         private const val TAG = "EditListActivity"
         private const val EXTRA_ITEM_POS = "notallyx.intent.extra.ITEM_POS"
         private const val EXTRA_SELECTION_START = "notallyx.intent.extra.EXTRA_SELECTION_START"
         private const val EXTRA_SELECTION_END = "notallyx.intent.extra.EXTRA_SELECTION_END"
+    }
+
+    /**
+     * ??m b?o dùng cùng backend_note_id cho checklist n?u n?i dung không ??i.
+     * - N?u hash kh?p và có backend_note_id ?ã l?u ? dùng l?i.
+     * - N?u ch?a có ho?c hash khác ? sinh UUID m?i, l?u mapping và clear hash c?.
+     */
+    private fun ensureBackendNoteIdForVocab(localNoteId: Long, currentHash: String?): String {
+        if (localNoteId != -1L && currentHash != null) {
+            val storedHash =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                    this,
+                    localNoteId,
+                    "vocab",
+                )
+            val storedBackend =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getBackendNoteId(
+                    this,
+                    localNoteId,
+                )
+
+            android.util.Log.d(
+                "EditListActivity",
+                "ensureBackendNoteIdForVocab: localNoteId=$localNoteId, currentHash=${currentHash.take(16)}..., storedHash=${storedHash?.take(16)}..., storedBackend=$storedBackend",
+            )
+
+            if (currentHash == storedHash && storedBackend != null) {
+                android.util.Log.d(
+                    "EditListActivity",
+                    "ensureBackendNoteIdForVocab: Reusing existing backend_note_id=$storedBackend",
+                )
+                return storedBackend
+            }
+
+            // Hash ??i ho?c ch?a có mapping: clear c?, sinh m?i
+            android.util.Log.d(
+                "EditListActivity",
+                "ensureBackendNoteIdForVocab: Hash mismatch or no mapping, generating new UUID. currentHash=${currentHash.take(16)}..., storedHash=${storedHash?.take(16)}...",
+            )
+            com.philkes.notallyx.data.preferences.AIUserPreferences.removeBackendNoteId(
+                this,
+                localNoteId,
+            )
+            com.philkes.notallyx.data.preferences.AIUserPreferences.clearNoteContentHash(
+                this,
+                localNoteId,
+                "vocab",
+            )
+            val generated = UUID.randomUUID().toString()
+            com.philkes.notallyx.data.preferences.AIUserPreferences.setBackendNoteId(
+                this,
+                localNoteId,
+                generated,
+            )
+            com.philkes.notallyx.data.preferences.AIUserPreferences.setNoteContentHash(
+                this,
+                localNoteId,
+                "vocab",
+                currentHash,
+            )
+            android.util.Log.d(
+                "EditListActivity",
+                "ensureBackendNoteIdForVocab: Generated and saved new backend_note_id=$generated",
+            )
+            return generated
+        }
+
+        // localNoteId = -1 ho?c không có hash ? sinh UUID nh?ng không l?u mapping
+        android.util.Log.d(
+            "EditListActivity",
+            "ensureBackendNoteIdForVocab: localNoteId=$localNoteId or no hash, generating temporary UUID",
+        )
+        return UUID.randomUUID().toString()
     }
 }

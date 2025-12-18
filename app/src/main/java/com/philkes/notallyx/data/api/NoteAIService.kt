@@ -120,6 +120,6 @@ interface NoteAIService {
     @POST("translate")
     suspend fun translateText(
         @Field("text") text: String,
-        @Field("target_language") targetLanguage: String = "Vietnamese",
+        @Field("target_lang") targetLanguage: String = "vi",
     ): Response<TranslateResponse>
 }

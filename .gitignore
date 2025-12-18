@@ -1,0 +1,4 @@
+.gradle/
+**/.gradle/
+.idea/caches/
+local.properties

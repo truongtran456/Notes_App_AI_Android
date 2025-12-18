@@ -11,13 +11,17 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
 import com.philkes.notallyx.R
+import com.philkes.notallyx.data.api.ApiClient
 import com.philkes.notallyx.data.api.models.AIResult
 import com.philkes.notallyx.data.preferences.AIUserPreferences
 import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.databinding.ActivityAiSummaryBinding
 import java.security.MessageDigest
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AIFileProcessActivity : AppCompatActivity() {
 
@@ -180,12 +184,12 @@ class AIFileProcessActivity : AppCompatActivity() {
         binding.ProgressStage.text = ""
         binding.ProgressText.text = getString(R.string.ai_processing_file)
 
-        // Use backend_note_id if available, otherwise use local note_id
-        val noteIdString = backendNoteId ?: (if (noteId != -1L) noteId.toString() else null)
+        // ??m b?o note_id g?i lên backend luôn là UUID duy nh?t (tránh trùng sau khi wipe app)
+        val noteIdString = ensureBackendNoteId()
 
         lifecycleScope.launch {
             val shouldUseCache = shouldUseLocalCache(uris)
-            // S? d?ng contentType t? intent (có th? là "checklist" ho?c "vocab")
+            // S? d?ng contentType t? intent (c? th? l? "checklist" ho?c "vocab")
             val contentTypeToUse = contentType ?: (if (isVocabMode) "vocab" else null)
 
             when (
@@ -201,14 +205,8 @@ class AIFileProcessActivity : AppCompatActivity() {
                     )
             ) {
                 is AIResult.Success -> {
-                    // Save backend_note_id if not exists and noteId is valid
-                    if (backendNoteId == null && noteId != -1L && noteIdString != null) {
-                        AIUserPreferences.setBackendNoteId(
-                            this@AIFileProcessActivity,
-                            noteId,
-                            noteIdString,
-                        )
-                    }
+                    // Save backend_note_id n?u v?a sinh m?i
+                    persistBackendNoteIdIfNeeded(noteIdString)
                     AISummaryActivity.startWithResult(
                         context = this@AIFileProcessActivity,
                         summaryResponse = result.data,
@@ -221,6 +219,59 @@ class AIFileProcessActivity : AppCompatActivity() {
                     finish()
                 }
                 is AIResult.Error -> {
+                    // N?u l?i là connection abort và có note_id, th? GET l?i t? backend
+                    // (có th? backend ?ã x? lý xong nh?ng response b? m?t)
+                    val isConnectionError =
+                        result.message.contains("connection abort", ignoreCase = true) ||
+                            result.message.contains("connection", ignoreCase = true) ||
+                            result.message.contains("network", ignoreCase = true)
+
+                    if (isConnectionError && noteIdString.isNotBlank()) {
+                        android.util.Log.d(
+                            "AIFileProcessActivity",
+                            "Connection error detected, attempting to fetch result from backend. noteId=$noteIdString",
+                        )
+                        // Th? GET l?i k?t qu? t? backend (có th? backend ?ã x? lý xong nh?ng
+                        // response b? m?t)
+                        try {
+                            val cachedResult =
+                                withContext(Dispatchers.IO) {
+                                    val response =
+                                        ApiClient.getService().getNoteById(noteIdString, userId)
+                                    if (response.isSuccessful && response.body() != null) {
+                                        response.body()
+                                    } else {
+                                        null
+                                    }
+                                }
+                            if (cachedResult != null) {
+                                android.util.Log.d(
+                                    "AIFileProcessActivity",
+                                    "Successfully retrieved cached result from backend after connection error",
+                                )
+                                // Save backend_note_id n?u v?a sinh m?i
+                                persistBackendNoteIdIfNeeded(noteIdString)
+                                AISummaryActivity.startWithResult(
+                                    context = this@AIFileProcessActivity,
+                                    summaryResponse = cachedResult,
+                                    noteId = noteId,
+                                    showAllSections = showAllSections,
+                                    initialSection = initialSection,
+                                    isVocabMode = isVocabMode,
+                                )
+                                persistContentHashIfNeeded()
+                                finish()
+                                return@launch
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e(
+                                "AIFileProcessActivity",
+                                "Failed to fetch cached result: ${e.message}",
+                                e,
+                            )
+                        }
+                    }
+
                     binding.LoadingLayout.isVisible = false
                     binding.ErrorLayout.isVisible = true
                     binding.ErrorMessage.text =
@@ -233,13 +284,32 @@ class AIFileProcessActivity : AppCompatActivity() {
         }
     }
 
+    /** Sinh backend_note_id d?ng UUID ?? tránh trùng l?p khi local noteId b? reset (wipe app). */
+    private fun ensureBackendNoteId(): String {
+        backendNoteId?.let {
+            return it
+        }
+        val generated = UUID.randomUUID().toString()
+        backendNoteId = generated
+
+        if (noteId != -1L) {
+            AIUserPreferences.setBackendNoteId(this, noteId, generated)
+        }
+        return generated
+    }
+
+    private fun persistBackendNoteIdIfNeeded(noteIdString: String?) {
+        if (backendNoteId == null && noteId != -1L && noteIdString != null) {
+            AIUserPreferences.setBackendNoteId(this, noteId, noteIdString)
+        }
+    }
+
     private fun AISummaryActivity.AISection.isVocabSection(): Boolean {
         return this in
             listOf(
                 AISummaryActivity.AISection.VOCAB_STORY,
                 AISummaryActivity.AISection.VOCAB_MCQ,
                 AISummaryActivity.AISection.VOCAB_FLASHCARDS,
-                AISummaryActivity.AISection.VOCAB_MINDMAP,
                 AISummaryActivity.AISection.VOCAB_SUMMARY_TABLE,
             )
     }

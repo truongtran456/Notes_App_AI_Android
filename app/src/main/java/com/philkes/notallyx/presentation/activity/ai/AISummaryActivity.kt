@@ -4,12 +4,18 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.text.SpannableString
 import android.text.Spanned
+import android.text.method.LinkMovementMethod
 import android.text.style.StyleSpan
 import android.view.View
+import android.widget.GridLayout
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -22,8 +28,11 @@ import com.google.android.material.tabs.TabLayout
 import com.google.gson.Gson
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.api.models.AIResult
+import com.philkes.notallyx.data.api.models.ClozeBlank
+import com.philkes.notallyx.data.api.models.ClozeTest
 import com.philkes.notallyx.data.api.models.Flashcard
 import com.philkes.notallyx.data.api.models.MCQ
+import com.philkes.notallyx.data.api.models.MatchPair
 import com.philkes.notallyx.data.api.models.MindmapBundle
 import com.philkes.notallyx.data.api.models.Question
 import com.philkes.notallyx.data.api.models.SummaryResponse
@@ -35,6 +44,8 @@ import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.databinding.ActivityAiSummaryBinding
 import java.security.MessageDigest
+import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.launch
 
 class AISummaryActivity : AppCompatActivity() {
@@ -53,7 +64,13 @@ class AISummaryActivity : AppCompatActivity() {
     private var initialSection: AISection = AISection.SUMMARY
     private var hasScrolledToInitialSection = false
     private var forceShowAllSections = false
+    private var statsOnly = false
     private var pendingContentHash: String? = null
+
+    // Original data for translation (to preserve format)
+    private var vocabStoryOriginal: VocabStory? = null
+    private var vocabMCQsOriginal: List<VocabQuiz>? = null
+    private var flashcardsOriginal: List<Flashcard>? = null
 
     // Translation states for each vocab card
     private var vocabStoryTranslated: String? = null
@@ -65,6 +82,65 @@ class AISummaryActivity : AppCompatActivity() {
     private var mindmapTranslated: String? = null
     private var mindmapIsTranslated = false
     private var summaryTableTranslated: String? = null
+    // TTS cho phát âm
+    private var tts: TextToSpeech? = null
+    private var ttsReady: Boolean = false
+    // State for flashcards
+    private var flashcardIndex = 0
+    private var flashcardFlipped = false
+
+    // State for match pairs
+    private var matchPairsState: MutableList<MatchPair>? = null
+    private var matchPairsAll: MutableList<MatchPair>? = null
+    private var matchPairsRevealed: MutableSet<Int> = mutableSetOf()
+    private var matchFirstSelection: Int? = null
+
+    // State for cloze answers
+    private var clozeUserAnswers: MutableMap<Pair<Int, Int>, String> = mutableMapOf()
+
+    // State for vocab MCQ quiz mode (checklist)
+    private var vocabMCQAllQuestions: List<VocabQuiz>? = null
+    private var vocabMCQShuffledQuestions: MutableList<VocabQuiz> = mutableListOf()
+    private var vocabMCQCurrentIndex: Int = 0
+    private var vocabMCQUserAnswers: MutableMap<Int, String> =
+        mutableMapOf() // question index -> selected answer
+    private var vocabMCQScore: Int = 0
+    private var vocabMCQIsQuizMode: Boolean = false
+
+    // State for cloze quiz mode (checklist)
+    private var clozeAllQuestions: MutableList<Pair<ClozeTest, ClozeBlank>> = mutableListOf()
+    private var clozeShuffledQuestions: MutableList<Pair<ClozeTest, ClozeBlank>> = mutableListOf()
+    private var clozeCurrentIndex: Int = 0
+    private var clozeUserAnswersQuiz: MutableMap<Int, String> =
+        mutableMapOf() // question index -> user answer
+    private var clozeScore: Int = 0
+    private var clozeIsQuizMode: Boolean = false
+
+    // State for match pairs quiz mode (theo t? v?ng)
+    private var matchPairsScore: Int = 0 // S? t? ?ã hoàn thành (?ã match ?úng ít nh?t 1 l?n)
+    private var matchPairsTotal: Int = 0 // T?ng s? t? unique trong note
+    private var matchPairsCompleted: Boolean = false
+    private var matchPairsWordsMatched: MutableSet<String> =
+        mutableSetOf() // Các vocab ?ã hoàn thành
+    private var matchPairsUniqueWords: Set<String> = emptySet() // T?t c? vocab unique
+
+    // Progress chi ti?t cho t?ng vocab c?a Match Pairs (l?u vào SharedPreferences)
+    private data class MatchPairVocabProgress(
+        val vocab: String,
+        var status: String = "pending", // "pending" | "completed"
+        var attempts: Int = 0, // s? l?n th? (match sai + ?úng)
+        var completedAt: Long? = null, // timestamp khi completed
+    )
+
+    private var matchPairsVocabProgress: MutableMap<String, MatchPairVocabProgress> = mutableMapOf()
+
+    // Quiz completion tracking
+    private var vocabQuizCompleted: Boolean = false
+    private var clozeQuizCompleted: Boolean = false
+    private var matchPairsQuizCompleted: Boolean = false
+
+    // State for summary table (to get Vietnamese translations for match pairs)
+    private var summaryTableState: List<VocabSummaryRow>? = null
     private var summaryTableIsTranslated = false
 
     companion object {
@@ -77,6 +153,7 @@ class AISummaryActivity : AppCompatActivity() {
         const val EXTRA_CHECKED_VOCAB_ITEMS = "checked_vocab_items"
         private const val EXTRA_PRECOMPUTED_RESULT = "precomputed_result"
         private const val EXTRA_SHOW_ALL_SECTIONS = "show_all_sections"
+        private const val EXTRA_STATS_ONLY = "stats_only"
 
         fun start(
             context: Context,
@@ -110,6 +187,7 @@ class AISummaryActivity : AppCompatActivity() {
             showAllSections: Boolean = false,
             initialSection: AISection = AISection.SUMMARY,
             isVocabMode: Boolean = false,
+            statsOnly: Boolean = false,
         ) {
             val intent =
                 Intent(context, AISummaryActivity::class.java).apply {
@@ -117,6 +195,9 @@ class AISummaryActivity : AppCompatActivity() {
                     putExtra(EXTRA_NOTE_ID, noteId)
                     putExtra(EXTRA_SHOW_ALL_SECTIONS, showAllSections)
                     putExtra(EXTRA_INITIAL_SECTION, initialSection.name)
+                    if (statsOnly) {
+                        putExtra(EXTRA_STATS_ONLY, true)
+                    }
                     if (isVocabMode) {
                         putExtra(EXTRA_USE_PROCESS, true)
                     }
@@ -136,9 +217,21 @@ class AISummaryActivity : AppCompatActivity() {
             showLoading()
 
             aiRepository = AIRepository(this)
+            // Init TTS (English) cho phát âm t? v?ng
+            tts =
+                TextToSpeech(this) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        val r = tts?.setLanguage(Locale.US)
+                        ttsReady =
+                            r != TextToSpeech.LANG_MISSING_DATA &&
+                                r != TextToSpeech.LANG_NOT_SUPPORTED
+                    } else {
+                        ttsReady = false
+                    }
+                }
 
-            setupToolbar()
             extractIntentData()
+            setupToolbar()
             setupClickListeners()
             setupTranslateButtons()
 
@@ -181,8 +274,32 @@ class AISummaryActivity : AppCompatActivity() {
         }
     }
 
+    override fun onDestroy() {
+        tts?.stop()
+        tts?.shutdown()
+        super.onDestroy()
+    }
+
     private fun setupToolbar() {
         binding.Toolbar.setNavigationOnClickListener { finish() }
+        // Set title d?a trên initialSection
+        val title =
+            when (initialSection) {
+                // Text-mode sections
+                AISection.SUMMARY -> "AI Summary"
+                AISection.BULLET_POINTS -> "AI Bullet Points"
+                AISection.QUESTIONS -> "AI Questions"
+                AISection.MCQ -> "AI MCQ Practice"
+
+                // Vocab/checklist sections
+                AISection.VOCAB_MCQ -> "AI Vocabulary Quizzes"
+                AISection.VOCAB_STORY -> "AI Story"
+                AISection.VOCAB_SUMMARY_TABLE -> "AI Vocabulary Summary"
+                AISection.VOCAB_FLASHCARDS -> "AI Flashcards"
+                AISection.VOCAB_CLOZE -> "AI Cloze Test"
+                AISection.VOCAB_MATCH -> "AI Match Pairs"
+            }
+        binding.Toolbar.title = title
     }
 
     private fun extractIntentData() {
@@ -197,12 +314,54 @@ class AISummaryActivity : AppCompatActivity() {
             intent.getStringExtra(EXTRA_INITIAL_SECTION)?.let {
                 runCatching { AISection.valueOf(it) }.getOrNull()
             } ?: AISection.SUMMARY
+        statsOnly = intent.getBooleanExtra(EXTRA_STATS_ONLY, false)
         hasScrolledToInitialSection = initialSection == AISection.SUMMARY
+
+        // If backendNoteId is not provided in intent, try to get it from preferences
+        // BUT only use it if the content hash matches (to avoid using old backend_note_id for new
+        // content)
+        if (backendNoteId == null && noteId != -1L && noteContent.isNotBlank()) {
+            val storedBackendNoteId =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getBackendNoteId(
+                    this,
+                    noteId,
+                )
+
+            // Check if content hash matches before using stored backend_note_id
+            if (storedBackendNoteId != null) {
+                val currentHash = computeContentHash()
+                val storedHash =
+                    com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                        this,
+                        noteId,
+                        currentHashMode(),
+                    )
+
+                // Only use stored backend_note_id if hash matches (content hasn't changed)
+                if (currentHash != null && currentHash == storedHash) {
+                    backendNoteId = storedBackendNoteId
+                    android.util.Log.d(
+                        "AISummaryActivity",
+                        "extractIntentData: Using stored backend_note_id=$backendNoteId (hash matches)",
+                    )
+                } else {
+                    // Content has changed, clear the old backend_note_id mapping
+                    android.util.Log.d(
+                        "AISummaryActivity",
+                        "extractIntentData: Content changed, clearing old backend_note_id mapping. currentHash=$currentHash, storedHash=$storedHash",
+                    )
+                    com.philkes.notallyx.data.preferences.AIUserPreferences.removeBackendNoteId(
+                        this,
+                        noteId,
+                    )
+                }
+            }
+        }
 
         // Debug logging
         android.util.Log.d(
             "AISummaryActivity",
-            "extractIntentData: noteContent length=${noteContent.length}, noteId=$noteId, useProcessEndpoint=$useProcessEndpoint, initialSection=$initialSection",
+            "extractIntentData: noteContent length=${noteContent.length}, noteId=$noteId, backendNoteId=$backendNoteId, useProcessEndpoint=$useProcessEndpoint, initialSection=$initialSection",
         )
 
         intent.getStringExtra(EXTRA_PRECOMPUTED_RESULT)?.let { json ->
@@ -302,8 +461,9 @@ class AISummaryActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // Use backend_note_id if available, otherwise use local note_id
-                val noteIdToUse = backendNoteId ?: (if (noteId != -1L) noteId.toString() else null)
+                // ??m b?o note_id g?i lên backend luôn là UUID duy nh?t (tránh trùng sau khi wipe
+                // app)
+                val noteIdToUse = ensureBackendNoteId()
 
                 val userId = getAiUserId()
 
@@ -323,35 +483,38 @@ class AISummaryActivity : AppCompatActivity() {
                     "summarizeNote: shouldUseCache=$shouldUseCache",
                 )
 
-                val result =
-                    if (useProcessEndpoint) {
-                        // For flows like vocab checklist, use /process (text) endpoint
-                        aiRepository.processNoteText(
-                            noteText = noteContent,
-                            userId = userId,
-                            noteId = noteIdToUse,
-                            contentType = contentType ?: "vocab",
-                            checkedVocabItems = checkedVocabItems,
-                            useCache = shouldUseCache,
+                // N?u nên dùng cache và ?ã có noteId, th? GET tr??c ?? tránh g?i POST
+                if (shouldUseCache && !noteIdToUse.isNullOrBlank()) {
+                    val cached = aiRepository.getCachedNote(userId, noteIdToUse)
+                    if (cached != null) {
+                        android.util.Log.d(
+                            "AISummaryActivity",
+                            "summarizeNote: Using cached note from GET /notes/$noteIdToUse",
                         )
-                    } else {
-                        // Default flow: use /summarize endpoint
-                        aiRepository.summarizeNote(
-                            noteText = noteContent,
-                            userId = userId,
-                            noteId = noteIdToUse,
-                            useCache = shouldUseCache,
-                        )
+                        summaryResponse = cached
+                        persistBackendNoteIdIfNeeded(noteIdToUse)
+                        displayResults(cached)
+                        persistContentHashIfNeeded()
+                        return@launch
                     }
+                }
+
+                // Luôn dùng /process/combined cho note text (text + future files) ?? ??ng b? cache
+                val result =
+                    aiRepository.processCombinedInputs(
+                        noteText = noteContent,
+                        attachments = emptyList(),
+                        userId = userId,
+                        noteId = noteIdToUse,
+                        contentType = contentType,
+                        checkedVocabItems = checkedVocabItems,
+                        useCache = shouldUseCache,
+                    )
 
                 when (result) {
                     is AIResult.Success -> {
                         summaryResponse = result.data
-                        // Save backend_note_id if not exists and noteId is valid
-                        if (backendNoteId == null && noteId != -1L && noteIdToUse != null) {
-                            com.philkes.notallyx.data.preferences.AIUserPreferences
-                                .setBackendNoteId(this@AISummaryActivity, noteId, noteIdToUse)
-                        }
+                        persistBackendNoteIdIfNeeded(noteIdToUse)
                         displayResults(result.data)
                         persistContentHashIfNeeded()
                     }
@@ -366,6 +529,31 @@ class AISummaryActivity : AppCompatActivity() {
                 e.printStackTrace()
                 showError("Error: ${e.message ?: "Unknown error occurred"}")
             }
+        }
+    }
+
+    /**
+     * ??m b?o note_id g?i lên backend luôn là UUID duy nh?t ?? tránh trùng v?i các l?n cài app
+     * tr??c ?ó (khi local noteId có th? l?p l?i sau khi wipe).
+     */
+    private fun ensureBackendNoteId(): String {
+        backendNoteId?.let {
+            return it
+        }
+
+        val generated = UUID.randomUUID().toString()
+        backendNoteId = generated
+
+        // N?u có local noteId, l?u mapping ?? l?n sau v?n dùng cùng backendNoteId (khi hash kh?p)
+        if (noteId != -1L) {
+            AIUserPreferences.setBackendNoteId(this, noteId, generated)
+        }
+        return generated
+    }
+
+    private fun persistBackendNoteIdIfNeeded(noteIdToUse: String?) {
+        if (backendNoteId == null && noteId != -1L && noteIdToUse != null) {
+            AIUserPreferences.setBackendNoteId(this@AISummaryActivity, noteId, noteIdToUse)
         }
     }
 
@@ -495,19 +683,39 @@ class AISummaryActivity : AppCompatActivity() {
             binding.MCQCard.isVisible = false
         }
 
+        // Stats-only mode: ?n các n?i dung khác, ch? hi?n th? ti?n ?? và b?ng th?ng kê
+        if (statsOnly) {
+            hideAllCardsExceptStats()
+            renderStatsOnly()
+            return
+        }
+
         val vocabStory = response.vocabStory ?: response.review?.vocabStory
         val vocabMcqs = response.vocabMcqs ?: response.review?.vocabMcqs
         val flashcards = response.flashcards ?: response.review?.flashcards
-        val mindmap = response.mindmap ?: response.review?.mindmap
+        val mindmap = null // Mindmap removed
         val summaryTable = response.summaryTable ?: response.review?.summaryTable
+        val clozeTests = response.clozeTests ?: response.review?.clozeTests
+        val matchPairs = response.matchPairs ?: response.review?.matchPairs
+
+        // LUÔN set summaryTableState ?? Match Pairs có th? l?y ngh?a ti?ng Vi?t
+        // (ngay c? khi không hi?n th? Summary Table card)
+        summaryTableState = summaryTable?.ifEmpty { null }
+
+        // Debug logging for vocab data
+        android.util.Log.d(
+            "AISummaryActivity",
+            "displayResults: vocab data - story=${vocabStory != null}, mcqs=${vocabMcqs?.size ?: 0}, flashcards=${flashcards?.size ?: 0}, mindmap=${mindmap != null}, summaryTable=${summaryTable?.size ?: 0}, clozeTests=${clozeTests?.size ?: 0}, matchPairs=${matchPairs?.size ?: 0}",
+        )
 
         if (!isVocabMode) {
             // N?u kh?ng ? ch? ?? vocab, ch? hi?n th? n?u c? (v? d? l?ch s?)
             updateVocabStoryCard(vocabStory)
             updateVocabMCQCard(vocabMcqs)
             updateFlashcardsCard(flashcards)
-            updateMindmapCard(mindmap)
             updateSummaryTableCard(summaryTable)
+            updateClozeCard(clozeTests)
+            updateMatchPairsCard(matchPairs)
         } else {
             // Vocab mode: ch? hi?n th? ch?c n?ng ???c ch?n
             if (showAll) {
@@ -515,7 +723,9 @@ class AISummaryActivity : AppCompatActivity() {
                 updateVocabStoryCard(vocabStory)
                 updateVocabMCQCard(vocabMcqs)
                 updateFlashcardsCard(flashcards)
-                updateMindmapCard(mindmap)
+                // mindmap removed
+                updateClozeCard(clozeTests)
+                updateMatchPairsCard(matchPairs)
             } else {
                 when (initialSection) {
                     AISection.VOCAB_SUMMARY_TABLE -> {
@@ -523,35 +733,48 @@ class AISummaryActivity : AppCompatActivity() {
                         updateVocabStoryCard(null)
                         updateVocabMCQCard(null)
                         updateFlashcardsCard(null)
-                        updateMindmapCard(null)
+                        updateClozeCard(null)
+                        updateMatchPairsCard(null)
                     }
                     AISection.VOCAB_STORY -> {
                         updateSummaryTableCard(null)
                         updateVocabStoryCard(vocabStory)
                         updateVocabMCQCard(null)
                         updateFlashcardsCard(null)
-                        updateMindmapCard(null)
+                        updateClozeCard(null)
+                        updateMatchPairsCard(null)
                     }
                     AISection.VOCAB_MCQ -> {
                         updateSummaryTableCard(null)
                         updateVocabStoryCard(null)
                         updateVocabMCQCard(vocabMcqs)
                         updateFlashcardsCard(null)
-                        updateMindmapCard(null)
+                        updateClozeCard(null)
+                        updateMatchPairsCard(null)
                     }
                     AISection.VOCAB_FLASHCARDS -> {
                         updateSummaryTableCard(null)
                         updateVocabStoryCard(null)
                         updateVocabMCQCard(null)
                         updateFlashcardsCard(flashcards)
-                        updateMindmapCard(null)
+                        updateClozeCard(null)
+                        updateMatchPairsCard(null)
                     }
-                    AISection.VOCAB_MINDMAP -> {
+                    AISection.VOCAB_CLOZE -> {
                         updateSummaryTableCard(null)
                         updateVocabStoryCard(null)
                         updateVocabMCQCard(null)
                         updateFlashcardsCard(null)
-                        updateMindmapCard(mindmap)
+                        updateClozeCard(clozeTests)
+                        updateMatchPairsCard(null)
+                    }
+                    AISection.VOCAB_MATCH -> {
+                        updateSummaryTableCard(null)
+                        updateVocabStoryCard(null)
+                        updateVocabMCQCard(null)
+                        updateFlashcardsCard(null)
+                        updateClozeCard(null)
+                        updateMatchPairsCard(matchPairs)
                     }
                     else -> {
                         // fallback: hi?n th? t?t c? n?u kh?ng kh?p case
@@ -559,11 +782,15 @@ class AISummaryActivity : AppCompatActivity() {
                         updateVocabStoryCard(vocabStory)
                         updateVocabMCQCard(vocabMcqs)
                         updateFlashcardsCard(flashcards)
-                        updateMindmapCard(mindmap)
+                        updateClozeCard(clozeTests)
+                        updateMatchPairsCard(matchPairs)
                     }
                 }
             }
         }
+
+        // C?p nh?t Overall Progress Card (n?u có d? li?u quiz)
+        updateOverallProgressCardSummary()
 
         maybeScrollToInitialSection(forceShowAll = showAll)
     }
@@ -618,7 +845,8 @@ class AISummaryActivity : AppCompatActivity() {
                     AISection.VOCAB_STORY -> binding.VocabStoryCard.takeIf { it.isVisible }
                     AISection.VOCAB_MCQ -> binding.VocabMCQCard.takeIf { it.isVisible }
                     AISection.VOCAB_FLASHCARDS -> binding.FlashcardsCard.takeIf { it.isVisible }
-                    AISection.VOCAB_MINDMAP -> binding.MindmapCard.takeIf { it.isVisible }
+                    AISection.VOCAB_CLOZE -> binding.ClozeCard.takeIf { it.isVisible }
+                    AISection.VOCAB_MATCH -> binding.MatchPairsCard.takeIf { it.isVisible }
                     AISection.VOCAB_SUMMARY_TABLE ->
                         binding.SummaryTableCard.takeIf { it.isVisible }
                 }
@@ -1038,22 +1266,58 @@ class AISummaryActivity : AppCompatActivity() {
         if (story == null) {
             binding.VocabStoryParagraphs.removeAllViews()
             binding.VocabStoryUsedWords.text = ""
+            vocabStoryOriginal = null
             return
         }
-        binding.VocabStoryTitle.text = story.title ?: getString(R.string.ai_vocab_story)
+
+        // L?u d? li?u g?c ?? dùng cho translate
+        vocabStoryOriginal = story
+
+        // Hi?n th? title
+        val title = story.title?.takeIf { it.isNotBlank() } ?: getString(R.string.ai_vocab_story)
+        binding.VocabStoryTitle.text = title
+
+        // Hi?n th? paragraphs
         binding.VocabStoryParagraphs.removeAllViews()
-        story.paragraphs.orEmpty().forEach { paragraph ->
+        val paragraphs = story.paragraphs?.filter { it.isNotBlank() } ?: emptyList()
+
+        if (paragraphs.isEmpty()) {
+            // N?u không có paragraphs, hi?n th? thông báo
             binding.VocabStoryParagraphs.addView(
                 TextView(this).apply {
-                    text = markdownBoldToSpannable(paragraph)
-                    textSize = 15f
-                    setTextIsSelectable(true)
-                    setPadding(0, 6.dpToPx(), 0, 6.dpToPx())
+                    text = "No story content available"
+                    textSize = 14f
+                    setTextColor(
+                        ContextCompat.getColor(this@AISummaryActivity, android.R.color.darker_gray)
+                    )
+                    setPadding(0, 16.dpToPx(), 0, 16.dpToPx())
+                    gravity = android.view.Gravity.CENTER
                 }
             )
+        } else {
+            paragraphs.forEachIndexed { index, paragraph ->
+                val paragraphText = paragraph.trim()
+                if (paragraphText.isNotBlank()) {
+                    binding.VocabStoryParagraphs.addView(
+                        TextView(this).apply {
+                            text = markdownBoldToSpannable(paragraphText)
+                            textSize = 15f
+                            setTextIsSelectable(true)
+                            setPadding(0, if (index == 0) 0 else 8.dpToPx(), 0, 8.dpToPx())
+                            setLineSpacing(4f, 1.2f)
+                        }
+                    )
+                }
+            }
         }
+
         // Hide used words section - already shown in Processed Text above
         binding.VocabStoryUsedWords.isVisible = false
+
+        android.util.Log.d(
+            "AISummaryActivity",
+            "updateVocabStoryCard: title='$title', paragraphs count=${paragraphs.size}",
+        )
     }
 
     private fun updateVocabMCQCard(quizzes: List<VocabQuiz>?) {
@@ -1061,7 +1325,444 @@ class AISummaryActivity : AppCompatActivity() {
         binding.VocabMCQCard.isVisible = items.isNotEmpty()
         binding.VocabMCQContainer.removeAllViews()
         if (items.isEmpty()) return
-        items.forEach { quiz -> binding.VocabMCQContainer.addView(createVocabMCQView(quiz)) }
+
+        // L?y set_id t? b? câu h?i (t?t c? cùng set_id)
+        val currentSetId = items.firstOrNull()?.setId
+        if (noteId != -1L && currentSetId != null) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val savedSetId = prefs.getInt("note_${noteId}_vocab_mcq_set_id", -1)
+            if (savedSetId != -1 && savedSetId != currentSetId) {
+                // set_id thay ??i -> reset ti?n trình MCQ
+                android.util.Log.d(
+                    "AISummaryActivity",
+                    "updateVocabMCQCard: set_id changed ($savedSetId -> $currentSetId), resetting progress",
+                )
+                prefs
+                    .edit()
+                    .apply {
+                        remove("note_${noteId}_vocab_mcq_completed")
+                        remove("note_${noteId}_vocab_mcq_score")
+                        remove("note_${noteId}_vocab_mcq_total")
+                        remove("note_${noteId}_vocab_mcq_set_id")
+                    }
+                    .apply()
+                vocabMCQUserAnswers.clear()
+                vocabMCQScore = 0
+                vocabQuizCompleted = false
+            }
+            // L?u set_id hi?n t?i ?? l?n sau so sánh
+            prefs.edit().putInt("note_${noteId}_vocab_mcq_set_id", currentSetId).apply()
+        }
+
+        // Ki?m tra xem quiz ?ã hoàn thành ch?a
+        val isCompleted = checkQuizCompleted("vocab_mcq")
+        if (isCompleted) {
+            // Load k?t qu? ?ã l?u và hi?n th?
+            vocabQuizCompleted = true
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            vocabMCQScore = prefs.getInt("note_${noteId}_vocab_mcq_score", 0)
+
+            // Khôi ph?c th? t? câu h?i và ?áp án ?ã ch?n t? prefs
+            val gson = Gson()
+            val savedOrderJson = prefs.getString("note_${noteId}_vocab_mcq_order", null)
+            val savedAnswersJson = prefs.getString("note_${noteId}_vocab_mcq_answers", null)
+
+            // Th? t? câu h?i (danh sách id)
+            val idOrder: List<Int>? =
+                try {
+                    savedOrderJson?.let { gson.fromJson(it, Array<Int>::class.java)?.toList() }
+                } catch (_: Exception) {
+                    null
+                }
+
+            // Map id -> answer
+            val answersById: Map<Int, String>? =
+                try {
+                    savedAnswersJson?.let {
+                        gson.fromJson(
+                            it,
+                            object : com.google.gson.reflect.TypeToken<Map<Int, String>>() {}.type,
+                        )
+                    }
+                } catch (_: Exception) {
+                    null
+                }
+
+            // S?p x?p l?i theo order ?ã l?u n?u có, ?? map ?áp án v? ?úng câu
+            val orderedItems =
+                if (!idOrder.isNullOrEmpty()) {
+                    items.sortedBy { quiz -> idOrder.indexOf(quiz.id ?: -1) }
+                } else {
+                    items
+                }
+
+            vocabMCQAllQuestions = orderedItems
+            vocabMCQShuffledQuestions = orderedItems.toMutableList()
+
+            // Khôi ph?c ?áp án ng??i dùng theo id
+            vocabMCQUserAnswers.clear()
+            if (!answersById.isNullOrEmpty()) {
+                vocabMCQShuffledQuestions.forEachIndexed { idx, quiz ->
+                    val qid = quiz.id
+                    if (qid != null) {
+                        answersById[qid]?.let { ans -> vocabMCQUserAnswers[idx] = ans }
+                    }
+                }
+            }
+            showVocabMCQResult()
+            return
+        }
+
+        // L?u d? li?u g?c ?? dùng cho translate
+        vocabMCQsOriginal = items
+
+        // Checklist mode: hi?n th? t?ng câu h?i ng?u nhiên, tính ?i?m
+        vocabMCQAllQuestions = items
+        vocabMCQShuffledQuestions = items.shuffled().toMutableList()
+        vocabMCQCurrentIndex = 0
+        vocabMCQUserAnswers.clear()
+        vocabMCQScore = 0
+        vocabMCQIsQuizMode = true
+        vocabQuizCompleted = false
+
+        displayVocabMCQQuestion()
+    }
+
+    private fun checkQuizCompleted(quizType: String): Boolean {
+        if (noteId == -1L) return false
+        val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+        return prefs.getBoolean("note_${noteId}_${quizType}_completed", false)
+    }
+
+    private fun displayVocabMCQQuestion() {
+        binding.VocabMCQContainer.removeAllViews()
+
+        if (vocabMCQCurrentIndex >= vocabMCQShuffledQuestions.size) {
+            // H?t câu h?i, hi?n th? k?t qu?
+            showVocabMCQResult()
+            return
+        }
+
+        val quiz = vocabMCQShuffledQuestions[vocabMCQCurrentIndex]
+        val questionNumber = vocabMCQCurrentIndex + 1
+        val totalQuestions = vocabMCQShuffledQuestions.size
+
+        // Header: Question X of Y
+        val header =
+            TextView(this).apply {
+                text = "Question $questionNumber / $totalQuestions"
+                textSize = 16f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, android.R.color.black))
+                setPadding(0, 0, 0, 12.dpToPx())
+            }
+        binding.VocabMCQContainer.addView(header)
+
+        // Question text
+        val questionText =
+            TextView(this).apply {
+                val questionStr = quiz.question ?: ""
+                text = markdownBoldToSpannable(questionStr)
+                textSize = 15f
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, android.R.color.black))
+                setTextIsSelectable(true)
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+        binding.VocabMCQContainer.addView(questionText)
+
+        // Options
+        val optionsContainer =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+
+        var selectedAnswer: String? = vocabMCQUserAnswers[vocabMCQCurrentIndex]
+        var isAnswered = selectedAnswer != null
+        var nextButton: MaterialButton? = null
+
+        quiz.options.orEmpty().forEach { (key, value) ->
+            val optionButton =
+                MaterialButton(
+                        this,
+                        null,
+                        com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                    )
+                    .apply {
+                        text = markdownBoldToSpannable("$key: $value")
+                        textSize = 13f
+                        isAllCaps = false
+                        layoutParams =
+                            LinearLayout.LayoutParams(
+                                    LinearLayout.LayoutParams.MATCH_PARENT,
+                                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                                )
+                                .apply { topMargin = 4.dpToPx() }
+
+                        // Highlight selected/correct/incorrect answer if already answered
+                        if (isAnswered) {
+                            if (key == selectedAnswer) {
+                                // User's selected answer
+                                setBackgroundColor(
+                                    ContextCompat.getColor(
+                                        this@AISummaryActivity,
+                                        if (key == quiz.answer) android.R.color.holo_green_light
+                                        else android.R.color.holo_red_light,
+                                    )
+                                )
+                            } else if (key == quiz.answer) {
+                                // Correct answer (highlight if user was wrong)
+                                if (selectedAnswer != quiz.answer) {
+                                    setBackgroundColor(
+                                        ContextCompat.getColor(
+                                            this@AISummaryActivity,
+                                            android.R.color.holo_green_light,
+                                        )
+                                    )
+                                }
+                            }
+                            isEnabled = false
+                        }
+
+                        setOnClickListener {
+                            if (isAnswered) return@setOnClickListener
+
+                            selectedAnswer = key
+                            vocabMCQUserAnswers[vocabMCQCurrentIndex] = key
+                            isAnswered = true
+
+                            // Show correct/incorrect
+                            if (key == quiz.answer) {
+                                setBackgroundColor(
+                                    ContextCompat.getColor(
+                                        this@AISummaryActivity,
+                                        android.R.color.holo_green_light,
+                                    )
+                                )
+                                vocabMCQScore++
+                            } else {
+                                setBackgroundColor(
+                                    ContextCompat.getColor(
+                                        this@AISummaryActivity,
+                                        android.R.color.holo_red_light,
+                                    )
+                                )
+                                // Highlight correct answer
+                                for (i in 0 until optionsContainer.childCount) {
+                                    val child = optionsContainer.getChildAt(i) as? MaterialButton
+                                    if (
+                                        child?.text?.toString()?.startsWith(quiz.answer ?: "") ==
+                                            true
+                                    ) {
+                                        child.setBackgroundColor(
+                                            ContextCompat.getColor(
+                                                this@AISummaryActivity,
+                                                android.R.color.holo_green_light,
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Lock all options
+                            for (i in 0 until optionsContainer.childCount) {
+                                (optionsContainer.getChildAt(i) as? MaterialButton)?.isEnabled =
+                                    false
+                            }
+
+                            // Enable Next/View Results once answered
+                            nextButton?.isEnabled = true
+
+                            // Show explanation if available
+                            quiz.explanation?.let { explanation ->
+                                val explanationView =
+                                    TextView(this@AISummaryActivity).apply {
+                                        text = markdownBoldToSpannable("? $explanation")
+                                        textSize = 13f
+                                        setPadding(0, 12.dpToPx(), 0, 0)
+                                        setTextIsSelectable(true)
+                                    }
+                                binding.VocabMCQContainer.addView(explanationView)
+                            }
+                        }
+                    }
+            optionsContainer.addView(optionButton)
+        }
+        binding.VocabMCQContainer.addView(optionsContainer)
+
+        // Next / View Results button (always show; disabled until answered)
+        nextButton =
+            MaterialButton(
+                    this,
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                )
+                .apply {
+                    text =
+                        if (vocabMCQCurrentIndex < vocabMCQShuffledQuestions.size - 1)
+                            "Next Question"
+                        else "View Results"
+                    isEnabled = isAnswered
+                    setOnClickListener {
+                        if (!isAnswered) return@setOnClickListener
+                        vocabMCQCurrentIndex++
+                        displayVocabMCQQuestion()
+                    }
+                }
+        binding.VocabMCQContainer.addView(nextButton)
+    }
+
+    private fun showVocabMCQResult() {
+        vocabQuizCompleted = true
+        val totalQuestions = vocabMCQShuffledQuestions.size
+
+        // Load k?t qu? ?ã l?u n?u có (khi m? l?i)
+        if (noteId != -1L) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val savedScore = prefs.getInt("note_${noteId}_vocab_mcq_score", -1)
+            val savedTotal = prefs.getInt("note_${noteId}_vocab_mcq_total", -1)
+            if (savedScore >= 0 && savedTotal > 0) {
+                vocabMCQScore = savedScore
+            }
+        }
+
+        val percentage = if (totalQuestions > 0) (vocabMCQScore * 100 / totalQuestions) else 0
+
+        // L?u k?t qu? vào preferences
+        saveQuizResults()
+
+        val resultView =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+            }
+
+        // Title
+        resultView.addView(
+            TextView(this).apply {
+                text = "Quiz Complete!"
+                textSize = 20f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, android.R.color.black))
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+        )
+
+        // Score
+        resultView.addView(
+            TextView(this).apply {
+                text = "Score: $vocabMCQScore / $totalQuestions ($percentage%)"
+                textSize = 18f
+                setTypeface(null, Typeface.BOLD)
+                val color =
+                    if (percentage >= 80) android.R.color.holo_green_dark
+                    else if (percentage >= 60) android.R.color.holo_orange_dark
+                    else android.R.color.holo_red_dark
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, color))
+                setPadding(0, 0, 0, 8.dpToPx())
+            }
+        )
+
+        // Review button
+        val reviewButton =
+            MaterialButton(
+                    this,
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                )
+                .apply {
+                    text = "Review Answers"
+                    setOnClickListener { showVocabMCQReview() }
+                }
+        resultView.addView(reviewButton)
+
+        // Show overall statistics if all quizzes completed
+        if (vocabQuizCompleted && clozeQuizCompleted && matchPairsQuizCompleted) {
+            resultView.addView(
+                TextView(this).apply {
+                    text = "\n--- Overall Statistics ---"
+                    textSize = 16f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 16.dpToPx(), 0, 8.dpToPx())
+                }
+            )
+            showOverallStatistics(resultView)
+        }
+
+        binding.VocabMCQContainer.addView(resultView)
+    }
+
+    private fun showVocabMCQReview() {
+        binding.VocabMCQContainer.removeAllViews()
+
+        val title =
+            TextView(this).apply {
+                text = "Review Answers"
+                textSize = 20f
+                setTypeface(null, Typeface.BOLD)
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+        binding.VocabMCQContainer.addView(title)
+
+        vocabMCQShuffledQuestions.forEachIndexed { index, quiz ->
+            val userAnswer = vocabMCQUserAnswers[index]
+            val isCorrect = userAnswer == quiz.answer
+
+            val reviewCard =
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
+                    setBackgroundColor(
+                        ContextCompat.getColor(
+                            this@AISummaryActivity,
+                            if (isCorrect) android.R.color.holo_green_light
+                            else android.R.color.holo_red_light,
+                        )
+                    )
+                }
+
+            // Question
+            reviewCard.addView(
+                TextView(this).apply {
+                    text = "Q${index + 1}: ${quiz.question}"
+                    textSize = 15f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 0, 0, 8.dpToPx())
+                }
+            )
+
+            // User answer
+            reviewCard.addView(
+                TextView(this).apply {
+                    text = "Your answer: ${userAnswer ?: "Not answered"}"
+                    textSize = 14f
+                    setPadding(0, 0, 0, 4.dpToPx())
+                }
+            )
+
+            // Correct answer
+            reviewCard.addView(
+                TextView(this).apply {
+                    text = "Correct answer: ${quiz.answer}"
+                    textSize = 14f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 0, 0, 8.dpToPx())
+                }
+            )
+
+            // Explanation
+            quiz.explanation?.let { explanation ->
+                reviewCard.addView(
+                    TextView(this).apply {
+                        text = "Explanation: $explanation"
+                        textSize = 13f
+                        setPadding(0, 0, 0, 8.dpToPx())
+                    }
+                )
+            }
+
+            binding.VocabMCQContainer.addView(reviewCard)
+        }
     }
 
     private fun createVocabMCQView(quiz: VocabQuiz): View {
@@ -1071,18 +1772,11 @@ class AISummaryActivity : AppCompatActivity() {
                 setPadding(0, 12.dpToPx(), 0, 16.dpToPx())
             }
 
-        // Question text with vocab target if available
+        // Question text (không hi?n th? Target ?? không l? ?áp án)
         val questionText =
             TextView(this).apply {
                 val questionStr = quiz.question ?: ""
-                val vocabTarget = quiz.vocabTarget
-                val fullQuestion =
-                    if (!vocabTarget.isNullOrBlank()) {
-                        "$questionStr\n(Target: **$vocabTarget**)"
-                    } else {
-                        questionStr
-                    }
-                text = markdownBoldToSpannable(fullQuestion)
+                text = markdownBoldToSpannable(questionStr)
                 textSize = 15f
                 setTextColor(ContextCompat.getColor(this@AISummaryActivity, android.R.color.black))
                 setTextIsSelectable(true)
@@ -1221,34 +1915,36 @@ class AISummaryActivity : AppCompatActivity() {
         val items = cards.orEmpty()
         binding.FlashcardsCard.isVisible = items.isNotEmpty()
         binding.FlashcardsContainer.removeAllViews()
-        if (items.isEmpty()) return
+        if (items.isEmpty()) {
+            flashcardsOriginal = null
+            return
+        }
 
-        // Display each flashcard separately for better readability
-        items.forEachIndexed { index, card ->
-            val flashcardView =
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
-                }
+        // L?u d? li?u g?c ?? dùng cho translate
+        flashcardsOriginal = items
 
-            // Front side (word)
-            val word = card.word ?: card.front ?: ""
-            if (word.isNotBlank()) {
-                flashcardView.addView(
-                    TextView(this).apply {
-                        text = "• $word"
-                        textSize = 16f
-                        setTypeface(null, Typeface.BOLD)
-                        setTextColor(
-                            ContextCompat.getColor(this@AISummaryActivity, android.R.color.black)
-                        )
-                        setPadding(0, 0, 0, 8.dpToPx())
-                        setTextIsSelectable(true)
-                    }
-                )
+        flashcardIndex = flashcardIndex.coerceIn(0, items.size - 1)
+        val card = items[flashcardIndex]
+        val word = card.word ?: card.front ?: ""
+        val back = card.back
+
+        val container =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
             }
 
-            fun addField(label: String, value: String?) {
+        container.addView(
+            TextView(this).apply {
+                text = word
+                textSize = 18f
+                setTypeface(null, Typeface.BOLD)
+                setTextIsSelectable(true)
+            }
+        )
+
+        if (flashcardFlipped && back != null) {
+            fun addLine(label: String, value: String?) {
                 if (value.isNullOrBlank()) return
                 val text = "$label: $value"
                 val spannable = SpannableString(text)
@@ -1258,7 +1954,7 @@ class AISummaryActivity : AppCompatActivity() {
                     label.length + 1,
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
                 )
-                flashcardView.addView(
+                container.addView(
                     TextView(this).apply {
                         setText(spannable)
                         textSize = 14f
@@ -1267,56 +1963,48 @@ class AISummaryActivity : AppCompatActivity() {
                     }
                 )
             }
-
-            // Back side (meaning, example, etc.)
-            card.back?.let { back ->
-                back.meaning?.let { addField(getString(R.string.meaning), it) }
-                back.example?.let { addField(getString(R.string.example), it) }
-                back.usageNote?.let { addField(getString(R.string.note), it) }
-                back.synonyms
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { addField("Synonyms", it.joinToString(", ")) }
-                back.antonyms
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { addField("Antonyms", it.joinToString(", ")) }
-                back.quickTip?.let { addField("Quick Tip", it) }
-            }
-
-            // SRS Schedule
-            card.srsSchedule?.let { schedule ->
-                val srsInfo = buildString {
-                    schedule.initialPrompt?.let { append("Prompt: $it\n") }
-                    schedule.intervals?.let { intervals ->
-                        append("Review intervals: ${intervals.joinToString(", ")} days\n")
-                    }
-                    schedule.recallTask?.let { append("Task: $it") }
+            addLine(getString(R.string.meaning), back.meaning)
+            addLine(getString(R.string.example), back.example)
+            addLine(getString(R.string.note), back.usageNote)
+            if (!back.synonyms.isNullOrEmpty())
+                addLine("Synonyms", back.synonyms.joinToString(", "))
+            if (!back.antonyms.isNullOrEmpty())
+                addLine("Antonyms", back.antonyms.joinToString(", "))
+            back.quickTip?.let { addLine("Quick Tip", it) }
+        } else {
+            container.addView(
+                TextView(this).apply {
+                    text = getString(R.string.ai_flashcard_tap_to_flip)
+                    textSize = 14f
+                    setPadding(0, 8.dpToPx(), 0, 0)
+                    setTextColor(
+                        ContextCompat.getColor(this@AISummaryActivity, android.R.color.darker_gray)
+                    )
                 }
-                if (srsInfo.isNotBlank()) {
-                    addField("SRS Schedule", srsInfo)
-                }
-            }
+            )
+        }
 
-            // Add divider between flashcards (except last)
-            if (index < items.size - 1) {
-                flashcardView.addView(
-                    View(this).apply {
-                        layoutParams =
-                            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
-                                .apply {
-                                    topMargin = 8.dpToPx()
-                                    bottomMargin = 8.dpToPx()
-                                }
-                        setBackgroundColor(
-                            ContextCompat.getColor(
-                                this@AISummaryActivity,
-                                android.R.color.darker_gray,
-                            )
-                        )
-                    }
-                )
-            }
+        binding.FlashcardsContainer.addView(container)
 
-            binding.FlashcardsContainer.addView(flashcardView)
+        binding.FlashPrevButton.setOnClickListener {
+            flashcardIndex = (flashcardIndex - 1 + items.size) % items.size
+            flashcardFlipped = false
+            updateFlashcardsCard(items)
+        }
+        binding.FlashNextButton.setOnClickListener {
+            flashcardIndex = (flashcardIndex + 1) % items.size
+            flashcardFlipped = false
+            updateFlashcardsCard(items)
+        }
+        binding.FlashFlipButton.setOnClickListener {
+            flashcardFlipped = !flashcardFlipped
+            updateFlashcardsCard(items)
+        }
+        binding.FlashGotItButton.setOnClickListener {
+            Toast.makeText(this, getString(R.string.ai_got_it), Toast.LENGTH_SHORT).show()
+        }
+        binding.FlashAgainButton.setOnClickListener {
+            Toast.makeText(this, getString(R.string.ai_again), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1383,7 +2071,7 @@ class AISummaryActivity : AppCompatActivity() {
                         )
 
                         // Make each word bold
-                        val pattern = Regex("?\\s+([^:]+):")
+                        val pattern = Regex("•\\s+([^:]+):")
                         pattern.findAll(meaningText).forEach { match ->
                             val wordStart = labelLength + 1 + match.range.first
                             val wordEnd = labelLength + 1 + match.range.last - 1
@@ -1442,7 +2130,7 @@ class AISummaryActivity : AppCompatActivity() {
             // Section title with bullet
             sectionContainer.addView(
                 TextView(this).apply {
-                    text = "• $title"
+                    text = "? $title"
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
                     setTextColor(
@@ -1501,7 +2189,7 @@ class AISummaryActivity : AppCompatActivity() {
 
                 sectionContainer.addView(
                     TextView(this).apply {
-                        text = "• $groupName"
+                        text = "? $groupName"
                         textSize = 15f
                         setTypeface(null, Typeface.BOLD)
                         setTextColor(
@@ -1545,7 +2233,7 @@ class AISummaryActivity : AppCompatActivity() {
 
                 sectionContainer.addView(
                     TextView(this).apply {
-                        text = "• $groupName"
+                        text = "? $groupName"
                         textSize = 15f
                         setTypeface(null, Typeface.BOLD)
                         setTextColor(
@@ -1588,8 +2276,1468 @@ class AISummaryActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateClozeCard(clozeTests: List<ClozeTest>?) {
+        binding.ClozeCard.isVisible = !clozeTests.isNullOrEmpty()
+        binding.ClozeContainer.removeAllViews()
+        clozeTests ?: return
+
+        // L?y set_id t? cloze_tests ??u tiên (t?t c? ??u có cùng set_id)
+        val currentSetId = clozeTests.firstOrNull()?.setId
+
+        // Check xem set_id có thay ??i không (n?u có thì reset progress)
+        if (noteId != -1L) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val savedSetId = prefs.getInt("note_${noteId}_cloze_set_id", -1)
+            if (currentSetId != null && savedSetId != -1 && currentSetId != savedSetId) {
+                // set_id ?ã thay ??i ? reset progress
+                android.util.Log.d(
+                    "AISummaryActivity",
+                    "updateClozeCard: set_id changed ($savedSetId -> $currentSetId), resetting progress",
+                )
+                prefs.edit().apply {
+                    remove("note_${noteId}_cloze_completed")
+                    remove("note_${noteId}_cloze_score")
+                    remove("note_${noteId}_cloze_total")
+                    remove("note_${noteId}_cloze_set_id")
+                    remove("note_${noteId}_cloze_order")
+                    remove("note_${noteId}_cloze_answers")
+                    apply()
+                }
+                // Clear in-memory state to avoid showing stale data
+                clozeAllQuestions.clear()
+                clozeShuffledQuestions.clear()
+                clozeUserAnswersQuiz.clear()
+                clozeScore = 0
+                clozeCurrentIndex = 0
+                clozeQuizCompleted = false
+            }
+        }
+
+        // Ki?m tra xem quiz ?ã hoàn thành ch?a (sau khi ?ã reset n?u c?n)
+        val isCompleted = checkQuizCompleted("cloze")
+        if (isCompleted) {
+            // Load k?t qu? ?ã l?u và hi?n th?
+            clozeQuizCompleted = true
+            if (noteId != -1L) {
+                val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+                clozeScore = prefs.getInt("note_${noteId}_cloze_score", 0)
+                // Khôi ph?c th? t? câu h?i và ?áp án ?ã ch?n
+                val gson = Gson()
+                val savedOrderJson = prefs.getString("note_${noteId}_cloze_order", null)
+                val savedAnswersJson = prefs.getString("note_${noteId}_cloze_answers", null)
+
+                val idOrder: List<Int>? =
+                    try {
+                        savedOrderJson?.let { gson.fromJson(it, Array<Int>::class.java)?.toList() }
+                    } catch (_: Exception) {
+                        null
+                    }
+
+                val answersById: Map<Int, String>? =
+                    try {
+                        savedAnswersJson?.let {
+                            gson.fromJson(
+                                it,
+                                object : com.google.gson.reflect.TypeToken<Map<Int, String>>() {}
+                                    .type,
+                            )
+                        }
+                    } catch (_: Exception) {
+                        null
+                    }
+
+                // Flatten cloze -> blanks to list<Pair<ClozeTest, ClozeBlank>>
+                val allPairs = mutableListOf<Pair<ClozeTest, ClozeBlank>>()
+                clozeTests.forEach { c ->
+                    c.blanks?.forEach { b ->
+                        if (b.id != null && b.answer != null) {
+                            allPairs.add(Pair(c, b))
+                        }
+                    }
+                }
+
+                // Reorder by saved id order if available
+                val ordered =
+                    if (!idOrder.isNullOrEmpty()) {
+                        allPairs.sortedBy { pair -> idOrder.indexOf(pair.second.id ?: -1) }
+                    } else {
+                        allPairs
+                    }
+
+                clozeAllQuestions = ordered.toMutableList()
+                clozeShuffledQuestions = ordered.toMutableList()
+
+                // Khôi ph?c câu tr? l?i ng??i dùng theo id
+                clozeUserAnswersQuiz.clear()
+                if (!answersById.isNullOrEmpty()) {
+                    clozeShuffledQuestions.forEachIndexed { idx, (_, blank) ->
+                        val bid = blank.id
+                        if (bid != null) {
+                            answersById[bid]?.let { ans -> clozeUserAnswersQuiz[idx] = ans }
+                        }
+                    }
+                }
+            }
+            showClozeResult()
+            return
+        }
+
+        // L?u set_id ngay khi load data (?? check khi save)
+        if (noteId != -1L && currentSetId != null) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            prefs.edit().putInt("note_${noteId}_cloze_set_id", currentSetId).apply()
+        }
+
+        // Checklist mode: hi?n th? t?ng câu h?i ng?u nhiên, tính ?i?m
+        // Tách m?i blank thành m?t câu h?i riêng
+        clozeAllQuestions.clear()
+        clozeTests.forEachIndexed { clozeIdx, cloze ->
+            cloze.blanks?.forEach { blank ->
+                if (blank.answer != null) {
+                    clozeAllQuestions.add(Pair(cloze, blank))
+                }
+            }
+        }
+
+        clozeShuffledQuestions = clozeAllQuestions.shuffled().toMutableList()
+        clozeCurrentIndex = 0
+        clozeUserAnswersQuiz.clear()
+        clozeScore = 0
+        clozeIsQuizMode = true
+        clozeQuizCompleted = false
+
+        displayClozeQuestion()
+    }
+
+    private fun displayClozeQuestion() {
+        binding.ClozeContainer.removeAllViews()
+
+        if (clozeCurrentIndex >= clozeShuffledQuestions.size) {
+            // H?t câu h?i, hi?n th? k?t qu?
+            showClozeResult()
+            return
+        }
+
+        val (cloze, blank) = clozeShuffledQuestions[clozeCurrentIndex]
+        val questionNumber = clozeCurrentIndex + 1
+        val totalQuestions = clozeShuffledQuestions.size
+        val answer = blank.answer ?: ""
+
+        // Header: Question X of Y
+        val header =
+            TextView(this).apply {
+                text = "Question $questionNumber / $totalQuestions"
+                textSize = 16f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, android.R.color.black))
+                setPadding(0, 0, 0, 12.dpToPx())
+            }
+        binding.ClozeContainer.addView(header)
+
+        // Paragraph (câu h?i v?i blank)
+        cloze.paragraph
+            ?.takeIf { it.isNotBlank() }
+            ?.let { paragraph ->
+                val paragraphView =
+                    TextView(this).apply {
+                        text = paragraph
+                        textSize = 14f
+                        setPadding(0, 0, 0, 16.dpToPx())
+                        setTextIsSelectable(true)
+                    }
+                binding.ClozeContainer.addView(paragraphView)
+            }
+
+        // Input field
+        val row =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+
+        val edit =
+            android.widget.EditText(this).apply {
+                hint = getString(R.string.ai_fill_answer)
+                setText(clozeUserAnswersQuiz[clozeCurrentIndex] ?: "")
+                setTextIsSelectable(true)
+            }
+
+        val feedback =
+            TextView(this).apply {
+                textSize = 13f
+                setPadding(0, 8.dpToPx(), 0, 0)
+                visibility = View.GONE
+                movementMethod = LinkMovementMethod.getInstance()
+            }
+
+        val userAnswer = clozeUserAnswersQuiz[clozeCurrentIndex]
+        val isAnswered = userAnswer != null
+
+        if (isAnswered) {
+            val correct = userAnswer.equals(answer, ignoreCase = true)
+            edit.isEnabled = false
+            edit.setBackgroundColor(
+                ContextCompat.getColor(
+                    this@AISummaryActivity,
+                    if (correct) android.R.color.holo_green_light
+                    else android.R.color.holo_red_light,
+                )
+            )
+            feedback.visibility = View.VISIBLE
+            if (correct) {
+                val example = blank.onCorrectExample ?: ""
+                feedback.text = buildString {
+                    append(getString(R.string.ai_correct))
+                    if (example.isNotBlank()) append("\n").append(example)
+                }
+            } else {
+                val explanation = blank.explanation ?: ""
+                feedback.text = buildString {
+                    append(getString(R.string.ai_incorrect))
+                    append("\n").append("Correct answer: $answer")
+                    if (explanation.isNotBlank()) append("\n").append(explanation)
+                }
+            }
+        }
+
+        row.addView(edit)
+        row.addView(feedback)
+        binding.ClozeContainer.addView(row)
+
+        // Check/Next button
+        val actionButton =
+            MaterialButton(
+                    this,
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                )
+                .apply {
+                    if (isAnswered) {
+                        text =
+                            if (clozeCurrentIndex < clozeShuffledQuestions.size - 1) "Next Question"
+                            else "View Results"
+                        setOnClickListener {
+                            clozeCurrentIndex++
+                            displayClozeQuestion()
+                        }
+                    } else {
+                        text = getString(R.string.ai_check_answer)
+                        setOnClickListener {
+                            val user = edit.text.toString().trim()
+                            if (user.isBlank()) {
+                                Toast.makeText(
+                                        this@AISummaryActivity,
+                                        "Please enter an answer",
+                                        Toast.LENGTH_SHORT,
+                                    )
+                                    .show()
+                                return@setOnClickListener
+                            }
+
+                            clozeUserAnswersQuiz[clozeCurrentIndex] = user
+                            val correct = user.equals(answer, ignoreCase = true)
+
+                            if (correct) {
+                                clozeScore++
+                            }
+                            edit.isEnabled = false
+                            edit.setBackgroundColor(
+                                ContextCompat.getColor(
+                                    this@AISummaryActivity,
+                                    if (correct) {
+                                        android.R.color.holo_green_light
+                                    } else {
+                                        android.R.color.holo_red_light
+                                    },
+                                )
+                            )
+                            feedback.visibility = View.VISIBLE
+
+                            if (correct) {
+                                val example = blank.onCorrectExample ?: ""
+                                feedback.text = buildString {
+                                    append(getString(R.string.ai_correct))
+                                    if (example.isNotBlank()) append("\n").append(example)
+                                }
+                            } else {
+                                val explanation = blank.explanation ?: ""
+                                feedback.text = buildString {
+                                    append(getString(R.string.ai_incorrect))
+                                    append("\n").append("Correct answer: $answer")
+                                    if (explanation.isNotBlank()) append("\n").append(explanation)
+                                }
+                            }
+
+                            // Update button to Next
+                            text =
+                                if (clozeCurrentIndex < clozeShuffledQuestions.size - 1)
+                                    "Next Question"
+                                else "View Results"
+                            setOnClickListener {
+                                clozeCurrentIndex++
+                                displayClozeQuestion()
+                            }
+                        }
+                    }
+                }
+        binding.ClozeContainer.addView(actionButton)
+    }
+
+    private fun showClozeResult() {
+        clozeQuizCompleted = true
+        val totalQuestions = clozeShuffledQuestions.size
+        val percentage = if (totalQuestions > 0) (clozeScore * 100 / totalQuestions) else 0
+
+        // Load k?t qu? ?ã l?u n?u có (khi m? l?i)
+        if (noteId != -1L) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val savedScore = prefs.getInt("note_${noteId}_cloze_score", -1)
+            val savedTotal = prefs.getInt("note_${noteId}_cloze_total", -1)
+            if (savedScore >= 0 && savedTotal > 0) {
+                clozeScore = savedScore
+            }
+        }
+
+        // L?u k?t qu? vào preferences
+        saveQuizResults()
+
+        val resultView =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+            }
+
+        // Title
+        resultView.addView(
+            TextView(this).apply {
+                text = "Quiz Complete!"
+                textSize = 20f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, android.R.color.black))
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+        )
+
+        // Score
+        resultView.addView(
+            TextView(this).apply {
+                text = "Score: $clozeScore / $totalQuestions ($percentage%)"
+                textSize = 18f
+                setTypeface(null, Typeface.BOLD)
+                val color =
+                    if (percentage >= 80) android.R.color.holo_green_dark
+                    else if (percentage >= 60) android.R.color.holo_orange_dark
+                    else android.R.color.holo_red_dark
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, color))
+                setPadding(0, 0, 0, 8.dpToPx())
+            }
+        )
+
+        // Review button
+        val reviewButton =
+            MaterialButton(
+                    this,
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                )
+                .apply {
+                    text = "Review Answers"
+                    setOnClickListener { showClozeReview() }
+                }
+        resultView.addView(reviewButton)
+
+        // Show overall statistics if all quizzes completed
+        if (vocabQuizCompleted && clozeQuizCompleted && matchPairsQuizCompleted) {
+            resultView.addView(
+                TextView(this).apply {
+                    text = "\n--- Overall Statistics ---"
+                    textSize = 16f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 16.dpToPx(), 0, 8.dpToPx())
+                }
+            )
+            showOverallStatistics(resultView)
+        }
+
+        binding.ClozeContainer.addView(resultView)
+    }
+
+    private fun showClozeReview() {
+        binding.ClozeContainer.removeAllViews()
+
+        val title =
+            TextView(this).apply {
+                text = "Review Answers"
+                textSize = 20f
+                setTypeface(null, Typeface.BOLD)
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+        binding.ClozeContainer.addView(title)
+
+        clozeShuffledQuestions.forEachIndexed { index, (cloze, blank) ->
+            val userAnswer = clozeUserAnswersQuiz[index]
+            val correctAnswer = blank.answer ?: ""
+            val isCorrect = userAnswer?.equals(correctAnswer, ignoreCase = true) == true
+
+            val reviewCard =
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(16.dpToPx(), 12.dpToPx(), 16.dpToPx(), 12.dpToPx())
+                    setBackgroundColor(
+                        ContextCompat.getColor(
+                            this@AISummaryActivity,
+                            if (isCorrect) android.R.color.holo_green_light
+                            else android.R.color.holo_red_light,
+                        )
+                    )
+                }
+
+            // Question
+            reviewCard.addView(
+                TextView(this).apply {
+                    text = "Q${index + 1}: ${cloze.paragraph}"
+                    textSize = 15f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 0, 0, 8.dpToPx())
+                }
+            )
+
+            // User answer
+            reviewCard.addView(
+                TextView(this).apply {
+                    text = "Your answer: ${userAnswer ?: "Not answered"}"
+                    textSize = 14f
+                    setPadding(0, 0, 0, 4.dpToPx())
+                }
+            )
+
+            // Correct answer
+            reviewCard.addView(
+                TextView(this).apply {
+                    text = "Correct answer: $correctAnswer"
+                    textSize = 14f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 0, 0, 8.dpToPx())
+                }
+            )
+
+            // Explanation
+            blank.explanation?.let { explanation ->
+                reviewCard.addView(
+                    TextView(this).apply {
+                        text = "Explanation: $explanation"
+                        textSize = 13f
+                        setPadding(0, 0, 0, 8.dpToPx())
+                    }
+                )
+            }
+
+            binding.ClozeContainer.addView(reviewCard)
+        }
+    }
+
+    private fun saveQuizResults() {
+        // L?u k?t qu? vào preferences ?? tracking
+        if (noteId != -1L) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+
+            if (vocabQuizCompleted) {
+                editor.putBoolean("note_${noteId}_vocab_mcq_completed", true)
+                editor.putInt("note_${noteId}_vocab_mcq_score", vocabMCQScore)
+                editor.putInt("note_${noteId}_vocab_mcq_total", vocabMCQShuffledQuestions.size)
+                // L?u th? t? câu h?i và ?áp án (?? xem l?i v?n ?úng màu)
+                val idOrder = vocabMCQShuffledQuestions.map { it.id ?: -1 }
+                val answersById = mutableMapOf<Int, String>()
+                vocabMCQUserAnswers.forEach { (idx, ans) ->
+                    idOrder.getOrNull(idx)?.let { qid -> if (qid != -1) answersById[qid] = ans }
+                }
+                val gson = Gson()
+                editor.putString("note_${noteId}_vocab_mcq_order", gson.toJson(idOrder))
+                editor.putString("note_${noteId}_vocab_mcq_answers", gson.toJson(answersById))
+            }
+
+            if (clozeQuizCompleted) {
+                editor.putBoolean("note_${noteId}_cloze_completed", true)
+                editor.putInt("note_${noteId}_cloze_score", clozeScore)
+                editor.putInt("note_${noteId}_cloze_total", clozeShuffledQuestions.size)
+                // set_id ?ã ???c l?u khi updateClozeCard
+                // L?u th? t? blank id và ?áp án ng??i dùng
+                val idOrder = clozeShuffledQuestions.map { it.second.id ?: -1 }
+                val answersById = mutableMapOf<Int, String>()
+                clozeShuffledQuestions.forEachIndexed { idx, (_, blank) ->
+                    val bid = blank.id ?: return@forEachIndexed
+                    clozeUserAnswersQuiz[idx]?.let { ans -> answersById[bid] = ans }
+                }
+                val gson = Gson()
+                editor.putString("note_${noteId}_cloze_order", gson.toJson(idOrder))
+                editor.putString("note_${noteId}_cloze_answers", gson.toJson(answersById))
+            }
+
+            if (matchPairsQuizCompleted) {
+                editor.putBoolean("note_${noteId}_match_pairs_completed", true)
+                editor.putInt("note_${noteId}_match_pairs_score", matchPairsScore)
+                editor.putInt("note_${noteId}_match_pairs_total", matchPairsTotal)
+                // set_id ?ã ???c l?u khi updateMatchPairsCard
+            }
+
+            // L?u progress chi ti?t per-vocab cho Match Pairs
+            if (matchPairsUniqueWords.isNotEmpty()) {
+                try {
+                    val progressList = matchPairsVocabProgress.values.toList()
+                    val json = Gson().toJson(progressList)
+                    editor.putString("note_${noteId}_match_pairs_vocab_progress", json)
+                } catch (e: Exception) {
+                    android.util.Log.e(
+                        "AISummaryActivity",
+                        "saveQuizResults: error saving match pairs vocab progress",
+                        e,
+                    )
+                }
+            }
+
+            editor.apply()
+
+            // Sau khi l?u, c?p nh?t l?i Overall Progress Card ?? ph?n ánh ?i?m m?i
+            updateOverallProgressCardSummary()
+        }
+    }
+
+    /** Load progress chi ti?t Match Pairs theo vocab t? SharedPreferences */
+    private fun loadMatchPairsVocabProgress() {
+        matchPairsVocabProgress.clear()
+        if (noteId == -1L) return
+
+        try {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val json = prefs.getString("note_${noteId}_match_pairs_vocab_progress", null)
+            if (!json.isNullOrBlank()) {
+                val gson = Gson()
+                val arr = gson.fromJson(json, Array<MatchPairVocabProgress>::class.java)
+                arr?.forEach { prog ->
+                    val key = prog.vocab.lowercase().trim()
+                    if (key.isNotBlank()) {
+                        matchPairsVocabProgress[key] = prog
+                        if (prog.status == "completed") {
+                            matchPairsWordsMatched.add(key)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AISummaryActivity", "loadMatchPairsVocabProgress: error", e)
+        }
+    }
+
+    private fun showOverallStatistics(container: LinearLayout) {
+        // N?u ?ang ? ch? ?? statsOnly: tính toán tr?c ti?p t? SummaryResponse + SharedPreferences
+        if (statsOnly && noteId != -1L && summaryResponse != null) {
+            val vocabStats = mutableMapOf<String, VocabStat>()
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val gson = Gson()
+
+            val resp = summaryResponse!!
+
+            // ---- MCQ t? prefs ----
+            val mcqs = (resp.vocabMcqs ?: resp.review?.vocabMcqs).orEmpty()
+            if (mcqs.isNotEmpty()) {
+                val answersJson = prefs.getString("note_${noteId}_vocab_mcq_answers", null)
+                val answersById: Map<Int, String> =
+                    try {
+                        answersJson?.let {
+                            gson.fromJson(
+                                it,
+                                object : com.google.gson.reflect.TypeToken<Map<Int, String>>() {}
+                                    .type,
+                            )
+                        } ?: emptyMap()
+                    } catch (_: Exception) {
+                        emptyMap()
+                    }
+
+                mcqs.forEach { quiz ->
+                    val vocab = quiz.vocabTarget?.lowercase()?.trim() ?: return@forEach
+                    val questionType = quiz.questionType?.lowercase()?.trim()
+                    val weight =
+                        when (questionType) {
+                            "meaning" -> 1
+                            "context" -> 1
+                            else -> 1
+                        }
+                    val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                    stat.maxPoints += weight
+                    val qid = quiz.id
+                    if (qid != null && answersById[qid] == quiz.answer) {
+                        stat.earnedPoints += weight
+                    }
+                }
+            }
+
+            // ---- Cloze t? prefs ----
+            val clozeTests = (resp.clozeTests ?: resp.review?.clozeTests).orEmpty()
+            if (clozeTests.isNotEmpty()) {
+                val answersJson = prefs.getString("note_${noteId}_cloze_answers", null)
+                val answersById: Map<Int, String> =
+                    try {
+                        answersJson?.let {
+                            gson.fromJson(
+                                it,
+                                object : com.google.gson.reflect.TypeToken<Map<Int, String>>() {}
+                                    .type,
+                            )
+                        } ?: emptyMap()
+                    } catch (_: Exception) {
+                        emptyMap()
+                    }
+
+                clozeTests.forEach { cloze ->
+                    cloze.blanks?.forEach { blank ->
+                        val bid = blank.id ?: return@forEach
+                        val ans = blank.answer ?: return@forEach
+                        val vocab = (cloze.vocab?.lowercase()?.trim() ?: ans.lowercase().trim())
+                        val clozeType = cloze.type?.lowercase()?.trim()
+                        val weight =
+                            when (clozeType) {
+                                "basic_usage" -> 2
+                                "context_usage" -> 2
+                                else -> 2
+                            }
+                        val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                        stat.maxPoints += weight
+                        if (answersById[bid]?.equals(ans, ignoreCase = true) == true) {
+                            stat.earnedPoints += weight
+                        }
+                    }
+                }
+            }
+
+            // ---- Match Pairs t? prefs ----
+            val progressJson = prefs.getString("note_${noteId}_match_pairs_vocab_progress", null)
+            if (!progressJson.isNullOrBlank()) {
+                try {
+                    val arr = gson.fromJson(progressJson, Array<MatchPairVocabProgress>::class.java)
+                    arr?.forEach { prog ->
+                        val vocab = prog.vocab.lowercase().trim()
+                        if (vocab.isNotBlank()) {
+                            val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                            stat.maxPoints += 1
+                            if (prog.status == "completed") {
+                                stat.earnedPoints += 1
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    // ignore parse errors
+                }
+            }
+
+            // T?ng ?i?m cho c? ghi chú
+            var totalEarned = 0
+            var totalMax = 0
+            vocabStats.values.forEach { s ->
+                totalEarned += s.earnedPoints
+                totalMax += s.maxPoints
+            }
+            val overallPercentage = if (totalMax > 0) (totalEarned * 100 / totalMax) else 0
+
+            container.addView(
+                TextView(this).apply {
+                    text = "\nTotal Mastery Score: $totalEarned / $totalMax ($overallPercentage%)"
+                    textSize = 16f
+                    setTypeface(null, Typeface.BOLD)
+                    val color =
+                        if (overallPercentage >= 80) {
+                            android.R.color.holo_green_dark
+                        } else if (overallPercentage >= 60) {
+                            android.R.color.holo_orange_dark
+                        } else {
+                            android.R.color.holo_red_dark
+                        }
+                    setTextColor(ContextCompat.getColor(this@AISummaryActivity, color))
+                    setPadding(0, 8.dpToPx(), 0, 16.dpToPx())
+                }
+            )
+
+            // Th?ng kê theo t? v?ng
+            container.addView(
+                TextView(this).apply {
+                    text = "\nVocabulary Statistics:"
+                    textSize = 16f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
+                }
+            )
+
+            vocabStats.values
+                .sortedByDescending { it.percentage }
+                .forEach { stat ->
+                    container.addView(
+                        TextView(this).apply {
+                            text =
+                                "${stat.vocab}: ${stat.earnedPoints}/${stat.maxPoints} (${stat.percentage}%)"
+                            textSize = 14f
+                            val color =
+                                if (stat.percentage >= 80) {
+                                    android.R.color.holo_green_dark
+                                } else if (stat.percentage >= 60) {
+                                    android.R.color.holo_orange_dark
+                                } else {
+                                    android.R.color.holo_red_dark
+                                }
+                            setTextColor(ContextCompat.getColor(this@AISummaryActivity, color))
+                            setPadding(0, 2.dpToPx(), 0, 2.dpToPx())
+                        }
+                    )
+                }
+            return
+        }
+
+        // M?c ??nh: dùng state hi?n t?i (khi ?ang ? màn quiz)
+        val vocabStats = mutableMapOf<String, VocabStat>()
+
+        // Vocab MCQ stats (weighted)
+        vocabMCQShuffledQuestions.forEachIndexed { index, quiz ->
+            val vocab = quiz.vocabTarget?.lowercase()?.trim() ?: return@forEachIndexed
+            val questionType = quiz.questionType?.lowercase()?.trim()
+            val weight =
+                when (questionType) {
+                    "meaning" -> 1
+                    "context" -> 1
+                    else -> 1
+                }
+            val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+            stat.maxPoints += weight
+            if (vocabMCQUserAnswers[index] == quiz.answer) {
+                stat.earnedPoints += weight
+            }
+        }
+
+        // Cloze stats (weighted)
+        clozeShuffledQuestions.forEachIndexed { index, (cloze, blank) ->
+            val vocab =
+                (cloze.vocab?.lowercase()?.trim() ?: blank.answer?.lowercase()?.trim())
+                    ?: return@forEachIndexed
+            val clozeType = cloze.type?.lowercase()?.trim()
+            val weight =
+                when (clozeType) {
+                    "basic_usage" -> 2
+                    "context_usage" -> 2
+                    else -> 2
+                }
+            val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+            stat.maxPoints += weight
+            if (clozeUserAnswersQuiz[index]?.equals(blank.answer, ignoreCase = true) == true) {
+                stat.earnedPoints += weight
+            }
+        }
+
+        // Match Pairs stats
+        if (matchPairsUniqueWords.isNotEmpty()) {
+            val matchPairsPercentage =
+                if (matchPairsTotal > 0) (matchPairsScore * 100 / matchPairsTotal) else 0
+            if (matchPairsTotal > 0) {
+                container.addView(
+                    TextView(this).apply {
+                        text =
+                            "Match Pairs: $matchPairsScore / $matchPairsTotal ($matchPairsPercentage%)"
+                        textSize = 14f
+                        setPadding(0, 4.dpToPx(), 0, 4.dpToPx())
+                    }
+                )
+            }
+
+            matchPairsUniqueWords.forEach { vocab ->
+                val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                stat.maxPoints += 1
+                if (matchPairsWordsMatched.contains(vocab)) {
+                    stat.earnedPoints += 1
+                }
+            }
+        }
+
+        var totalEarned = 0
+        var totalMax = 0
+        vocabStats.values.forEach { s ->
+            totalEarned += s.earnedPoints
+            totalMax += s.maxPoints
+        }
+        val overallPercentage = if (totalMax > 0) (totalEarned * 100 / totalMax) else 0
+
+        container.addView(
+            TextView(this).apply {
+                text = "\nTotal Mastery Score: $totalEarned / $totalMax ($overallPercentage%)"
+                textSize = 16f
+                setTypeface(null, Typeface.BOLD)
+                val color =
+                    if (overallPercentage >= 80) {
+                        android.R.color.holo_green_dark
+                    } else if (overallPercentage >= 60) {
+                        android.R.color.holo_orange_dark
+                    } else {
+                        android.R.color.holo_red_dark
+                    }
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, color))
+                setPadding(0, 8.dpToPx(), 0, 16.dpToPx())
+            }
+        )
+
+        container.addView(
+            TextView(this).apply {
+                text = "\nVocabulary Statistics:"
+                textSize = 16f
+                setTypeface(null, Typeface.BOLD)
+                setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
+            }
+        )
+
+        vocabStats.values
+            .sortedByDescending { it.percentage }
+            .forEach { stat ->
+                container.addView(
+                    TextView(this).apply {
+                        text =
+                            "${stat.vocab}: ${stat.earnedPoints}/${stat.maxPoints} (${stat.percentage}%)"
+                        textSize = 14f
+                        val color =
+                            if (stat.percentage >= 80) {
+                                android.R.color.holo_green_dark
+                            } else if (stat.percentage >= 60) {
+                                android.R.color.holo_orange_dark
+                            } else {
+                                android.R.color.holo_red_dark
+                            }
+                        setTextColor(ContextCompat.getColor(this@AISummaryActivity, color))
+                        setPadding(0, 2.dpToPx(), 0, 2.dpToPx())
+                    }
+                )
+            }
+    }
+
+    /**
+     * C?p nh?t Overall Progress Card ? ??u ghi chú (summary ng?n g?n) S? d?ng cùng tr?ng s? nh?
+     * showOverallStatistics nh?ng ch? hi?n th?:
+     * - Note Progress (%)
+     * - S? vocab ?ã master / t?ng vocab
+     */
+    private fun updateOverallProgressCardSummary() {
+        // N?u ch?a có d? li?u vocab/quizzes thì ?n card
+        if (
+            vocabMCQShuffledQuestions.isEmpty() &&
+                clozeShuffledQuestions.isEmpty() &&
+                matchPairsUniqueWords.isEmpty()
+        ) {
+            binding.OverallProgressCard.isVisible = false
+            return
+        }
+
+        val vocabStats = mutableMapOf<String, VocabStat>()
+
+        // MCQ (meaning/context) - weight 1
+        vocabMCQShuffledQuestions.forEachIndexed { index, quiz ->
+            val vocab = quiz.vocabTarget?.lowercase()?.trim() ?: return@forEachIndexed
+            val questionType = quiz.questionType?.lowercase()?.trim()
+            val weight =
+                when (questionType) {
+                    "meaning" -> 1
+                    "context" -> 1
+                    else -> 1
+                }
+            val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+            stat.maxPoints += weight
+            if (vocabMCQUserAnswers[index] == quiz.answer) {
+                stat.earnedPoints += weight
+            }
+        }
+
+        // Cloze (basic/context) - weight 2
+        clozeShuffledQuestions.forEachIndexed { index, (cloze, blank) ->
+            val vocab =
+                (cloze.vocab?.lowercase()?.trim() ?: blank.answer?.lowercase()?.trim())
+                    ?: return@forEachIndexed
+            val clozeType = cloze.type?.lowercase()?.trim()
+            val weight =
+                when (clozeType) {
+                    "basic_usage" -> 2
+                    "context_usage" -> 2
+                    else -> 2
+                }
+            val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+            stat.maxPoints += weight
+            if (clozeUserAnswersQuiz[index]?.equals(blank.answer, ignoreCase = true) == true) {
+                stat.earnedPoints += weight
+            }
+        }
+
+        // Match Pairs - weight 1 theo t?
+        if (matchPairsUniqueWords.isNotEmpty()) {
+            matchPairsUniqueWords.forEach { vocab ->
+                val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                stat.maxPoints += 1
+                if (matchPairsWordsMatched.contains(vocab)) {
+                    stat.earnedPoints += 1
+                }
+            }
+        }
+
+        if (vocabStats.isEmpty()) {
+            binding.OverallProgressCard.isVisible = false
+            return
+        }
+
+        var totalEarned = 0
+        var totalMax = 0
+        vocabStats.values.forEach { s ->
+            totalEarned += s.earnedPoints
+            totalMax += s.maxPoints
+        }
+
+        if (totalMax == 0) {
+            binding.OverallProgressCard.isVisible = false
+            return
+        }
+
+        val overallPercentage = (totalEarned * 100 / totalMax)
+        val masteredCount =
+            vocabStats.values.count { it.earnedPoints >= it.maxPoints && it.maxPoints > 0 }
+        val totalVocab = vocabStats.size
+
+        binding.OverallProgressCard.isVisible = true
+        binding.OverallProgressTitle.text = "Note Progress: $overallPercentage%"
+        binding.OverallProgressSubtitle.text = "Mastered $masteredCount / $totalVocab vocab"
+    }
+
+    private data class VocabStat(
+        val vocab: String,
+        var earnedPoints: Int = 0,
+        var maxPoints: Int = 0,
+    ) {
+        val percentage: Int
+            get() = if (maxPoints > 0) (earnedPoints * 100 / maxPoints) else 0
+    }
+
+    private fun updateMatchPairsCard(pairs: List<MatchPair>?) {
+        binding.MatchPairsCard.isVisible = !pairs.isNullOrEmpty()
+        binding.MatchPairsContainer.removeAllViews()
+
+        if (pairs.isNullOrEmpty()) {
+            android.util.Log.d("AISummaryActivity", "updateMatchPairsCard: pairs is null or empty")
+            return
+        }
+
+        android.util.Log.d("AISummaryActivity", "updateMatchPairsCard: pairs count=${pairs.size}")
+
+        // L?y set_id t? match_pairs ??u tiên (t?t c? ??u có cùng set_id)
+        val currentSetId = pairs.firstOrNull()?.setId
+
+        // Check xem set_id có thay ??i không (n?u có thì reset progress)
+        if (noteId != -1L) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            val savedSetId = prefs.getInt("note_${noteId}_match_pairs_set_id", -1)
+            if (currentSetId != null && savedSetId != -1 && currentSetId != savedSetId) {
+                // set_id ?ã thay ??i ? reset progress
+                android.util.Log.d(
+                    "AISummaryActivity",
+                    "updateMatchPairsCard: set_id changed ($savedSetId -> $currentSetId), resetting progress",
+                )
+                prefs.edit().apply {
+                    remove("note_${noteId}_match_pairs_completed")
+                    remove("note_${noteId}_match_pairs_score")
+                    remove("note_${noteId}_match_pairs_total")
+                    remove("note_${noteId}_match_pairs_set_id")
+                    remove("note_${noteId}_match_pairs_vocab_progress")
+                    apply()
+                }
+                // Clear in-memory state to avoid showing stale data
+                matchPairsAll = null
+                matchPairsState = null
+                matchPairsWordsMatched.clear()
+                matchPairsVocabProgress.clear()
+                matchPairsUniqueWords = emptySet()
+                matchPairsScore = 0
+                matchPairsTotal = 0
+                matchPairsQuizCompleted = false
+            }
+        }
+
+        // L?u toàn b? pairs
+        matchPairsAll = pairs.toMutableList()
+
+        // L?y t?t c? các t? unique ?? tính ?i?m theo t?
+        matchPairsUniqueWords =
+            pairs.mapNotNull { it.word?.lowercase()?.trim() }.filter { it.isNotBlank() }.toSet()
+
+        // Kh?i t?o total theo s? vocab unique
+        matchPairsTotal = matchPairsUniqueWords.size
+
+        // L?u set_id ngay khi load data (?? check khi save)
+        if (noteId != -1L && currentSetId != null) {
+            val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+            prefs.edit().putInt("note_${noteId}_match_pairs_set_id", currentSetId).apply()
+        }
+
+        // Load progress ?ã l?u (n?u có)
+        matchPairsWordsMatched.clear()
+        matchPairsVocabProgress.clear()
+        loadMatchPairsVocabProgress()
+
+        // ??m b?o t?t c? vocab ??u có entry trong progress
+        matchPairsUniqueWords.forEach { vocab ->
+            val key = vocab.lowercase().trim()
+            if (key.isNotBlank() && !matchPairsVocabProgress.containsKey(key)) {
+                matchPairsVocabProgress[key] = MatchPairVocabProgress(vocab = key)
+            }
+        }
+
+        // C?p nh?t score t? progress (s? vocab ?ã completed)
+        matchPairsWordsMatched =
+            matchPairsVocabProgress.values
+                .filter { it.status == "completed" }
+                .map { it.vocab.lowercase().trim() }
+                .toMutableSet()
+        matchPairsScore = matchPairsWordsMatched.size
+
+        // N?u t?t c? vocab ??u completed -> quiz hoàn thành
+        if (matchPairsWordsMatched.size >= matchPairsUniqueWords.size && matchPairsTotal > 0) {
+            matchPairsQuizCompleted = true
+            saveQuizResults()
+            showMatchPairsResult()
+            return
+        } else {
+            matchPairsQuizCompleted = false
+        }
+
+        // L?y ngh?a ti?ng Vi?t t? summaryTable d?a trên word
+        fun getVietnameseTranslation(word: String?): String? {
+            if (word.isNullOrBlank()) return null
+            // Tìm translation t? summaryTable
+            return summaryTableState
+                ?.firstOrNull { it.word?.equals(word, ignoreCase = true) == true }
+                ?.translation
+        }
+
+        // Rút g?n ngh?a ?? hi?n th? ng?n g?n (t?i ?a 25 ký t? ?? ?? hi?n th? trong ô)
+        fun shortenMeaning(meaning: String?): String {
+            if (meaning.isNullOrBlank()) return ""
+            val text = meaning.trim()
+            // Lo?i b? các prefix nh? "Ngh?a c?a", "Ý ngh?a", v.v.
+            val cleaned =
+                text.replace(
+                    Regex(
+                        "^(Ngh?a c?a|Ý ngh?a|Ngh?a|Meaning of|Meaning|con|Con)\\s*:?\\s*",
+                        RegexOption.IGNORE_CASE,
+                    ),
+                    "",
+                )
+            // L?y ph?n ??u tiên, lo?i b? d?u câu
+            val firstPart = cleaned.split(Regex("[,?.?()??\\-–—]")).firstOrNull()?.trim() ?: cleaned
+            // Gi?i h?n 25 ký t? ?? v?a v?i ô
+            return if (firstPart.length > 25) firstPart.take(25).trim() + "..." else firstPart
+        }
+
+        /**
+         * Render m?t l??t (round) 4x4 v?i t?i ?a 8 t? v?ng, ?u tiên các t? CH?A completed, ch?m
+         * ?i?m theo t?.
+         *
+         * Sau khi hoàn thành h?t các t? trong round hi?n t?i:
+         * - N?u v?n còn t? ch?a hoàn thành trong note ? t? ??ng render round m?i.
+         * - N?u ?ã hoàn thành h?t t?t c? t? ? hi?n th? k?t qu? cu?i cùng.
+         */
+        var currentRoundWords: MutableSet<String> = mutableSetOf()
+
+        fun renderRound() {
+            val allPairs = matchPairsAll ?: return
+
+            // N?u ?ã hoàn thành h?t thì hi?n th? k?t qu?
+            if (
+                matchPairsQuizCompleted || matchPairsWordsMatched.size >= matchPairsUniqueWords.size
+            ) {
+                matchPairsQuizCompleted = true
+                saveQuizResults()
+                showMatchPairsResult()
+                return
+            }
+
+            // Danh sách vocab ch?a hoàn thành
+            val unfinishedVocab =
+                matchPairsUniqueWords.filter { vocab ->
+                    val prog = matchPairsVocabProgress[vocab]
+                    prog?.status != "completed"
+                }
+
+            if (unfinishedVocab.isEmpty()) {
+                matchPairsQuizCompleted = true
+                saveQuizResults()
+                showMatchPairsResult()
+                return
+            }
+
+            // ?u tiên vocab có attempts cao h?n (b? sai nhi?u) r?i shuffle và l?y t?i ?a 8
+            val sortedByAttempts =
+                unfinishedVocab.sortedByDescending { matchPairsVocabProgress[it]?.attempts ?: 0 }
+            val vocabForRound =
+                if (sortedByAttempts.size <= 8) sortedByAttempts.shuffled()
+                else sortedByAttempts.shuffled().take(8)
+
+            // L?u l?i danh sách vocab c?a round hi?n t?i (?? bi?t khi nào hoàn thành round này)
+            currentRoundWords.clear()
+            currentRoundWords.addAll(vocabForRound.map { it.lowercase().trim() })
+
+            // Ch?n 1 pair cho m?i vocab (n?u có nhi?u pair cho cùng 1 t? thì l?y c?p ??u tiên)
+            val selected = mutableListOf<MatchPair>()
+            vocabForRound.forEach { vocab ->
+                val p = allPairs.firstOrNull { it.word?.equals(vocab, ignoreCase = true) == true }
+                if (p != null) selected.add(p)
+            }
+
+            if (selected.isEmpty()) {
+                android.util.Log.w(
+                    "AISummaryActivity",
+                    "renderRound: no selected pairs for this round",
+                )
+                matchPairsQuizCompleted = true
+                saveQuizResults()
+                showMatchPairsResult()
+                return
+            }
+
+            matchPairsState = selected.toMutableList()
+            matchPairsRevealed.clear()
+            matchFirstSelection = null
+
+            // Data class ?? l?u tile info
+            data class TileInfo(
+                val key: Int,
+                val text: String,
+                val type: String,
+                val wordKey: String,
+            )
+
+            val tiles = mutableListOf<TileInfo>()
+            selected.forEachIndexed { idx, pair ->
+                val wordRaw = pair.word?.takeIf { it.isNotBlank() } ?: return@forEachIndexed
+                val key = idx + 1 // unique per pair
+                val meaning = getVietnameseTranslation(wordRaw) ?: pair.meaning ?: pair.hint
+                val shortenedMeaning = shortenMeaning(meaning)
+                val finalMeaning = if (shortenedMeaning.isNotBlank()) shortenedMeaning else wordRaw
+                if (wordRaw.isNotBlank() && finalMeaning.isNotBlank()) {
+                    val wordKey = wordRaw.lowercase().trim()
+                    tiles.add(TileInfo(key, wordRaw, "word", wordKey))
+                    tiles.add(TileInfo(key, finalMeaning, "meaning", wordKey))
+                }
+            }
+
+            if (tiles.isEmpty()) {
+                android.util.Log.w(
+                    "AISummaryActivity",
+                    "updateMatchPairsCard: No valid tiles created from pairs",
+                )
+                binding.MatchPairsCard.isVisible = false
+                return
+            }
+
+            tiles.shuffle()
+
+            // Tính s? c?t và hàng d?a trên s? l??ng tiles (4x4 ho?c ít h?n nh?ng v?n 4 c?t)
+            val totalTiles = tiles.size
+            val columnCount = 4
+            val rowCount = (totalTiles + columnCount - 1) / columnCount // Làm tròn lên
+
+            val grid =
+                GridLayout(this).apply {
+                    this.columnCount = columnCount
+                    this.rowCount = rowCount
+                    setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
+                    layoutParams =
+                        LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                        )
+                }
+
+            // Map ?? l?u word t??ng ?ng v?i key
+            val keyToWordMap = mutableMapOf<Int, String>()
+            tiles.forEach { tile -> keyToWordMap[tile.key] = tile.wordKey }
+
+            tiles.forEachIndexed { idx, tile ->
+                val btn =
+                    MaterialButton(this).apply {
+                        this.text = tile.text
+                        isAllCaps = false
+                        tag = tile // L?u toàn b? TileInfo vào tag
+                        maxLines = 2
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        textSize = 11f
+                        setTextColor(Color.BLACK)
+                        gravity = android.view.Gravity.CENTER
+                        setTypeface(null, Typeface.NORMAL)
+                        backgroundTintList = ColorStateList.valueOf(Color.parseColor("#E6E8F0"))
+                        minHeight = 0
+                        minWidth = 0
+                        setPadding(4.dpToPx(), 4.dpToPx(), 4.dpToPx(), 4.dpToPx())
+                        layoutParams =
+                            GridLayout.LayoutParams().apply {
+                                width = 0
+                                height = GridLayout.LayoutParams.WRAP_CONTENT
+                                columnSpec = GridLayout.spec(idx % columnCount, 1f)
+                                rowSpec = GridLayout.spec(idx / columnCount)
+                                setMargins(4.dpToPx(), 4.dpToPx(), 4.dpToPx(), 4.dpToPx())
+                            }
+                        minimumHeight = 48.dpToPx()
+                        setOnClickListener {
+                            val tileInfo = tag as? TileInfo ?: return@setOnClickListener
+                            val key = tileInfo.key
+
+                            if (matchPairsRevealed.contains(key)) return@setOnClickListener
+                            val first = matchFirstSelection
+                            if (first == null) {
+                                matchFirstSelection = key
+                                setBackgroundColor(
+                                    ContextCompat.getColor(
+                                        this@AISummaryActivity,
+                                        android.R.color.holo_blue_light,
+                                    )
+                                )
+                            } else {
+                                val secondKey = key
+
+                                if (first == secondKey) {
+                                    // Match ?úng
+                                    matchPairsRevealed.add(key)
+
+                                    // L?y word t? tileInfo
+                                    val vocabKey = tileInfo.wordKey.lowercase().trim()
+                                    val prog = matchPairsVocabProgress[vocabKey]
+
+                                    // N?u t? này ch?a ???c match ?úng tr??c ?ó, ?ánh d?u completed
+                                    // + t?ng ?i?m
+                                    if (!matchPairsWordsMatched.contains(vocabKey)) {
+                                        matchPairsWordsMatched.add(vocabKey)
+                                        matchPairsScore =
+                                            matchPairsWordsMatched
+                                                .size // ?i?m tính theo s? vocab ?ã hoàn thành
+
+                                        if (prog != null) {
+                                            prog.status = "completed"
+                                            prog.completedAt = System.currentTimeMillis()
+                                            // C?ng thêm 1 attempt cho l?n match ?úng này
+                                            prog.attempts = (prog.attempts + 1).coerceAtMost(999)
+                                            matchPairsVocabProgress[vocabKey] = prog
+                                        }
+                                    }
+
+                                    for (i in 0 until grid.childCount) {
+                                        val child =
+                                            grid.getChildAt(i) as? MaterialButton ?: continue
+                                        val childTile = child.tag as? TileInfo
+                                        if (childTile?.key == key) {
+                                            child.isEnabled = false
+                                            child.setBackgroundColor(
+                                                ContextCompat.getColor(
+                                                    this@AISummaryActivity,
+                                                    android.R.color.holo_green_light,
+                                                )
+                                            )
+                                        }
+                                    }
+
+                                    // N?u ?ã hoàn thành T?T C? vocab trong note ? k?t thúc quiz
+                                    if (matchPairsWordsMatched.size >= matchPairsUniqueWords.size) {
+                                        matchPairsQuizCompleted = true
+                                        saveQuizResults()
+                                        showMatchPairsResult()
+                                    } else {
+                                        // N?u ch? hoàn thành xong ROUND hi?n t?i (t?t c? t? trong
+                                        // currentRoundWords),
+                                        // nh?ng v?n còn t? ch?a hoàn thành trong note ? render
+                                        // round m?i.
+                                        val roundCompleted =
+                                            currentRoundWords.all { wordKey ->
+                                                matchPairsWordsMatched.contains(wordKey)
+                                            }
+                                        if (roundCompleted) {
+                                            grid.postDelayed({ renderRound() }, 300)
+                                        }
+                                    }
+                                } else {
+                                    // Match sai -> t?ng attempts cho vocab ?ó
+                                    val vocabKey = tileInfo.wordKey.lowercase().trim()
+                                    val prog = matchPairsVocabProgress[vocabKey]
+                                    if (prog != null) {
+                                        prog.attempts = (prog.attempts + 1).coerceAtMost(999)
+                                        matchPairsVocabProgress[vocabKey] = prog
+                                    }
+
+                                    setBackgroundColor(
+                                        ContextCompat.getColor(
+                                            this@AISummaryActivity,
+                                            android.R.color.holo_red_light,
+                                        )
+                                    )
+                                    for (i in 0 until grid.childCount) {
+                                        val child =
+                                            grid.getChildAt(i) as? MaterialButton ?: continue
+                                        val childTile = child.tag as? TileInfo
+                                        if (childTile?.key == first) {
+                                            child.setBackgroundColor(
+                                                ContextCompat.getColor(
+                                                    this@AISummaryActivity,
+                                                    android.R.color.holo_red_light,
+                                                )
+                                            )
+                                        }
+                                    }
+                                    grid.postDelayed(
+                                        {
+                                            for (i in 0 until grid.childCount) {
+                                                val child =
+                                                    grid.getChildAt(i) as? MaterialButton
+                                                        ?: continue
+                                                val childTile = child.tag as? TileInfo
+                                                val childKey = childTile?.key
+                                                if (childKey == first || childKey == secondKey) {
+                                                    if (
+                                                        !matchPairsRevealed.contains(childKey ?: -1)
+                                                    ) {
+                                                        child.backgroundTintList =
+                                                            ColorStateList.valueOf(
+                                                                Color.parseColor("#E6E8F0")
+                                                            )
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        800,
+                                    )
+                                }
+                                matchFirstSelection = null
+                            }
+                        }
+                    }
+                grid.addView(btn)
+            }
+
+            binding.MatchPairsContainer.removeAllViews()
+            binding.MatchPairsContainer.addView(grid)
+
+            // B? nút reset vì ?ã hi?n th? t?t c? các c?p, không c?n reset n?a
+            // (User ph?i match h?t t?t c? các t? m?i hoàn thành)
+        }
+
+        // Render l?n ??u
+        renderRound()
+    }
+
+    /**
+     * ?n toàn b? card n?i dung, ch? gi? Overall Progress và b?ng th?ng kê per vocab. Dùng cho ch?
+     * ?? statsOnly.
+     */
+    private fun hideAllCardsExceptStats() {
+        // Raw text / summary cards
+        binding.RawTextCard.isVisible = false
+        binding.OneSentenceCard.isVisible = false
+        binding.ParagraphCard.isVisible = false
+        binding.BulletPointsCard.isVisible = false
+        binding.QuestionsCard.isVisible = false
+        binding.MCQCard.isVisible = false
+
+        // Vocab cards
+        binding.VocabStoryCard.isVisible = false
+        binding.VocabMCQCard.isVisible = false
+        binding.FlashcardsCard.isVisible = false
+        binding.SummaryTableCard.isVisible = false
+        binding.ClozeCard.isVisible = false
+        binding.MatchPairsCard.isVisible = false
+    }
+
+    /**
+     * Render b?ng th?ng kê per-vocab và % t?ng, ch? dùng cho statsOnly. T?n d?ng hàm
+     * showOverallStatistics ?? tính toán l?i.
+     */
+    private fun renderStatsOnly() {
+        // ??m b?o Overall Progress card hi?n
+        binding.OverallProgressCard.isVisible = true
+        updateOverallProgressCardSummary()
+
+        // T?o container m?i cho b?ng th?ng kê
+        val statsContainer =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 32.dpToPx())
+            }
+
+        statsContainer.addView(
+            TextView(this).apply {
+                text = "Vocabulary Statistics"
+                textSize = 18f
+                setTypeface(null, Typeface.BOLD)
+                setPadding(0, 0, 0, 12.dpToPx())
+            }
+        )
+
+        showOverallStatistics(statsContainer)
+
+        // Thêm vào cu?i n?i dung ScrollView
+        val root = (binding.ContentScrollView.getChildAt(0) as? LinearLayout)
+        root?.addView(statsContainer)
+    }
+
+    private fun showMatchPairsResult() {
+        val percentage = if (matchPairsTotal > 0) (matchPairsScore * 100 / matchPairsTotal) else 0
+
+        binding.MatchPairsContainer.removeAllViews()
+
+        val resultView =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dpToPx(), 16.dpToPx(), 16.dpToPx(), 16.dpToPx())
+            }
+
+        // Title
+        resultView.addView(
+            TextView(this).apply {
+                text = "Match Pairs Complete!"
+                textSize = 20f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, android.R.color.black))
+                setPadding(0, 0, 0, 16.dpToPx())
+            }
+        )
+
+        // Score
+        resultView.addView(
+            TextView(this).apply {
+                text = "Score: $matchPairsScore / $matchPairsTotal ($percentage%)"
+                textSize = 18f
+                setTypeface(null, Typeface.BOLD)
+                val color =
+                    if (percentage >= 80) android.R.color.holo_green_dark
+                    else if (percentage >= 60) android.R.color.holo_orange_dark
+                    else android.R.color.holo_red_dark
+                setTextColor(ContextCompat.getColor(this@AISummaryActivity, color))
+                setPadding(0, 0, 0, 8.dpToPx())
+            }
+        )
+
+        // Show overall statistics if all quizzes completed
+        if (vocabQuizCompleted && clozeQuizCompleted && matchPairsQuizCompleted) {
+            resultView.addView(
+                TextView(this).apply {
+                    text = "\n--- Overall Statistics ---"
+                    textSize = 16f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(0, 16.dpToPx(), 0, 8.dpToPx())
+                }
+            )
+            showOverallStatistics(resultView)
+        }
+
+        binding.MatchPairsContainer.addView(resultView)
+    }
+
     private fun updateSummaryTableCard(rows: List<VocabSummaryRow>?) {
         val items = rows.orEmpty()
+        // L?u summaryTable vào state ?? dùng cho match pairs
+        summaryTableState = items.ifEmpty { null }
         binding.SummaryTableCard.isVisible = items.isNotEmpty()
         binding.SummaryTableContainer.removeAllViews()
         if (items.isEmpty()) return
@@ -1605,10 +3753,15 @@ class AISummaryActivity : AppCompatActivity() {
                     }
                 }
 
-            // Word title (bold)
+            // Word title (bold) + speaker
             val word = row.word ?: ""
             if (word.isNotBlank()) {
-                wordCard.addView(
+                val header =
+                    LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        setPadding(0, 0, 0, 8.dpToPx())
+                    }
+                val wordView =
                     TextView(this).apply {
                         text = "• $word"
                         textSize = 16f
@@ -1616,10 +3769,38 @@ class AISummaryActivity : AppCompatActivity() {
                         setTextColor(
                             ContextCompat.getColor(this@AISummaryActivity, android.R.color.black)
                         )
-                        setPadding(0, 0, 0, 8.dpToPx())
                         setTextIsSelectable(true)
+                        layoutParams =
+                            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     }
-                )
+                header.addView(wordView)
+
+                val speakBtn =
+                    ImageButton(this).apply {
+                        setImageResource(android.R.drawable.ic_lock_silent_mode_off)
+                        background = null
+                        contentDescription = "Speak $word"
+                        setOnClickListener {
+                            // Luôn dùng t? g?c (word) ?? TTS ??c, không dùng phonetic vì TTS không
+                            // hi?u IPA notation
+                            // TTS s? t? ??ng phát âm ?úng t? ti?ng Anh n?u setLanguage(Locale.US)
+                            val toSpeak = word.trim()
+                            if (ttsReady && toSpeak.isNotBlank()) {
+                                // Stop any ongoing speech tr??c khi ??c t? m?i
+                                tts?.stop()
+                                tts?.speak(toSpeak, TextToSpeech.QUEUE_FLUSH, null, "tts-$word")
+                            } else {
+                                Toast.makeText(
+                                        this@AISummaryActivity,
+                                        getString(R.string.ai_tts_not_ready),
+                                        Toast.LENGTH_SHORT,
+                                    )
+                                    .show()
+                            }
+                        }
+                    }
+                header.addView(speakBtn)
+                wordCard.addView(header)
             }
 
             fun addField(label: String, value: String?) {
@@ -1643,7 +3824,7 @@ class AISummaryActivity : AppCompatActivity() {
             }
 
             // Translation
-            row.translation?.let { addField(getString(R.string.translation), it) }
+            row.translation?.let { addField("D?ch", it) }
 
             // Part of Speech
             row.partOfSpeech?.let { addField("Lo?i t?", it) }
@@ -1662,7 +3843,7 @@ class AISummaryActivity : AppCompatActivity() {
             // Collocations
             row.collocations
                 ?.takeIf { it.isNotEmpty() }
-                ?.let { addField("Collocations", it.joinToString(", ")) }
+                ?.let { addField("C?m t?", it.joinToString(", ")) }
 
             // Add divider between words (except last)
             if (index < items.size - 1) {
@@ -1862,8 +4043,11 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun translateVocabStory() {
+        // ?u tiên l?y t? bi?n instance (?ã hi?n th?), n?u không có thì l?y t? summaryResponse
         val story =
-            summaryResponse?.vocabStory
+            vocabStoryOriginal
+                ?: summaryResponse?.vocabStory
+                ?: summaryResponse?.review?.vocabStory
                 ?: run {
                     android.util.Log.d("AISummaryActivity", "translateVocabStory: story is null")
                     Toast.makeText(this, "Story data is not available", Toast.LENGTH_SHORT).show()
@@ -1871,9 +4055,10 @@ class AISummaryActivity : AppCompatActivity() {
                 }
 
         if (vocabStoryIsTranslated && vocabStoryTranslated != null) {
-            // Toggle back to original
+            // Toggle back to original - l?y t? bi?n instance ho?c summaryResponse
             vocabStoryIsTranslated = false
-            updateVocabStoryCard(story)
+            val originalStory = vocabStoryOriginal ?: story
+            updateVocabStoryCard(originalStory)
             binding.VocabStoryTranslateButton.text = getString(R.string.translate)
             return
         }
@@ -1931,17 +4116,28 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun translateVocabMCQ() {
+        // ?u tiên l?y t? bi?n instance (?ã hi?n th?), n?u không có thì l?y t? summaryResponse
         val quizzes =
-            summaryResponse?.vocabMcqs
+            vocabMCQsOriginal
+                ?: summaryResponse?.vocabMcqs
+                ?: summaryResponse?.review?.vocabMcqs
                 ?: run {
                     android.util.Log.d("AISummaryActivity", "translateVocabMCQ: quizzes is null")
                     Toast.makeText(this, "MCQ data is not available", Toast.LENGTH_SHORT).show()
                     return
                 }
 
+        if (quizzes.isEmpty()) {
+            android.util.Log.d("AISummaryActivity", "translateVocabMCQ: quizzes is empty")
+            Toast.makeText(this, "MCQ data is not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         if (vocabMCQIsTranslated && vocabMCQTranslated != null) {
+            // Toggle back to original - l?y t? bi?n instance ho?c summaryResponse
             vocabMCQIsTranslated = false
-            updateVocabMCQCard(quizzes)
+            val originalQuizzes = vocabMCQsOriginal ?: quizzes
+            updateVocabMCQCard(originalQuizzes)
             binding.VocabMCQTranslateButton.text = getString(R.string.translate)
             return
         }
@@ -1951,7 +4147,7 @@ class AISummaryActivity : AppCompatActivity() {
                 if (index > 0) appendLine()
                 appendLine("Question ${index + 1}:")
                 quiz.type?.let { appendLine("Type: $it") }
-                quiz.vocabTarget?.let { appendLine("Target: $it") }
+                // Không hi?n th? Target ?? không l? ?áp án
                 quiz.question?.let { appendLine("Q: $it") }
                 quiz.options?.forEach { (key, value) -> appendLine("$key: $value") }
                 quiz.explanation?.let { appendLine("Explanation: $it") }
@@ -1970,37 +4166,228 @@ class AISummaryActivity : AppCompatActivity() {
             "translateVocabMCQ: targetLanguage=$targetLang, textLength=${textToTranslate.length}",
         )
 
-        translateText(
-            text = textToTranslate,
-            targetLanguage = targetLang,
-            onSuccess = { translated ->
-                android.util.Log.d(
-                    "AISummaryActivity",
-                    "translateVocabMCQ: success, translatedLength=${translated.length}",
-                )
-                vocabMCQTranslated = translated
-                vocabMCQIsTranslated = true
-                // Display translated text with formatting
-                binding.VocabMCQContainer.removeAllViews()
-                binding.VocabMCQContainer.addView(
-                    TextView(this).apply {
-                        text = markdownBoldToSpannable(translated)
-                        textSize = 13f
-                        setTextIsSelectable(true)
-                        setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
-                    }
-                )
-                binding.VocabMCQTranslateButton.text = getString(R.string.show_original)
-            },
-            onError = { error ->
-                android.util.Log.e("AISummaryActivity", "translateVocabMCQ: error - $error")
-            },
+        // D?ch t?ng quiz item ?? gi? format g?c
+        translateVocabMCQsWithFormat(quizzes, targetLang)
+    }
+
+    private fun translateSummaryTableWithFormat(rows: List<VocabSummaryRow>, targetLang: String) {
+        binding.SummaryTableContainer.removeAllViews()
+        binding.SummaryTableContainer.addView(
+            TextView(this).apply {
+                text = "?ang d?ch..."
+                textSize = 14f
+                setPadding(0, 16.dpToPx(), 0, 16.dpToPx())
+                gravity = android.view.Gravity.CENTER
+            }
         )
+
+        // D?ch t?ng row
+        val translatedRows = mutableListOf<VocabSummaryRow>()
+        var completedCount = 0
+
+        rows.forEachIndexed { index, row ->
+            val textToTranslate = buildString {
+                row.word?.let { appendLine("Word: $it") }
+                row.translation?.let { appendLine("Translation: $it") }
+                row.partOfSpeech?.let { appendLine("Part of Speech: $it") }
+                row.definition?.let { appendLine("Definition: $it") }
+                row.usageNote?.let { appendLine("Usage Note: $it") }
+                row.commonStructures?.joinToString(", ")?.let { appendLine("Structures: $it") }
+                row.collocations?.joinToString(", ")?.let { appendLine("Collocations: $it") }
+            }
+
+            translateText(
+                text = textToTranslate,
+                targetLanguage = targetLang,
+                onSuccess = { translated ->
+                    // Parse k?t qu? d?ch
+                    val lines = translated.split("\n")
+                    var translatedWord = row.word
+                    var translatedTranslation = row.translation
+                    var translatedPartOfSpeech = row.partOfSpeech
+                    var translatedDefinition = row.definition
+                    var translatedUsageNote = row.usageNote
+                    var translatedStructures = row.commonStructures
+                    var translatedCollocations = row.collocations
+
+                    lines.forEach { line ->
+                        when {
+                            line.startsWith("Word:", ignoreCase = true) -> {
+                                translatedWord = line.removePrefix("Word:").trim()
+                            }
+                            line.startsWith("Translation:", ignoreCase = true) -> {
+                                translatedTranslation = line.removePrefix("Translation:").trim()
+                            }
+                            line.startsWith("Part of Speech:", ignoreCase = true) -> {
+                                translatedPartOfSpeech = line.removePrefix("Part of Speech:").trim()
+                            }
+                            line.startsWith("Definition:", ignoreCase = true) -> {
+                                translatedDefinition = line.removePrefix("Definition:").trim()
+                            }
+                            line.startsWith("Usage Note:", ignoreCase = true) -> {
+                                translatedUsageNote = line.removePrefix("Usage Note:").trim()
+                            }
+                            line.startsWith("Structures:", ignoreCase = true) -> {
+                                translatedStructures =
+                                    line.removePrefix("Structures:").trim().split(", ")
+                            }
+                            line.startsWith("Collocations:", ignoreCase = true) -> {
+                                translatedCollocations =
+                                    line.removePrefix("Collocations:").trim().split(", ")
+                            }
+                        }
+                    }
+
+                    // T?o l?i row v?i các field ?ã d?ch
+                    val translatedRow =
+                        row.copy(
+                            word = translatedWord,
+                            translation = translatedTranslation,
+                            partOfSpeech = translatedPartOfSpeech,
+                            definition = translatedDefinition,
+                            usageNote = translatedUsageNote,
+                            commonStructures = translatedStructures,
+                            collocations = translatedCollocations,
+                        )
+                    translatedRows.add(translatedRow)
+                    completedCount++
+
+                    // Khi d?ch xong t?t c?, hi?n th? l?i v?i format g?c
+                    if (completedCount == rows.size) {
+                        summaryTableIsTranslated = true
+                        updateSummaryTableCard(translatedRows)
+                        binding.SummaryTableTranslateButton.text = getString(R.string.show_original)
+                    }
+                },
+                onError = { error ->
+                    android.util.Log.e(
+                        "AISummaryActivity",
+                        "translateSummaryTable row $index: error - $error",
+                    )
+                    // N?u l?i, dùng row g?c
+                    translatedRows.add(row)
+                    completedCount++
+                    if (completedCount == rows.size) {
+                        summaryTableIsTranslated = true
+                        updateSummaryTableCard(translatedRows)
+                        binding.SummaryTableTranslateButton.text = getString(R.string.show_original)
+                    }
+                },
+            )
+        }
+    }
+
+    private fun translateVocabMCQsWithFormat(quizzes: List<VocabQuiz>, targetLang: String) {
+        binding.VocabMCQContainer.removeAllViews()
+        binding.VocabMCQContainer.addView(
+            TextView(this).apply {
+                text = "?ang d?ch..."
+                textSize = 14f
+                setPadding(0, 16.dpToPx(), 0, 16.dpToPx())
+                gravity = android.view.Gravity.CENTER
+            }
+        )
+
+        // D?ch t?ng quiz item
+        val translatedQuizzes = mutableListOf<VocabQuiz>()
+        var completedCount = 0
+
+        quizzes.forEachIndexed { index, quiz ->
+            // D?ch question
+            val questionText = quiz.question ?: ""
+            val optionsText =
+                quiz.options?.entries?.joinToString("\n") { "${it.key}: ${it.value}" } ?: ""
+            val explanationText = quiz.explanation ?: ""
+            val textToTranslate = buildString {
+                if (questionText.isNotBlank()) appendLine("Question: $questionText")
+                if (optionsText.isNotBlank()) appendLine("Options:\n$optionsText")
+                if (explanationText.isNotBlank()) appendLine("Explanation: $explanationText")
+            }
+
+            translateText(
+                text = textToTranslate,
+                targetLanguage = targetLang,
+                onSuccess = { translated ->
+                    // Parse k?t qu? d?ch
+                    val lines = translated.split("\n")
+                    var translatedQuestion = questionText
+                    val translatedOptions = mutableMapOf<String, String>()
+                    var translatedExplanation = explanationText
+
+                    var currentSection = ""
+                    lines.forEach { line ->
+                        when {
+                            line.startsWith("Question:", ignoreCase = true) -> {
+                                currentSection = "question"
+                                translatedQuestion = line.removePrefix("Question:").trim()
+                            }
+                            line.startsWith("Options:", ignoreCase = true) -> {
+                                currentSection = "options"
+                            }
+                            line.startsWith("Explanation:", ignoreCase = true) -> {
+                                currentSection = "explanation"
+                                translatedExplanation = line.removePrefix("Explanation:").trim()
+                            }
+                            currentSection == "options" && line.contains(":") -> {
+                                val parts = line.split(":", limit = 2)
+                                if (parts.size == 2) {
+                                    val key = parts[0].trim()
+                                    val value = parts[1].trim()
+                                    translatedOptions[key] = value
+                                }
+                            }
+                        }
+                    }
+
+                    // T?o l?i quiz v?i các field ?ã d?ch
+                    val translatedQuiz =
+                        quiz.copy(
+                            question =
+                                translatedQuestion.takeIf { it.isNotBlank() } ?: quiz.question,
+                            options =
+                                if (translatedOptions.isNotEmpty()) translatedOptions
+                                else quiz.options,
+                            explanation =
+                                translatedExplanation.takeIf { it.isNotBlank() } ?: quiz.explanation,
+                        )
+                    translatedQuizzes.add(translatedQuiz)
+                    completedCount++
+
+                    // Khi d?ch xong t?t c?, hi?n th? l?i v?i format g?c
+                    if (completedCount == quizzes.size) {
+                        vocabMCQIsTranslated = true
+                        binding.VocabMCQContainer.removeAllViews()
+                        translatedQuizzes.forEach { tq ->
+                            binding.VocabMCQContainer.addView(createVocabMCQView(tq))
+                        }
+                        binding.VocabMCQTranslateButton.text = getString(R.string.show_original)
+                    }
+                },
+                onError = { error ->
+                    android.util.Log.e(
+                        "AISummaryActivity",
+                        "translateVocabMCQ item $index: error - $error",
+                    )
+                    // N?u l?i, dùng quiz g?c
+                    translatedQuizzes.add(quiz)
+                    completedCount++
+                    if (completedCount == quizzes.size) {
+                        vocabMCQIsTranslated = true
+                        binding.VocabMCQContainer.removeAllViews()
+                        translatedQuizzes.forEach { tq ->
+                            binding.VocabMCQContainer.addView(createVocabMCQView(tq))
+                        }
+                        binding.VocabMCQTranslateButton.text = getString(R.string.show_original)
+                    }
+                },
+            )
+        }
     }
 
     private fun translateFlashcards() {
         val cards =
             summaryResponse?.flashcards
+                ?: summaryResponse?.review?.flashcards
                 ?: run {
                     android.util.Log.d("AISummaryActivity", "translateFlashcards: cards is null")
                     Toast.makeText(this, "Flashcards data is not available", Toast.LENGTH_SHORT)
@@ -2008,9 +4395,17 @@ class AISummaryActivity : AppCompatActivity() {
                     return
                 }
 
+        if (cards.isEmpty()) {
+            android.util.Log.d("AISummaryActivity", "translateFlashcards: cards is empty")
+            Toast.makeText(this, "Flashcards data is not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         if (flashcardsIsTranslated && flashcardsTranslated != null) {
+            // Toggle back to original - l?y t? bi?n instance ho?c summaryResponse
             flashcardsIsTranslated = false
-            updateFlashcardsCard(cards)
+            val originalCards = flashcardsOriginal ?: cards
+            updateFlashcardsCard(originalCards)
             binding.FlashcardsTranslateButton.text = getString(R.string.translate)
             return
         }
@@ -2094,31 +4489,135 @@ class AISummaryActivity : AppCompatActivity() {
             "translateFlashcards: targetLanguage=$targetLang, textLength=${textToTranslate.length}",
         )
 
-        translateText(
-            text = textToTranslate,
-            targetLanguage = targetLang,
-            onSuccess = { translated ->
-                android.util.Log.d(
-                    "AISummaryActivity",
-                    "translateFlashcards: success, translatedLength=${translated.length}",
-                )
-                flashcardsTranslated = translated
-                flashcardsIsTranslated = true
-                binding.FlashcardsContainer.removeAllViews()
-                binding.FlashcardsContainer.addView(
-                    TextView(this).apply {
-                        text = markdownBoldToSpannable(translated)
-                        textSize = 13f
-                        setTextIsSelectable(true)
-                        setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
-                    }
-                )
-                binding.FlashcardsTranslateButton.text = getString(R.string.show_original)
-            },
-            onError = { error ->
-                android.util.Log.e("AISummaryActivity", "translateFlashcards: error - $error")
-            },
+        // D?ch t?ng flashcard ?? gi? format g?c
+        translateFlashcardsWithFormat(cards, targetLang)
+    }
+
+    private fun translateFlashcardsWithFormat(cards: List<Flashcard>, targetLang: String) {
+        binding.FlashcardsContainer.removeAllViews()
+        binding.FlashcardsContainer.addView(
+            TextView(this).apply {
+                text = "?ang d?ch..."
+                textSize = 14f
+                setPadding(0, 16.dpToPx(), 0, 16.dpToPx())
+                gravity = android.view.Gravity.CENTER
+            }
         )
+
+        // D?ch t?ng flashcard
+        val translatedCards = mutableListOf<Flashcard>()
+        var completedCount = 0
+
+        cards.forEachIndexed { index, card ->
+            val word = card.word ?: card.front ?: ""
+            val meaning = card.back?.meaning ?: ""
+            val example = card.back?.example ?: ""
+            val usageNote = card.back?.usageNote ?: ""
+            val synonyms = card.back?.synonyms?.joinToString(", ") ?: ""
+            val antonyms = card.back?.antonyms?.joinToString(", ") ?: ""
+            val quickTip = card.back?.quickTip ?: ""
+
+            val textToTranslate = buildString {
+                if (word.isNotBlank()) appendLine("Word: $word")
+                if (meaning.isNotBlank()) appendLine("Meaning: $meaning")
+                if (example.isNotBlank()) appendLine("Example: $example")
+                if (usageNote.isNotBlank()) appendLine("Usage Note: $usageNote")
+                if (synonyms.isNotBlank()) appendLine("Synonyms: $synonyms")
+                if (antonyms.isNotBlank()) appendLine("Antonyms: $antonyms")
+                if (quickTip.isNotBlank()) appendLine("Quick Tip: $quickTip")
+            }
+
+            translateText(
+                text = textToTranslate,
+                targetLanguage = targetLang,
+                onSuccess = { translated ->
+                    // Parse k?t qu? d?ch
+                    val lines = translated.split("\n")
+                    var translatedWord = word
+                    var translatedMeaning = meaning
+                    var translatedExample = example
+                    var translatedUsageNote = usageNote
+                    var translatedSynonyms = synonyms
+                    var translatedAntonyms = antonyms
+                    var translatedQuickTip = quickTip
+
+                    lines.forEach { line ->
+                        when {
+                            line.startsWith("Word:", ignoreCase = true) -> {
+                                translatedWord = line.removePrefix("Word:").trim()
+                            }
+                            line.startsWith("Meaning:", ignoreCase = true) -> {
+                                translatedMeaning = line.removePrefix("Meaning:").trim()
+                            }
+                            line.startsWith("Example:", ignoreCase = true) -> {
+                                translatedExample = line.removePrefix("Example:").trim()
+                            }
+                            line.startsWith("Usage Note:", ignoreCase = true) -> {
+                                translatedUsageNote = line.removePrefix("Usage Note:").trim()
+                            }
+                            line.startsWith("Synonyms:", ignoreCase = true) -> {
+                                translatedSynonyms = line.removePrefix("Synonyms:").trim()
+                            }
+                            line.startsWith("Antonyms:", ignoreCase = true) -> {
+                                translatedAntonyms = line.removePrefix("Antonyms:").trim()
+                            }
+                            line.startsWith("Quick Tip:", ignoreCase = true) -> {
+                                translatedQuickTip = line.removePrefix("Quick Tip:").trim()
+                            }
+                        }
+                    }
+
+                    // T?o l?i flashcard v?i các field ?ã d?ch
+                    val translatedBack =
+                        card.back?.copy(
+                            meaning =
+                                translatedMeaning.takeIf { it.isNotBlank() } ?: card.back?.meaning,
+                            example =
+                                translatedExample.takeIf { it.isNotBlank() } ?: card.back?.example,
+                            usageNote =
+                                translatedUsageNote.takeIf { it.isNotBlank() }
+                                    ?: card.back?.usageNote,
+                            synonyms =
+                                translatedSynonyms.takeIf { it.isNotBlank() }?.split(", ")
+                                    ?: card.back?.synonyms,
+                            antonyms =
+                                translatedAntonyms.takeIf { it.isNotBlank() }?.split(", ")
+                                    ?: card.back?.antonyms,
+                            quickTip =
+                                translatedQuickTip.takeIf { it.isNotBlank() } ?: card.back?.quickTip,
+                        )
+                    val translatedCard =
+                        card.copy(
+                            word = translatedWord.takeIf { it.isNotBlank() } ?: card.word,
+                            front = translatedWord.takeIf { it.isNotBlank() } ?: card.front,
+                            back = translatedBack,
+                        )
+                    translatedCards.add(translatedCard)
+                    completedCount++
+
+                    // Khi d?ch xong t?t c?, hi?n th? l?i v?i format g?c
+                    if (completedCount == cards.size) {
+                        flashcardsIsTranslated = true
+                        updateFlashcardsCard(translatedCards)
+                        binding.FlashcardsTranslateButton.text = getString(R.string.show_original)
+                    }
+                },
+                onError = { error ->
+                    android.util.Log.e(
+                        "AISummaryActivity",
+                        "translateFlashcards card $index: error - $error",
+                    )
+                    // N?u l?i, dùng card g?c
+                    translatedCards.add(card)
+                    completedCount++
+                    if (completedCount == cards.size) {
+                        flashcardsIsTranslated = true
+                        updateFlashcardsCard(translatedCards)
+                        binding.FlashcardsTranslateButton.text = getString(R.string.show_original)
+                    }
+                },
+            )
+        }
     }
 
     private fun translateMindmap() {
@@ -2221,8 +4720,11 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun translateSummaryTable() {
+        // ?u tiên l?y t? bi?n instance (?ã hi?n th?), n?u không có thì l?y t? summaryResponse
         val rows =
-            summaryResponse?.summaryTable
+            summaryTableState
+                ?: summaryResponse?.summaryTable
+                ?: summaryResponse?.review?.summaryTable
                 ?: run {
                     android.util.Log.d("AISummaryActivity", "translateSummaryTable: rows is null")
                     Toast.makeText(this, "Summary Table data is not available", Toast.LENGTH_SHORT)
@@ -2230,9 +4732,17 @@ class AISummaryActivity : AppCompatActivity() {
                     return
                 }
 
+        if (rows.isEmpty()) {
+            android.util.Log.d("AISummaryActivity", "translateSummaryTable: rows is empty")
+            Toast.makeText(this, "Summary Table data is not available", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         if (summaryTableIsTranslated && summaryTableTranslated != null) {
+            // Toggle back to original - l?y t? bi?n instance ho?c summaryResponse
             summaryTableIsTranslated = false
-            updateSummaryTableCard(rows)
+            val originalRows = summaryTableState ?: rows
+            updateSummaryTableCard(originalRows)
             binding.SummaryTableTranslateButton.text = getString(R.string.translate)
             return
         }
@@ -2264,31 +4774,8 @@ class AISummaryActivity : AppCompatActivity() {
             "translateSummaryTable: targetLanguage=$targetLang, textLength=${textToTranslate.length}",
         )
 
-        translateText(
-            text = textToTranslate,
-            targetLanguage = targetLang,
-            onSuccess = { translated ->
-                android.util.Log.d(
-                    "AISummaryActivity",
-                    "translateSummaryTable: success, translatedLength=${translated.length}",
-                )
-                summaryTableTranslated = translated
-                summaryTableIsTranslated = true
-                binding.SummaryTableContainer.removeAllViews()
-                binding.SummaryTableContainer.addView(
-                    TextView(this).apply {
-                        text = markdownBoldToSpannable(translated)
-                        textSize = 14f
-                        setTextIsSelectable(true)
-                        setPadding(0, 8.dpToPx(), 0, 8.dpToPx())
-                    }
-                )
-                binding.SummaryTableTranslateButton.text = getString(R.string.show_original)
-            },
-            onError = { error ->
-                android.util.Log.e("AISummaryActivity", "translateSummaryTable: error - $error")
-            },
-        )
+        // D?ch t?ng row ?? gi? format g?c
+        translateSummaryTableWithFormat(rows, targetLang)
     }
 
     private fun translateText(
@@ -2354,7 +4841,8 @@ class AISummaryActivity : AppCompatActivity() {
         VOCAB_STORY,
         VOCAB_MCQ,
         VOCAB_FLASHCARDS,
-        VOCAB_MINDMAP,
         VOCAB_SUMMARY_TABLE,
+        VOCAB_CLOZE,
+        VOCAB_MATCH,
     }
 }
