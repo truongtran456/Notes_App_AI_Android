@@ -31,13 +31,14 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.philkes.notallyx.R
+import com.philkes.notallyx.presentation.hideKeyboard
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.model.createNoteUrl
 import com.philkes.notallyx.data.model.getNoteIdFromUrl
 import com.philkes.notallyx.data.model.getNoteTypeFromUrl
 import com.philkes.notallyx.data.model.isNoteUrl
 import com.philkes.notallyx.data.preferences.getAiUserId
-import com.philkes.notallyx.databinding.BottomTextFormattingMenuBinding
+import com.philkes.notallyx.databinding.BottomSheetTextFormatBinding
 import com.philkes.notallyx.databinding.RecyclerToggleBinding
 import com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
 import com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity
@@ -52,7 +53,9 @@ import com.philkes.notallyx.presentation.setControlsContrastColorForAllViews
 import com.philkes.notallyx.presentation.setOnNextAction
 import com.philkes.notallyx.presentation.showKeyboard
 import com.philkes.notallyx.presentation.showToast
-import com.philkes.notallyx.presentation.view.note.TextFormattingAdapter
+import com.philkes.notallyx.presentation.view.note.TextFormattingStyleAdapter
+import com.philkes.notallyx.presentation.view.note.TextFormattingFormatAdapter
+import com.philkes.notallyx.presentation.view.note.TextFormattingListsAdapter
 import com.philkes.notallyx.presentation.view.note.action.AddNoteActions
 import com.philkes.notallyx.presentation.view.note.action.AddNoteBottomSheet
 import com.philkes.notallyx.presentation.view.note.action.MoreNoteBottomSheet
@@ -70,7 +73,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     private lateinit var pickNoteUpdateActivityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var textFormatMenu: View
 
-    private var textFormattingAdapter: TextFormattingAdapter? = null
+    private var textFormatSheet: BottomSheetDialog? = null
 
     private var searchResultIndices: List<Pair<Int, Int>>? = null
 
@@ -291,7 +294,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
                 if (::textFormatMenu.isInitialized) {
                     textFormatMenu.isEnabled = true
                 }
-                textFormattingAdapter?.updateTextFormattingToggles(selStart, selEnd)
+                // Text formatting toggles are updated in showTextFormatSheet()
             } else {
                 if (::textFormatMenu.isInitialized && textFormatMenu.isEnabled) {
                     initBottomMenu()
@@ -319,12 +322,85 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     override fun openTextFormattingMenu() {
-        if (binding.EnterBody.isActionModeOn) {
-            initBottomTextFormattingMenu()
-        } else {
-            binding.EnterBody.requestFocus()
+        // Focus vào text và đặt caret nếu cần
+        binding.EnterBody.requestFocus()
+        if (
+            binding.EnterBody.selectionStart < 0 ||
+                binding.EnterBody.selectionStart > binding.EnterBody.length()
+        ) {
             binding.EnterBody.setSelection(binding.EnterBody.length())
         }
+
+        // Hiển thị bottom sheet định dạng (dùng adapter hiện có)
+        showTextFormatSheet()
+    }
+
+    private var styleAdapter: TextFormattingStyleAdapter? = null
+    private var formatAdapter: TextFormattingFormatAdapter? = null
+    private var listsAdapter: TextFormattingListsAdapter? = null
+
+    private fun showTextFormatSheet() {
+        val updateAll: () -> Unit = {
+            styleAdapter?.updateToggles()
+            formatAdapter?.updateToggles()
+            listsAdapter?.updateToggles()
+        }
+
+        if (textFormatSheet == null) {
+            val layout = BottomSheetTextFormatBinding.inflate(layoutInflater)
+            
+            // Setup style adapter (Title, Heading, Body)
+            styleAdapter = TextFormattingStyleAdapter(
+                this,
+                binding.EnterBody,
+                colorInt,
+                onUpdate = updateAll
+            )
+            layout.RecyclerViewStyles.apply {
+                adapter = styleAdapter
+                layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            }
+            
+            // Setup format adapter (Bold, Italic, Underline, Strikethrough, Color)
+            formatAdapter = TextFormattingFormatAdapter(
+                this,
+                binding.EnterBody,
+                colorInt,
+                onUpdate = updateAll
+            )
+            layout.RecyclerViewFormatting.apply {
+                adapter = formatAdapter
+                layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            }
+            
+            // Setup lists adapter (Bullet, Numbered, Indent, Outdent)
+            listsAdapter = TextFormattingListsAdapter(
+                this,
+                binding.EnterBody,
+                colorInt,
+                onUpdate = updateAll
+            )
+            layout.RecyclerViewLists.apply {
+                adapter = listsAdapter
+                layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            }
+            
+            // Close button
+            layout.CloseButton.setOnClickListener {
+                textFormatSheet?.dismiss()
+            }
+
+            textFormatSheet = BottomSheetDialog(this).apply {
+                setContentView(layout.root)
+                setOnDismissListener {
+                    this@EditNoteActivity.hideKeyboard(binding.EnterBody)
+                }
+            }
+        }
+        
+        // Update all toggles when showing
+        updateAll()
+        textFormatSheet?.show()
     }
 
     override fun openMoreMenu() {
@@ -551,15 +627,8 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         binding.BottomAppBarLeft.apply {
             removeAllViews()
             requestLayout()
-            val layout = BottomTextFormattingMenuBinding.inflate(layoutInflater, this, false)
-            layout.RecyclerView.apply {
-                textFormattingAdapter =
-                    TextFormattingAdapter(this@EditNoteActivity, binding.EnterBody, colorInt)
-                adapter = textFormattingAdapter
-                layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
-            }
-            textFormatMenu = layout.root
-            addView(layout.root)
+            // Note: textFormatMenu is set up elsewhere, this might be a different menu
+            // Keeping this empty for now as the main formatting is in the bottom sheet
         }
     }
 

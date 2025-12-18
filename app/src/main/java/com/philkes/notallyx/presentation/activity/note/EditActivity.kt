@@ -20,6 +20,7 @@ import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams
 import android.view.ViewGroup.VISIBLE
 import android.view.inputmethod.InputMethodManager
+import android.widget.ImageButton
 import android.widget.ImageView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -327,6 +328,7 @@ abstract class EditActivity(private val type: Type) :
             setupListeners()
             setStateFromModel(savedInstanceState)
             applySavedBackgroundToCanvas()
+            setupCanvasStrokeListener()
 
             configureUI()
             binding.ScrollView.apply {
@@ -473,8 +475,18 @@ abstract class EditActivity(private val type: Type) :
     protected open fun initChangeHistory() {
         changeHistory =
             ChangeHistory().apply {
-                canUndo.observe(this@EditActivity) { canUndo -> undo?.isEnabled = canUndo }
-                canRedo.observe(this@EditActivity) { canRedo -> redo?.isEnabled = canRedo }
+                canUndo.observe(this@EditActivity) { canUndo ->
+                    if (!isDrawingModeActive) {
+                        undo?.isEnabled = canUndo
+                        undo?.alpha = if (canUndo) 1f else 0.5f
+                    }
+                }
+                canRedo.observe(this@EditActivity) { canRedo ->
+                    if (!isDrawingModeActive) {
+                        redo?.isEnabled = canRedo
+                        redo?.alpha = if (canRedo) 1f else 0.5f
+                    }
+                }
             }
     }
 
@@ -620,7 +632,7 @@ abstract class EditActivity(private val type: Type) :
 
     protected open fun initBottomMenu() {
         binding.BottomAppBarLayout.visibility = View.GONE
-        // AI FAB thay b?ng n�t inline tr�n header, kh�ng t?o FAB n?i n?a
+        // AI FAB thay b?ng n�t inline tr�n header, kh�ng t?o FAB n?i n?a
         setupJellyFab()
     }
 
@@ -946,7 +958,7 @@ abstract class EditActivity(private val type: Type) :
     }
 
     /**
-     * Hi?n th? canvas v� bottom bar ngay trong EditActivity Toolbar gi? nguy�n, ch? show canvas v�
+     * Hi?n th? canvas v� bottom bar ngay trong EditActivity Toolbar gi? nguy�n, ch? show canvas v�
      * bottom bar v?i animation
      */
     private fun openFullScreenDrawing() {
@@ -1100,7 +1112,7 @@ abstract class EditActivity(private val type: Type) :
         binding.root.post(postRunnable)
     }
 
-    /** Animation cho canvas v� bottom bar khi m? drawing mode */
+    /** Animation cho canvas v� bottom bar khi m? drawing mode */
     private fun startDrawingModeAnimations() {
         if (isDestroyed || isFinishing) return
 
@@ -1173,63 +1185,84 @@ abstract class EditActivity(private val type: Type) :
         aiFabView?.let { aiFab -> showAIFab(aiFab) }
     }
 
+    private fun setupCanvasStrokeListener() {
+        binding.DrawingCanvas.setOnStrokesChangedListener {
+            if (isDrawingModeActive) {
+                val ivUndo = binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView
+                val ivRedo = binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView
+                if (ivUndo != null && ivRedo != null) {
+                    updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+                }
+            }
+        }
+    }
+
+    private fun updateDrawingUndoRedoButtons(ivUndo: ImageView, ivRedo: ImageView) {
+        val canUndoDrawing = binding.DrawingCanvas.canUndo()
+        val canRedoDrawing = binding.DrawingCanvas.canRedo()
+        ivUndo.isEnabled = canUndoDrawing
+        ivUndo.alpha = if (canUndoDrawing) 1f else 0.5f
+        ivRedo.isEnabled = canRedoDrawing
+        ivRedo.alpha = if (canRedoDrawing) 1f else 0.5f
+    }
+
     private fun initDrawToolbar() {
         val toolbar = binding.Toolbar
-        val ivBack = toolbar.findViewById<ImageView>(R.id.ivBack)
-        val ivUndo = toolbar.findViewById<ImageView>(R.id.ivUndo)
-        val ivRedo = toolbar.findViewById<ImageView>(R.id.ivRedo)
-        val ivBackground = toolbar.findViewById<ImageView>(R.id.ivBackground)
-        val ivPin = toolbar.findViewById<ImageView>(R.id.ivPin)
-        val ivMore = toolbar.findViewById<ImageView>(R.id.ivMore)
+        val ivBack = toolbar.findViewById<View>(R.id.ivBack)
+        val ivUndo = toolbar.findViewById<View>(R.id.ivUndo)
+        val ivRedo = toolbar.findViewById<View>(R.id.ivRedo)
+        val ivPin = toolbar.findViewById<View>(R.id.ivPin)
+        val ivMore = toolbar.findViewById<View>(R.id.ivMore)
 
         ivBack.setOnClickListener { finish() }
 
         ivUndo.setOnClickListener {
-            try {
-                changeHistory.undo()
-            } catch (
-                e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                application.log(TAG, throwable = e)
+            if (isDrawingModeActive) {
+                if (binding.DrawingCanvas.undo()) {
+                    updateDrawingUndoRedoButtons(ivUndo as ImageView, ivRedo as ImageView)
+                }
+            } else {
+                try {
+                    changeHistory.undo()
+                } catch (
+                    e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
+                    application.log(TAG, throwable = e)
+                }
             }
         }
         changeHistory.canUndo.observe(this) { canUndo ->
-            ivUndo.isEnabled = canUndo
-            ivUndo.alpha = if (canUndo) 1f else 0.5f
+            if (isDrawingModeActive) {
+                updateDrawingUndoRedoButtons(ivUndo as ImageView, ivRedo as ImageView)
+            } else {
+                ivUndo.isEnabled = canUndo
+                ivUndo.alpha = if (canUndo) 1f else 0.5f
+            }
         }
 
         ivRedo.setOnClickListener {
-            try {
-                changeHistory.redo()
-            } catch (
-                e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
-                application.log(TAG, throwable = e)
+            if (isDrawingModeActive) {
+                if (binding.DrawingCanvas.redo()) {
+                    updateDrawingUndoRedoButtons(ivUndo as ImageView, ivRedo as ImageView)
+                }
+            } else {
+                try {
+                    changeHistory.redo()
+                } catch (
+                    e: com.philkes.notallyx.utils.changehistory.ChangeHistory.ChangeHistoryException) {
+                    application.log(TAG, throwable = e)
+                }
             }
         }
         changeHistory.canRedo.observe(this) { canRedo ->
-            ivRedo.isEnabled = canRedo
-            ivRedo.alpha = if (canRedo) 1f else 0.5f
-        }
-
-        ivBackground.setOnClickListener {
             if (isDrawingModeActive) {
-                val initialColor = Color.WHITE
-                val sheet = BackgroundBottomSheet.newInstance(initialColor)
-                sheet.setListener(
-                    object : BackgroundBottomSheet.Listener {
-                        override fun onBackgroundSelected(colorInt: Int, drawableResId: Int?) {
-                            if (drawableResId != null) {
-                                binding.DrawingCanvas.setCanvasBackgroundDrawable(drawableResId)
-                            } else {
-                                binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
-                            }
-                        }
-                    }
-                )
-                sheet.show(supportFragmentManager, "BackgroundBottomSheet")
+                updateDrawingUndoRedoButtons(ivUndo as ImageView, ivRedo as ImageView)
             } else {
-                changeColor()
+                ivRedo.isEnabled = canRedo
+                ivRedo.alpha = if (canRedo) 1f else 0.5f
             }
         }
+
+        // ivBackground đã được loại bỏ khỏi toolbar, chức năng changeColor có thể được truy cập qua menu more
 
         ivPin.setOnClickListener { pin() }
 
@@ -1246,6 +1279,12 @@ abstract class EditActivity(private val type: Type) :
         applySavedBackgroundToCanvas()
         binding.DrawingCanvas.isEnabled = true
         isDrawingModeActive = true
+        // Sync undo/redo state for drawing
+        (binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView)?.let { ivUndo ->
+            (binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView)?.let { ivRedo ->
+                updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+            }
+        }
 
         if (notallyModel.drawingStrokes.isNotEmpty()) {
             binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
@@ -1406,6 +1445,17 @@ abstract class EditActivity(private val type: Type) :
         showFABs()
 
         isDrawingModeActive = false
+        // Restore undo/redo state for note content
+        (binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView)?.let { ivUndo ->
+            (binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView)?.let { ivRedo ->
+                val canUndoNote = changeHistory.canUndo.value
+                val canRedoNote = changeHistory.canRedo.value
+                ivUndo.isEnabled = canUndoNote
+                ivUndo.alpha = if (canUndoNote) 1f else 0.5f
+                ivRedo.isEnabled = canRedoNote
+                ivRedo.alpha = if (canRedoNote) 1f else 0.5f
+            }
+        }
     }
 
     private fun enableEyeDropperMode() {
@@ -1562,6 +1612,11 @@ abstract class EditActivity(private val type: Type) :
             binding.DrawingDivider.visibility = View.VISIBLE
             binding.DrawingCanvas.visibility = View.VISIBLE
             isDrawingModeActive = true
+            (binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView)?.let { ivUndo ->
+                (binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView)?.let { ivRedo ->
+                    updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+                }
+            }
 
             // Set divider position
             val postRunnable = Runnable {
@@ -1919,12 +1974,34 @@ abstract class EditActivity(private val type: Type) :
 
     protected open fun setColor() {
         colorInt = extractColor(notallyModel.color)
+        
+        // Nếu là màu mặc định, sử dụng gradient thay vì màu trắng
+        val isDefaultColor = notallyModel.color == com.philkes.notallyx.data.model.BaseNote.COLOR_DEFAULT
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (isDefaultColor) {
+                // Dùng màu từ gradient cho status bar và navigation bar
+                val gradientColor = ContextCompat.getColor(this, R.color.md_theme_background)
+                window.statusBarColor = gradientColor
+                window.navigationBarColor = gradientColor
+                window.setLightStatusAndNavBar(true)
+            } else {
             window.statusBarColor = colorInt
             window.navigationBarColor = colorInt
             window.setLightStatusAndNavBar(colorInt.isLightColor())
         }
+        }
+        
         binding.apply {
+            if (isDefaultColor) {
+                // Sử dụng gradient cho background mặc định
+                ScrollView.setBackgroundResource(R.drawable.bg_edit_default_gradient)
+                root.setBackgroundResource(R.drawable.bg_edit_default_gradient)
+                RecyclerView.setBackgroundResource(R.drawable.bg_edit_default_gradient)
+                // Toolbar trong suốt để hiển thị gradient
+                Toolbar.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+                Toolbar.setBackgroundColor(Color.TRANSPARENT)
+            } else {
             ScrollView.apply {
                 setBackgroundColor(colorInt)
                 setControlsContrastColorForAllViews(colorInt)
@@ -1933,9 +2010,19 @@ abstract class EditActivity(private val type: Type) :
             RecyclerView.setBackgroundColor(colorInt)
             Toolbar.backgroundTintList = ColorStateList.valueOf(colorInt)
         }
+        }
+        
+        if (!isDefaultColor) {
         setBottomAppBarColor(colorInt)
         fileAdapter.setColor(colorInt)
         audioAdapter.setColor(colorInt)
+        } else {
+            // Dùng màu từ gradient cho bottom bar
+            val gradientColor = ContextCompat.getColor(this, R.color.md_theme_background)
+            setBottomAppBarColor(gradientColor)
+            fileAdapter.setColor(gradientColor)
+            audioAdapter.setColor(gradientColor)
+        }
     }
 
     protected fun setBottomAppBarColor(@ColorInt color: Int) {
@@ -1984,8 +2071,8 @@ abstract class EditActivity(private val type: Type) :
             } else {
                 R.drawable.pin
             }
-        val ivPin = binding.Toolbar.findViewById<ImageView>(R.id.ivPin)
-        ivPin.setImageResource(icon)
+        val ivPin = binding.Toolbar.findViewById<View>(R.id.ivPin) as? ImageButton
+        ivPin?.setImageResource(icon)
     }
 
     data class Search(

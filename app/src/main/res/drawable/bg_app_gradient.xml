@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base gradient - từ light purple đến light orange/peach -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="270"
+            android:startColor="#E8E4F0"
+            android:centerColor="#F0E8E0"
+            android:endColor="#FFE8D4" />
+        </shape>
+    </item>
+    <!-- Radial gradient overlay for soft depth -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.5"
+                android:centerY="0.3"
+                android:gradientRadius="1000dp"
+                android:startColor="#30FFFFFF"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+</layer-list>
+

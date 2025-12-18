@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    app:startDestination="@+id/Notes">
+    app:startDestination="@+id/Home">
+
+    <fragment
+        android:id="@+id/Home"
+        android:name="com.philkes.notallyx.presentation.activity.main.fragment.HomeFragment"
+        android:label="Home" />
 
     <fragment
         android:id="@+id/Notes"
@@ -86,5 +91,10 @@
         android:id="@+id/Unlabeled"
         android:name="com.philkes.notallyx.presentation.activity.main.fragment.UnlabeledFragment"
         android:label="@string/unlabeled" />
+
+    <fragment
+        android:id="@+id/Checklist"
+        android:name="com.philkes.notallyx.presentation.activity.main.fragment.ChecklistFragment"
+        android:label="List" />
 
 </navigation>

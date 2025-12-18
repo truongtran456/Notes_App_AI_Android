@@ -5,19 +5,19 @@
     <item
         android:id="@+id/icon_home"
         android:icon="@drawable/home"
-        android:title="@string/notes"
+        android:title="Home"
         app:exb_color="#A594F9" />
 
     <item
-        android:id="@+id/icon_archive"
-        android:icon="@drawable/archive"
-        android:title="@string/archived"
+        android:id="@+id/icon_notes"
+        android:icon="@drawable/notebook"
+        android:title="@string/notes"
         app:exb_color="#32C5FF" />
 
     <item
-        android:id="@+id/icon_trash"
-        android:icon="@drawable/delete"
-        android:title="@string/deleted"
+        android:id="@+id/icon_list"
+        android:icon="@drawable/checkbox"
+        android:title="List"
         app:exb_color="#FF5D8F" />
 
     <item

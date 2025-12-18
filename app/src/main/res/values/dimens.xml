@@ -4,7 +4,7 @@
     <dimen name="nav_item_horizontal_padding">12dp</dimen>
     <dimen name="nav_item_vertical_padding">8dp</dimen>
     <dimen name="nav_item_corner">12dp</dimen>
-    <dimen name="nav_width">300dp</dimen>
+    <dimen name="nav_width">320dp</dimen>
 
     <integer name="config_navAnimTime">300</integer>
     <dimen name="dp_0">0dp</dimen>

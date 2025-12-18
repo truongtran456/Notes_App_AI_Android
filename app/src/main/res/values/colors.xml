@@ -142,6 +142,18 @@
     <color name="md_theme_surfaceContainerHigh_highContrast">#E9E7EF</color>
     <color name="md_theme_surfaceContainerHighest_highContrast">#E3E1E9</color>
 
+    <!-- Navigation drawer palette -->
+    <color name="nav_header_gradient_start">#F8F7FF</color>
+    <color name="nav_header_gradient_end">#EDE9FE</color>
+    <color name="nav_background">#FAFAFA</color>
+    <color name="nav_item_selected">#6366F1</color>
+    <color name="nav_item_selected_bg">#EEF0FF</color>
+    <color name="nav_item_unselected">#5A5A5A</color>
+    <color name="nav_item_unselected_bg">#00000000</color>
+    <color name="nav_text_primary">#1A1A1A</color>
+    <color name="nav_text_secondary">#6A6A6A</color>
+    <color name="nav_divider">#E0E0E0</color>
+
 
     <color name="Transparent">#00000000</color>
 
@@ -192,6 +204,7 @@
     <color name="primaryDark">#659BF5</color>
     <color name="colorE1E0E0">#E1E0E0</color>
     <color name="colorCFCFCF">#CFCFCF</color>
+    <color name="text_primary">#1A1A1A</color>
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>

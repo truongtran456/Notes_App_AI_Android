@@ -4,28 +4,31 @@ import android.content.Intent
 import android.os.Bundle
 import android.transition.TransitionManager
 import android.view.Menu
-import android.view.Menu.CATEGORY_CONTAINER
-import android.view.Menu.CATEGORY_SYSTEM
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.graphics.Color
+import android.content.res.ColorStateList
+import android.view.inputmethod.InputMethodManager
+import android.text.Editable
+import android.text.TextWatcher
+import android.widget.EditText
 import androidx.appcompat.widget.PopupMenu
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.activity.enableEdgeToEdge
-import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.children
+import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.core.view.updateLayoutParams
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.appcompat.app.AppCompatDelegate
-import com.google.android.material.color.MaterialColors
+import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
@@ -41,7 +44,6 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.transition.platform.MaterialFade
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.NotallyDatabase
-import android.widget.Toast
 import com.philkes.notallyx.data.model.BaseNote
 import com.philkes.notallyx.data.model.Folder
 import com.philkes.notallyx.data.model.Type
@@ -75,6 +77,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import github.com.st235.lib_expandablebottombar.ExpandableBottomBar
+import com.philkes.notallyx.presentation.view.main.DrawerAdapter
+import com.philkes.notallyx.presentation.view.main.DrawerEntry
+import com.philkes.notallyx.presentation.view.main.PinnedNoteAdapter
 
 class MainActivity : LockedActivity<ActivityMainBinding>() {
 
@@ -184,34 +189,16 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     }
 
     private fun applyBackgroundForTheme(theme: Theme) {
-        if (theme == Theme.FOLLOW_SYSTEM) {
-            // Khi chọn Follow system: dùng nền đặc biệt bg_background cho toàn màn Main + navigation
-            window.setBackgroundDrawableResource(R.drawable.bg_background)
-            binding.root.setBackgroundResource(R.drawable.bg_background)
-            binding.DrawerLayout.setBackgroundResource(R.drawable.bg_background)
-            binding.NavigationView.setBackgroundResource(android.R.color.transparent)
-        } else {
-            // Các theme khác: trả về nền mặc định của theme (màu background của Material 3)
-            window.setBackgroundDrawable(null)
-            val surfaceColor =
-                MaterialColors.getColor(
-                    binding.root,
-                    com.google.android.material.R.attr.colorSurface
-                )
-            binding.root.setBackgroundColor(surfaceColor)
-            binding.DrawerLayout.setBackgroundColor(surfaceColor)
-            binding.NavigationView.setBackgroundColor(
-                MaterialColors.getColor(
-                    binding.NavigationView,
-                    com.google.android.material.R.attr.colorSurfaceContainerLow
-                )
-            )
-        }
+        // Dùng gradient thống nhất cho toàn app
+        window.setBackgroundDrawableResource(R.drawable.bg_app_gradient)
+        binding.root.setBackgroundResource(R.drawable.bg_app_gradient)
+        binding.DrawerLayout.setBackgroundResource(R.drawable.bg_app_gradient)
+        // Đồng bộ màu thanh điều hướng với nền app để tránh ám đen
+        val navColor = ContextCompat.getColor(this, R.color.md_theme_background)
+        window.navigationBarColor = navColor
     }
 
     private fun setupWindowInsets() {
-        // Xử lý window insets cho NavigationDrawerContainer để drawer không bị cắt
-        // DrawerLayout cần full screen để drawer có thể slide, nhưng container bên trong cần padding
         val navigationContainer = binding.root.findViewById<ViewGroup>(R.id.NavigationDrawerContainer)
         if (navigationContainer != null) {
             ViewCompat.setOnApplyWindowInsetsListener(navigationContainer) { view, insets ->
@@ -234,18 +221,25 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
             val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
             
-            // Padding cho toolbar để tránh status bar
+            // Padding cho tất cả toolbar để tránh status bar (nằm dưới status bar)
             binding.Toolbar.updatePadding(top = statusBars.top)
+            binding.HomeToolbar.updatePadding(top = statusBars.top)
+            binding.NotesToolbar.updatePadding(top = statusBars.top)
+            binding.ActionMode.updatePadding(top = statusBars.top)
             
             // Điều chỉnh margin bottom cho bottom bar theo chiều cao navigation bar
             // Chỉ set bottomMargin, không thay đổi margin khác
             val bottomBarBottomMargin = navBars.bottom
-            val fabMargin = resources.getDimensionPixelSize(R.dimen.dp_16) + navBars.bottom
+            // FAB cần cao hơn bottom bar (68dp minHeight + 16dp margin + 16dp padding = 100dp) + nav bar
+            val fabMargin = resources.getDimensionPixelSize(R.dimen.dp_100) + navBars.bottom
             
-            binding.expandableBottomBar.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            // BottomBarContainer là MaterialCardView trong ConstraintLayout
+            val bottomBarContainer = binding.root.findViewById<ViewGroup>(R.id.BottomBarContainer)
+            bottomBarContainer?.updateLayoutParams<androidx.constraintlayout.widget.ConstraintLayout.LayoutParams> {
                 bottomMargin = bottomBarBottomMargin
             }
-            binding.FabContainer.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            
+            binding.FabContainer?.updateLayoutParams<androidx.constraintlayout.widget.ConstraintLayout.LayoutParams> {
                 bottomMargin = fabMargin
             }
             
@@ -302,10 +296,27 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         
         setupFAB()
         setupMenu()
-        setupDrawerFooter()
         setupActionMode()
         setupNavigation()
         setupExpandableBottomBar()
+        setupHomeTopBar()
+        setupNotesTopBar()
+        
+        // Set visibility ban đầu cho toolbars
+        val currentDestination = navController.currentDestination?.id
+        if (currentDestination == R.id.Home) {
+            binding.Toolbar?.isVisible = false
+            binding.HomeToolbar?.isVisible = true
+            binding.NotesToolbar?.isVisible = false
+        } else if (currentDestination == R.id.Notes || currentDestination == R.id.DisplayLabel || currentDestination == R.id.Unlabeled) {
+            binding.Toolbar?.isVisible = false
+            binding.HomeToolbar?.isVisible = false
+            binding.NotesToolbar?.isVisible = true
+        } else {
+            binding.Toolbar?.isVisible = true
+            binding.HomeToolbar?.isVisible = false
+            binding.NotesToolbar?.isVisible = false
+        }
 
         setupActivityResultLaunchers()
 
@@ -336,7 +347,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
 
     private fun getStartViewNavigation(): Pair<Int, Bundle> {
         return when (val startView = preferences.startView.value) {
-            START_VIEW_DEFAULT -> Pair(R.id.Notes, Bundle())
+            START_VIEW_DEFAULT -> Pair(R.id.Home, Bundle()) // Home là màn hình đầu tiên
             START_VIEW_UNLABELED -> Pair(R.id.Unlabeled, Bundle())
             else -> {
                 val bundle = Bundle().apply { putString(EXTRA_DISPLAYED_LABEL, startView) }
@@ -441,156 +452,319 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             } ?: intent
     }
 
-    private var labelsMenuItems: List<MenuItem> = listOf()
-    private var labelsMoreMenuItem: MenuItem? = null
     private var labels: List<String> = listOf()
     private var labelsLiveData: LiveData<List<String>>? = null
+    private var drawerAdapter: DrawerAdapter? = null
+    private var drawerEntries: List<DrawerEntry> = emptyList()
+    private var selectedDrawerId: String = "notes"
+    private var isSearchExpanded = false
+    private var isNotesSearchExpanded = false
+    private var homeSearchListener: ((String) -> Unit)? = null
+    private var homeAddListener: (() -> Unit)? = null
+    private var notesSearchListener: ((String) -> Unit)? = null
 
-    private fun setupMenu() {
-        binding.NavigationView.menu.apply {
-            add(0, R.id.Notes, 0, R.string.notes).setCheckable(true).setIcon(R.drawable.home)
+    private fun setupDrawerRecycler() {
+        val drawerRecycler = binding.root.findViewById<RecyclerView>(R.id.DrawerRecyclerView)
+        val themeToggle = binding.root.findViewById<com.google.android.material.button.MaterialButtonToggleGroup>(R.id.ThemeToggle)
+        val btnSystem = binding.root.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnThemeSystem)
+        val btnLight = binding.root.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnThemeLight)
+        val btnDark = binding.root.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnThemeDark)
+        drawerAdapter =
+            DrawerAdapter(
+                onItemClick = { entry ->
+                    when (entry) {
+                        is DrawerEntry.Item -> handleDrawerItemClick(entry.id)
+                        is DrawerEntry.Child -> handleDrawerItemClick(entry.id)
+                        is DrawerEntry.Section -> Unit
+                    }
+                },
+            )
+        drawerRecycler?.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = drawerAdapter
+            setHasFixedSize(false)
+        }
 
-            addStaticLabelsMenuItems()
             NotallyDatabase.getDatabase(application).observe(this@MainActivity) { database ->
                 labelsLiveData?.removeObservers(this@MainActivity)
                 labelsLiveData =
                     database.getLabelDao().getAll().also {
                         it.observe(this@MainActivity) { labels ->
                             this@MainActivity.labels = labels
-                            setupLabelsMenuItems(labels, preferences.maxLabels.value)
+                        refreshDrawer()
                         }
                     }
             }
 
-            add(2, R.id.Deleted, CATEGORY_SYSTEM + 1, R.string.deleted)
-                .setCheckable(true)
-                .setIcon(R.drawable.delete)
-            add(2, R.id.Archived, CATEGORY_SYSTEM + 2, R.string.archived)
-                .setCheckable(true)
-                .setIcon(R.drawable.archive)
-            add(3, R.id.Reminders, CATEGORY_SYSTEM + 3, R.string.reminders)
-                .setCheckable(true)
-                .setIcon(R.drawable.notifications)
-            add(3, R.id.Settings, CATEGORY_SYSTEM + 4, R.string.settings)
-                .setCheckable(true)
-                .setIcon(R.drawable.settings)
-        }
-        baseModel.preferences.labelsHiddenInNavigation.observe(this) { hiddenLabels ->
-            hideLabelsInNavigation(hiddenLabels, baseModel.preferences.maxLabels.value)
-        }
-        baseModel.preferences.maxLabels.observe(this) { maxLabels ->
-            binding.NavigationView.menu.setupLabelsMenuItems(labels, maxLabels)
-        }
-    }
+        fun applyToggle(theme: Theme) {
+            val systemBtn = btnSystem ?: return
+            val lightBtn = btnLight ?: return
+            val darkBtn = btnDark ?: return
+            val selectedTint = ColorStateList.valueOf(Color.parseColor("#EEF0FF"))
+            val unselectedTint = ColorStateList.valueOf(Color.TRANSPARENT)
+            val selectedText = Color.parseColor("#1A1A1A")
+            val unselectedText = Color.parseColor("#5A5A5A")
 
-    private fun setupDrawerFooter() {
-        // Setup theme toggle - find footer view from root
-        val drawerFooter = binding.root.findViewById<View>(R.id.DrawerFooter)
-        val themeLight = drawerFooter?.findViewById<com.google.android.material.button.MaterialButton>(R.id.ThemeLight)
-        val themeDark = drawerFooter?.findViewById<com.google.android.material.button.MaterialButton>(R.id.ThemeDark)
+            fun style(btn: com.google.android.material.button.MaterialButton, selected: Boolean) {
+                btn.backgroundTintList = if (selected) selectedTint else unselectedTint
+                btn.setTextColor(if (selected) selectedText else unselectedText)
+                btn.iconTint = ColorStateList.valueOf(if (selected) selectedText else unselectedText)
+            }
 
-        if (themeLight != null && themeDark != null) {
-            // Update theme buttons state based on current theme
-            preferences.theme.observe(this) { currentTheme ->
-                when (currentTheme) {
-                    Theme.LIGHT -> {
-                        themeLight.isSelected = true
-                        themeDark.isSelected = false
-                        themeLight.backgroundTintList = ContextCompat.getColorStateList(this, R.color.md_theme_primaryContainer)
-                        themeDark.backgroundTintList = null
-                    }
-                    Theme.DARK -> {
-                        themeLight.isSelected = false
-                        themeDark.isSelected = true
-                        themeLight.backgroundTintList = null
-                        themeDark.backgroundTintList = ContextCompat.getColorStateList(this, R.color.md_theme_primaryContainer)
-                    }
-                    Theme.FOLLOW_SYSTEM -> {
-                        themeLight.isSelected = false
-                        themeDark.isSelected = false
-                        themeLight.backgroundTintList = null
-                        themeDark.backgroundTintList = null
-                    }
+            style(systemBtn, theme == Theme.FOLLOW_SYSTEM)
+            style(lightBtn, theme == Theme.LIGHT)
+            style(darkBtn, theme == Theme.DARK)
+            when (theme) {
+                Theme.FOLLOW_SYSTEM -> {
+                    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+                    themeToggle?.check(R.id.BtnThemeSystem)
+                }
+                Theme.LIGHT -> {
+                    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                    themeToggle?.check(R.id.BtnThemeLight)
+                }
+                Theme.DARK -> {
+                    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                    themeToggle?.check(R.id.BtnThemeDark)
                 }
             }
+            baseModel.savePreference(preferences.theme, theme)
+        }
 
-            themeLight.setOnClickListener {
-                baseModel.savePreference(preferences.theme, Theme.LIGHT)
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                recreate()
+        themeToggle?.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            when (checkedId) {
+                R.id.BtnThemeSystem -> applyToggle(Theme.FOLLOW_SYSTEM)
+                R.id.BtnThemeLight -> applyToggle(Theme.LIGHT)
+                R.id.BtnThemeDark -> applyToggle(Theme.DARK)
+            }
+        }
+
+        // Default to system; respect stored preference if present
+        when (preferences.theme.value) {
+            Theme.LIGHT -> applyToggle(Theme.LIGHT)
+            Theme.DARK -> applyToggle(Theme.DARK)
+            else -> applyToggle(Theme.FOLLOW_SYSTEM)
+        }
             }
 
-            themeDark.setOnClickListener {
-                baseModel.savePreference(preferences.theme, Theme.DARK)
-                AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                recreate()
+    private val searchDebounceRunnable = android.os.Handler(android.os.Looper.getMainLooper())
+    
+    private fun setupHomeTopBar() {
+        binding.HomeMenuButton?.setOnClickListener {
+            binding.DrawerLayout.openDrawer(GravityCompat.START)
+        }
+        binding.HomeSearchButton?.setOnClickListener { toggleSearch() }
+        binding.HomeAddButton?.setOnClickListener { homeAddListener?.invoke() }
+        
+        // Debounce search input to avoid lag when typing
+        binding.HomeSearchInput?.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // Remove previous pending search
+                searchDebounceRunnable.removeCallbacksAndMessages(null)
+                // Debounce search by 300ms
+                val query = s?.toString().orEmpty()
+                searchDebounceRunnable.postDelayed({
+                    homeSearchListener?.invoke(query)
+                }, 300)
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        collapseSearch(clearText = true, hideKeyboard = false)
+    }
+
+    private fun setupNotesTopBar() {
+        binding.NotesMenuButton?.setOnClickListener {
+            binding.DrawerLayout.openDrawer(GravityCompat.START)
+        }
+        binding.NotesSearchButton?.setOnClickListener { toggleNotesSearch() }
+        binding.NotesMoreButton?.setOnClickListener {
+            // Mở menu options (3 chấm)
+            openOptionsMenu()
+        }
+        // Đảm bảo icon more luôn hiển thị và có màu đen
+        binding.NotesMoreButton?.visibility = View.VISIBLE
+        binding.NotesMoreButton?.imageTintList = ColorStateList.valueOf(Color.BLACK)
+        
+        // Debounce search input to avoid lag when typing
+        binding.NotesSearchInput?.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                // Remove previous pending search
+                searchDebounceRunnable.removeCallbacksAndMessages(null)
+                // Debounce search by 300ms
+                val query = s?.toString().orEmpty()
+                searchDebounceRunnable.postDelayed({
+                    notesSearchListener?.invoke(query)
+                }, 300)
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+        collapseNotesSearch(clearText = true, hideKeyboard = false)
+    }
+
+    private fun toggleSearch() {
+        val input = binding.HomeSearchInput
+        if (!isSearchExpanded) {
+            expandSearch()
+        } else {
+            if (input?.text.isNullOrEmpty()) {
+                collapseSearch(clearText = false, hideKeyboard = true)
+            } else {
+                input?.setText("")
             }
         }
     }
 
-    private fun Menu.addStaticLabelsMenuItems() {
-        add(1, R.id.Unlabeled, CATEGORY_CONTAINER + 1, R.string.unlabeled)
-            .setCheckable(true)
-            .setChecked(baseModel.currentLabel == CURRENT_LABEL_NONE)
-            .setIcon(R.drawable.label_off)
-        add(1, R.id.Labels, CATEGORY_CONTAINER + 2, R.string.labels)
-            .setCheckable(true)
-            .setIcon(R.drawable.label_more)
+    private fun expandSearch() {
+        isSearchExpanded = true
+        binding.HomeSearchHint?.visibility = View.GONE
+        binding.HomeSearchInput?.visibility = View.VISIBLE
+        binding.HomeSearchInput?.requestFocus()
+        binding.HomeSearchButton?.setImageResource(R.drawable.close)
+        showKeyboard(binding.HomeSearchInput)
     }
 
-    private fun Menu.setupLabelsMenuItems(labels: List<String>, maxLabelsToDisplay: Int) {
-        removeGroup(1)
-        addStaticLabelsMenuItems()
-        labelsMenuItems =
-            labels
-                .mapIndexed { index, label ->
-                    add(1, R.id.DisplayLabel, CATEGORY_CONTAINER + index + 3, label)
-                        .setCheckable(true)
-                        .setChecked(baseModel.currentLabel == label)
-                        .setVisible(index < maxLabelsToDisplay)
-                        .setIcon(R.drawable.label)
-                        .setOnMenuItemClickListener {
-                            navigateToLabel(label)
-                            false
-                        }
-                }
-                .toList()
+    private fun collapseSearch(clearText: Boolean = true, hideKeyboard: Boolean = true) {
+        isSearchExpanded = false
+        if (clearText) {
+            binding.HomeSearchInput?.setText("")
+            homeSearchListener?.invoke("")
+        }
+        binding.HomeSearchHint?.visibility = View.VISIBLE
+        binding.HomeSearchInput?.visibility = View.GONE
+        binding.HomeSearchButton?.setImageResource(R.drawable.ic_search)
+        if (hideKeyboard) {
+            hideKeyboard(binding.HomeSearchInput)
+        }
+    }
 
-        labelsMoreMenuItem =
-            if (labelsMenuItems.size > maxLabelsToDisplay) {
-                add(
-                        1,
-                        R.id.Labels,
-                        CATEGORY_CONTAINER + labelsMenuItems.size + 2,
-                        getString(R.string.more, labelsMenuItems.size - maxLabelsToDisplay),
-                    )
-                    .setCheckable(true)
-                    .setIcon(R.drawable.label)
-            } else null
-        configuration = AppBarConfiguration(binding.NavigationView.menu, binding.DrawerLayout)
-        setupActionBarWithNavController(navController, configuration)
-        hideLabelsInNavigation(
-            baseModel.preferences.labelsHiddenInNavigation.value,
-            maxLabelsToDisplay,
+    private fun showKeyboard(editText: EditText?) {
+        editText ?: return
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+                    }
+
+    private fun hideKeyboard(view: View?) {
+        view ?: return
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(view.windowToken, 0)
+    }
+
+    private fun toggleNotesSearch() {
+        val input = binding.NotesSearchInput
+        if (!isNotesSearchExpanded) {
+            expandNotesSearch()
+        } else {
+            if (input?.text.isNullOrEmpty()) {
+                collapseNotesSearch(clearText = false, hideKeyboard = true)
+            } else {
+                input?.setText("")
+            }
+        }
+    }
+
+    private fun expandNotesSearch() {
+        isNotesSearchExpanded = true
+        binding.NotesSearchHint?.visibility = View.GONE
+        binding.NotesSearchInput?.visibility = View.VISIBLE
+        binding.NotesSearchInput?.requestFocus()
+        binding.NotesSearchButton?.setImageResource(R.drawable.close)
+        showKeyboard(binding.NotesSearchInput)
+    }
+
+    private fun collapseNotesSearch(clearText: Boolean = true, hideKeyboard: Boolean = true) {
+        isNotesSearchExpanded = false
+        if (clearText) {
+            binding.NotesSearchInput?.setText("")
+            notesSearchListener?.invoke("")
+        }
+        binding.NotesSearchHint?.visibility = View.VISIBLE
+        binding.NotesSearchInput?.visibility = View.GONE
+        binding.NotesSearchButton?.setImageResource(R.drawable.ic_search)
+        if (hideKeyboard) {
+            hideKeyboard(binding.NotesSearchInput)
+        }
+            }
+
+    private fun refreshDrawer() {
+        drawerEntries = buildDrawerEntries(labels)
+        drawerAdapter?.submitList(drawerEntries)
+        drawerAdapter?.selectedId = selectedDrawerId
+    }
+
+    private fun buildDrawerEntries(labels: List<String>): List<DrawerEntry> {
+        val list = mutableListOf<DrawerEntry>()
+        list.add(DrawerEntry.Item("notes", getString(R.string.notes), R.drawable.home))
+        list.add(
+            DrawerEntry.Item(
+                "unlabeled",
+                getString(R.string.unlabeled),
+                R.drawable.label_off,
+            )
         )
+        list.add(
+            DrawerEntry.Item(
+                "reminders",
+                getString(R.string.reminders),
+                R.drawable.notifications,
+            )
+        )
+        if (labels.isNotEmpty()) {
+            list.add(DrawerEntry.Section("labels_header", getString(R.string.labels)))
+            list.addAll(labels.map { DrawerEntry.Child(id = "label:$it", title = it) })
+        }
+        list.add(DrawerEntry.Section("storage_header", getString(R.string.nav_storage)))
+        list.add(
+            DrawerEntry.Item(
+                "archived",
+                getString(R.string.archived),
+                R.drawable.archive,
+            )
+        )
+        list.add(
+            DrawerEntry.Item(
+                "deleted",
+                getString(R.string.deleted),
+                R.drawable.delete,
+            )
+        )
+        list.add(DrawerEntry.Section("settings_header", getString(R.string.settings)))
+        list.add(
+            DrawerEntry.Item(
+                "settings",
+                getString(R.string.settings),
+                R.drawable.settings,
+            )
+        )
+        return list
+    }
+
+    private fun handleDrawerItemClick(id: String) {
+        when {
+            id == "notes" -> navigateWithAnimation(R.id.Notes)
+            id == "unlabeled" -> navigateWithAnimation(R.id.Unlabeled)
+            id.startsWith("label:") -> {
+                val label = id.removePrefix("label:")
+                            navigateToLabel(label)
+            }
+            id == "deleted" -> navigateWithAnimation(R.id.Deleted)
+            id == "archived" -> navigateWithAnimation(R.id.Archived)
+            id == "reminders" -> navigateWithAnimation(R.id.Reminders)
+            id == "settings" -> navigateWithAnimation(R.id.Settings)
+        }
+        selectedDrawerId = id
+        drawerAdapter?.selectedId = selectedDrawerId
+        binding.DrawerLayout.closeDrawer(GravityCompat.START)
+    }
+    private fun setupMenu() {
+        setupDrawerRecycler()
     }
 
     private fun navigateToLabel(label: String) {
         val bundle = Bundle().apply { putString(EXTRA_DISPLAYED_LABEL, label) }
         navController.navigate(R.id.DisplayLabel, bundle)
-    }
-
-    private fun hideLabelsInNavigation(hiddenLabels: Set<String>, maxLabelsToDisplay: Int) {
-        var visibleLabels = 0
-        labelsMenuItems.forEach { menuItem ->
-            val visible =
-                !hiddenLabels.contains(menuItem.title) && visibleLabels < maxLabelsToDisplay
-            menuItem.setVisible(visible)
-            if (visible) {
-                visibleLabels++
-            }
-        }
-        labelsMoreMenuItem?.setTitle(getString(R.string.more, labels.size - visibleLabels))
     }
 
     private fun setupActionMode() {
@@ -605,7 +779,6 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 excludeTarget(binding.MakeList, true)
                 excludeTarget(binding.MainFab, true)
                 excludeTarget(binding.FabContainer, true)
-                excludeTarget(binding.NavigationView, true)
             }
 
         baseModel.actionMode.enabled.observe(this) { enabled ->
@@ -741,49 +914,52 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         // Scrim tối cho drawer, tránh trong suốt
         binding.DrawerLayout.setScrimColor(Color.parseColor("#80000000"))
 
-        configuration = AppBarConfiguration(binding.NavigationView.menu, binding.DrawerLayout)
+        configuration =
+            AppBarConfiguration(
+                setOf(
+                    R.id.Home,
+                    R.id.Notes,
+                    R.id.DisplayLabel,
+                    R.id.Unlabeled,
+                    R.id.Deleted,
+                    R.id.Archived,
+                    R.id.Reminders,
+                    R.id.Settings,
+                ),
+                binding.DrawerLayout,
+            )
         setupActionBarWithNavController(navController, configuration)
 
-        var fragmentIdToLoad: Int? = null
-        binding.NavigationView.setNavigationItemSelectedListener { item ->
-            fragmentIdToLoad = item.itemId
-            binding.DrawerLayout.closeDrawer(GravityCompat.START)
-            return@setNavigationItemSelectedListener true
-        }
-
-        binding.DrawerLayout.addDrawerListener(
-            object : DrawerLayout.SimpleDrawerListener() {
-
-                override fun onDrawerClosed(drawerView: View) {
-                    if (
-                        fragmentIdToLoad != null &&
-                            navController.currentDestination?.id != fragmentIdToLoad
-                    ) {
-                        navigateWithAnimation(requireNotNull(fragmentIdToLoad))
-                    }
-                }
-            }
-        )
-
         navController.addOnDestinationChangedListener { _, destination, bundle ->
-            fragmentIdToLoad = destination.id
-            when (fragmentIdToLoad) {
-                R.id.DisplayLabel ->
-                    bundle?.getString(EXTRA_DISPLAYED_LABEL)?.let {
-                        baseModel.currentLabel = it
-                        binding.NavigationView.menu.children
-                            .find { menuItem -> menuItem.title == it }
-                            ?.let { menuItem -> menuItem.isChecked = true }
+            // Ẩn hamburger menu ở Home
+            if (destination.id == R.id.Home) {
+                supportActionBar?.setDisplayHomeAsUpEnabled(false)
+                binding.Toolbar.navigationIcon = null
+            } else {
+                supportActionBar?.setDisplayHomeAsUpEnabled(true)
+                    }
+            
+            selectedDrawerId =
+                when (destination.id) {
+                    R.id.DisplayLabel -> {
+                        val label = bundle?.getString(EXTRA_DISPLAYED_LABEL)
+                        baseModel.currentLabel = label ?: CURRENT_LABEL_EMPTY
+                        label?.let { "label:$it" } ?: "labels"
                     }
                 R.id.Unlabeled -> {
                     baseModel.currentLabel = CURRENT_LABEL_NONE
-                    binding.NavigationView.setCheckedItem(destination.id)
+                        "unlabeled"
                 }
+                    R.id.Deleted -> "deleted"
+                    R.id.Archived -> "archived"
+                    R.id.Reminders -> "reminders"
+                    R.id.Settings -> "settings"
                 else -> {
                     baseModel.currentLabel = CURRENT_LABEL_EMPTY
-                    binding.NavigationView.setCheckedItem(destination.id)
+                        "notes"
                 }
             }
+            drawerAdapter?.selectedId = selectedDrawerId
             when (destination.id) {
                 R.id.Notes,
                 R.id.DisplayLabel,
@@ -801,9 +977,41 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 }
             }
 
-            // Toolbar luôn transparent để background full màn hình hiển thị
+            // Toolbar luôn transparent để background full màn hình hiển thị - suôn sẽ mượt mà
             binding.Toolbar.setBackgroundColor(android.graphics.Color.TRANSPARENT)
             binding.Toolbar.elevation = 0f
+            binding.Toolbar.background = null
+            binding.ActionMode.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            binding.ActionMode.elevation = 0f
+            binding.ActionMode.background = null
+            
+            // Ẩn/hiện toolbar tùy theo fragment
+            if (destination.id == R.id.Home) {
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false // Ẩn toolbar mặc định
+                binding.HomeToolbar?.isVisible = true // Hiển thị Home toolbar
+                binding.NotesToolbar?.isVisible = false
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else if (destination.id == R.id.Notes || destination.id == R.id.DisplayLabel || destination.id == R.id.Unlabeled) {
+                // Hiển thị Notes toolbar (giống Home nhưng không có avatar và có nút more)
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false // Ẩn toolbar mặc định
+                binding.HomeToolbar?.isVisible = false // Đảm bảo HomeToolbar bị ẩn
+                binding.NotesToolbar?.isVisible = true // Hiển thị Notes toolbar
+                // Đảm bảo icon more luôn hiển thị
+                binding.NotesMoreButton?.visibility = View.VISIBLE
+                binding.NotesMoreButton?.isVisible = true
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else {
+                supportActionBar?.setDisplayShowTitleEnabled(true)
+                binding.Toolbar?.isVisible = true // Hiển thị toolbar mặc định
+                binding.HomeToolbar?.isVisible = false
+                binding.NotesToolbar?.isVisible = false
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            }
+            
             isStartViewFragment = isStartViewFragment(destination.id, bundle)
             // Cập nhật lại menu mỗi khi đổi màn hình (đảm bảo 3 chấm không xuất hiện ở Settings)
             invalidateOptionsMenu()
@@ -839,12 +1047,20 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     private fun setupExpandableBottomBar() {
         val bottomBar = binding.root.findViewById<ExpandableBottomBar>(R.id.expandable_bottom_bar)
             ?: return
+        
+        // Đặt nền bottom bar theo màu nền app
+        val backgroundColor = ContextCompat.getColor(this, R.color.md_theme_background)
+        bottomBar.setBackgroundColor(backgroundColor)
+        
+        // Cũng set cho container để đảm bảo
+        val container = binding.root.findViewById<ViewGroup>(R.id.BottomBarContainer)
+        container?.setBackgroundColor(backgroundColor)
 
         // Map menu item IDs với destination IDs
         val menuItemToDestinationMap = mapOf(
-            R.id.icon_home to R.id.Notes,
-            R.id.icon_archive to R.id.Archived,
-            R.id.icon_trash to R.id.Deleted,
+            R.id.icon_home to R.id.Home,
+            R.id.icon_notes to R.id.Notes,
+            R.id.icon_list to R.id.Checklist,
             R.id.icon_settings to R.id.Settings
         )
         
@@ -895,9 +1111,9 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         
         // Map destination IDs với menu item IDs
         val destinationToMenuItemMap = mapOf(
-            R.id.Notes to R.id.icon_home,
-            R.id.Archived to R.id.icon_archive,
-            R.id.Deleted to R.id.icon_trash,
+            R.id.Home to R.id.icon_home,
+            R.id.Notes to R.id.icon_notes,
+            R.id.Checklist to R.id.icon_list,
             R.id.Settings to R.id.icon_settings
         )
         
@@ -1136,6 +1352,23 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 }
             }
         }
+    }
+
+    fun setupHomeAvatarButton(onClick: () -> Unit) {
+        binding.HomeAppAvatarCard?.setOnClickListener { onClick() }
+    }
+    
+    fun setupHomeSearch(onQueryChange: (String) -> Unit) {
+        homeSearchListener = onQueryChange
+    }
+    
+    fun setupNotesSearch(onQueryChange: (String) -> Unit) {
+        notesSearchListener = onQueryChange
+    }
+    
+    fun setupHomeAddButton(onClick: () -> Unit) {
+        homeAddListener = onClick
+        binding.HomeAddButton?.setOnClickListener { homeAddListener?.invoke() }
     }
 
     companion object {

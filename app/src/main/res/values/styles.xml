@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Toggle buttons in drawer footer -->
+    <style name="ToggleButtonStyle" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:backgroundTint">@null</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.MaterialComponents.SmallComponent</item>
+        <item name="rippleColor">@android:color/transparent</item>
+        <item name="android:textColor">#FFFFFFFF</item>
+        <item name="iconTint">#FFFFFFFF</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+</resources>
+

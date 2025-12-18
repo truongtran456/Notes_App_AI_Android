@@ -28,7 +28,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     View(context, attrs, defStyleAttr) {
 
     init {
-        // ??m b?o view có th? nh?n touch events
+        // ??m b?o view cï¿½ th? nh?n touch events
         isClickable = true
         isFocusable = true
     }
@@ -42,17 +42,18 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     // L?u strokes ?? persist drawing
     private val savedStrokes = mutableListOf<DrawingStroke>()
+    private val redoStrokes = mutableListOf<DrawingStroke>()
 
     // Bitmap ?? l?u drawing state (backup cho eyedropper)
     private var savedDrawingBitmap: Bitmap? = null
-    private var dividerY: Float = 0f // V? trí ???ng divider
+    private var dividerY: Float = 0f // V? trï¿½ ???ng divider
 
-    // Bitmaps ?? x? lý eraser (theo flow Starnest)
-    private var layerBitmap: Bitmap? = null // Ch?a t?t c? strokes ?ã v? (?ã ???c update v?i eraser)
+    // Bitmaps ?? x? lï¿½ eraser (theo flow Starnest)
+    private var layerBitmap: Bitmap? = null // Ch?a t?t c? strokes ?ï¿½ v? (?ï¿½ ???c update v?i eraser)
     private var strokeBitmap: Bitmap? = null // Bitmap t?m ?? v? stroke m?i (v?i eraser)
     private var resultBitmap: Bitmap? = null // Bitmap k?t qu? (?? hi?n th?)
     private var hasEraserBeenUsed: Boolean =
-        false // Flag ?? ?ánh d?u ?ã dùng eraser (layerBitmap ?ã b? modify)
+        false // Flag ?? ?ï¿½nh d?u ?ï¿½ dï¿½ng eraser (layerBitmap ?ï¿½ b? modify)
 
     // Eyedropper mode
     private var isEyeDropperMode: Boolean = false
@@ -68,6 +69,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     // Bitmap ?? l?u canvas content cho eyedropper
     private var canvasBitmap: Bitmap? = null
+
+    // Stroke change listener (for enabling/disabling undo/redo in toolbar)
+    private var onStrokesChanged: (() -> Unit)? = null
 
     private val paint =
         Paint().apply {
@@ -96,7 +100,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     data class DrawingPath(val path: Path, val paint: Paint)
 
-    /** Thay ??i màu n?n cho vùng canvas (d??i các strokes) */
+    /** Thay ??i mï¿½u n?n cho vï¿½ng canvas (d??i cï¿½c strokes) */
     fun setCanvasBackgroundColor(color: Int) {
         canvasBackgroundColor = color
         backgroundBitmap = null
@@ -104,7 +108,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         invalidate()
     }
 
-    /** Set background b?ng drawable (?nh). N?u truy?n null s? quay l?i dùng màu. */
+    /** Set background b?ng drawable (?nh). N?u truy?n null s? quay l?i dï¿½ng mï¿½u. */
     fun setCanvasBackgroundDrawable(@DrawableRes resId: Int?) {
         backgroundDrawableResId = resId
         if (resId == null) {
@@ -129,7 +133,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         if (brush != null) {
             updatePaint()
         } else {
-            // Clear brush - không th? v? ???c n?a
+            // Clear brush - khï¿½ng th? v? ???c n?a
             currentPath = null
             paths.clear()
         }
@@ -137,20 +141,20 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
     private fun updatePaint() {
         currentBrush?.let { brush ->
-            // X? lý màu
+            // X? lï¿½ mï¿½u
             try {
                 paint.color = Color.parseColor(brush.color)
             } catch (e: IllegalArgumentException) {
-                paint.color = Color.BLACK // Fallback n?u màu không h?p l?
+                paint.color = Color.BLACK // Fallback n?u mï¿½u khï¿½ng h?p l?
             }
 
-            // X? lý kích th??c (sliderSize có th? t? 0-100, convert sang pixel)
+            // X? lï¿½ kï¿½ch th??c (sliderSize cï¿½ th? t? 0-100, convert sang pixel)
             paint.strokeWidth = brush.sliderSize.coerceIn(1f, 100f)
 
-            // X? lý opacity (0-1 ? 0-255)
+            // X? lï¿½ opacity (0-1 ? 0-255)
             paint.alpha = ((brush.opacity.coerceIn(0f, 1f)) * 255).toInt()
 
-            // X? lý brush type (Pen, Pencil, AirBrush, etc.)
+            // X? lï¿½ brush type (Pen, Pencil, AirBrush, etc.)
             when (brush.brush) {
                 Brush.Pen,
                 Brush.Pencil,
@@ -165,31 +169,31 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                     paint.strokeCap = Paint.Cap.ROUND
                     paint.strokeJoin = Paint.Join.ROUND
                     paint.style = Paint.Style.STROKE
-                    // AirBrush và Marker có th? c?n blur effect (tùy ch?n)
+                    // AirBrush vï¿½ Marker cï¿½ th? c?n blur effect (tï¿½y ch?n)
                 }
                 Brush.DashLine -> {
                     paint.strokeCap = Paint.Cap.ROUND
                     paint.strokeJoin = Paint.Join.ROUND
                     paint.style = Paint.Style.STROKE
-                    // DashLine c?n path effect (có th? thêm sau)
+                    // DashLine c?n path effect (cï¿½ th? thï¿½m sau)
                 }
                 Brush.NeonLine -> {
                     paint.strokeCap = Paint.Cap.ROUND
                     paint.strokeJoin = Paint.Join.ROUND
                     paint.style = Paint.Style.STROKE
-                    // NeonLine có th? c?n glow effect (tùy ch?n)
+                    // NeonLine cï¿½ th? c?n glow effect (tï¿½y ch?n)
                 }
                 Brush.HardEraser,
                 Brush.SoftEraser -> {
-                    // Eraser: xóa thay vì v? màu
+                    // Eraser: xï¿½a thay vï¿½ v? mï¿½u
                     paint.strokeCap = Paint.Cap.ROUND
                     paint.strokeJoin = Paint.Join.ROUND
                     paint.style = Paint.Style.STROKE
-                    // S? d?ng DST_OUT mode ?? xóa (theo flow Starnest)
+                    // S? d?ng DST_OUT mode ?? xï¿½a (theo flow Starnest)
                     paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
-                    // Màu không quan tr?ng v?i eraser, nh?ng v?n set ?? tránh l?i
-                    paint.color = Color.BLACK // DST_OUT c?n màu ?en
-                    paint.alpha = 255 // Eraser c?n alpha = 255 ?? xóa ?úng
+                    // Mï¿½u khï¿½ng quan tr?ng v?i eraser, nh?ng v?n set ?? trï¿½nh l?i
+                    paint.color = Color.BLACK // DST_OUT c?n mï¿½u ?en
+                    paint.alpha = 255 // Eraser c?n alpha = 255 ?? xï¿½a ?ï¿½ng
                 }
                 else -> {
                     paint.strokeCap = Paint.Cap.ROUND
@@ -201,7 +205,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        // X? lý eyedropper mode (?u tiên cao nh?t)
+        // X? lï¿½ eyedropper mode (?u tiï¿½n cao nh?t)
         if (isEyeDropperMode) {
             when (event.action) {
                 MotionEvent.ACTION_DOWN,
@@ -215,15 +219,15 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             return true
         }
 
-        // X? lý zoom mode (ch? khi zoom mode b?t)
+        // X? lï¿½ zoom mode (ch? khi zoom mode b?t)
         if (isZoomModeEnabled) {
-            // X? lý zoom gesture (khi có 2 ngón tay tr? lên)
+            // X? lï¿½ zoom gesture (khi cï¿½ 2 ngï¿½n tay tr? lï¿½n)
             if (event.pointerCount >= 2) {
                 scaleGestureDetector.onTouchEvent(event)
                 return true
             }
 
-            // X? lý pan khi zoom mode b?t và ch? có 1 ngón tay
+            // X? lï¿½ pan khi zoom mode b?t vï¿½ ch? cï¿½ 1 ngï¿½n tay
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     lastTouchX = event.x
@@ -241,11 +245,11 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             return true
         }
 
-        // X? lý v? bình th??ng (ch? khi zoom mode t?t và có brush ???c ch?n)
+        // X? lï¿½ v? bï¿½nh th??ng (ch? khi zoom mode t?t vï¿½ cï¿½ brush ???c ch?n)
         if (!isZoomModeEnabled && !isEyeDropperMode && currentBrush != null) {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    // Ki?m tra xem có v? d??i divider không (ch? ki?m tra khi b?t ??u v?)
+                    // Ki?m tra xem cï¿½ v? d??i divider khï¿½ng (ch? ki?m tra khi b?t ??u v?)
                     val canDraw = dividerY <= 0f || event.y >= dividerY
                     if (!canDraw) {
                         return false
@@ -254,13 +258,15 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                     // QUAN TR?NG: Ng?n parent ScrollView scroll khi ?ang v?
                     parent?.requestDisallowInterceptTouchEvent(true)
 
-                    // B?t ??u v? v?i brush config ?ã set
+                    // B?t ??u v? v?i brush config ?ï¿½ set
                     val newPath = Path()
                     newPath.moveTo(event.x, event.y)
                     currentPath = DrawingPath(newPath, Paint(paint))
                     paths.add(currentPath!!)
+                    // New stroke starts a new history branch, clear redo stack
+                    redoStrokes.clear()
 
-                    // X? lý eraser: copy layerBitmap vào strokeBitmap
+                    // X? lï¿½ eraser: copy layerBitmap vï¿½o strokeBitmap
                     if (
                         currentBrush?.brush == Brush.HardEraser ||
                             currentBrush?.brush == Brush.SoftEraser
@@ -272,13 +278,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    // M?t khi ?ã b?t ??u v?, cho phép v? ti?p dù y ? ?âu (không ki?m tra dividerY
+                    // M?t khi ?ï¿½ b?t ??u v?, cho phï¿½p v? ti?p dï¿½ y ? ?ï¿½u (khï¿½ng ki?m tra dividerY
                     // n?a)
                     if (currentPath == null) {
                         return false
                     }
 
-                    // V? ti?p path - s? d?ng lineTo ?? v? ??n gi?n và chính xác
+                    // V? ti?p path - s? d?ng lineTo ?? v? ??n gi?n vï¿½ chï¿½nh xï¿½c
                     val x = event.x
                     val y = event.y
                     currentPath!!.path.lineTo(x, y)
@@ -296,7 +302,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                                     color = Color.BLACK
                                     alpha = 255
                                 }
-                            // V? eraser path lên strokeBitmap (?ã copy t? layerBitmap)
+                            // V? eraser path lï¿½n strokeBitmap (?ï¿½ copy t? layerBitmap)
                             Canvas(stroke).drawPath(currentPath!!.path, eraserPaint)
                         }
                     }
@@ -306,9 +312,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                 }
                 MotionEvent.ACTION_UP,
                 MotionEvent.ACTION_CANCEL -> {
-                    // K?t thúc v? và l?u stroke
+                    // K?t thï¿½c v? vï¿½ l?u stroke
                     if (currentPath != null && currentBrush != null) {
-                        // X? lý eraser ??c bi?t
+                        // X? lï¿½ eraser ??c bi?t
                         if (
                             currentBrush!!.brush == Brush.HardEraser ||
                                 currentBrush!!.brush == Brush.SoftEraser
@@ -320,7 +326,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                     }
                     currentPath = null
 
-                    // Cho phép parent ScrollView scroll l?i sau khi v? xong
+                    // Cho phï¿½p parent ScrollView scroll l?i sau khi v? xong
                     parent?.requestDisallowInterceptTouchEvent(false)
 
                     return true
@@ -334,13 +340,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        // V? n?n canvas (màu ho?c ?nh)
+        // V? n?n canvas (mï¿½u ho?c ?nh)
         backgroundBitmap?.let { bmp ->
             val dest = Rect(0, 0, width, height)
             canvas.drawBitmap(bmp, null, dest, null)
         } ?: canvas.drawColor(canvasBackgroundColor)
 
-        // Apply zoom and pan transformations (ch? khi zoom mode b?t và có scale)
+        // Apply zoom and pan transformations (ch? khi zoom mode b?t vï¿½ cï¿½ scale)
         if (isZoomModeEnabled && scaleFactor != 1.0f) {
             canvas.save()
             canvas.translate(translateX, translateY)
@@ -350,19 +356,19 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         // ??m b?o bitmaps ???c kh?i t?o
         ensureBitmapsInitialized()
 
-        // N?u ?ang v? v?i eraser, v? t? strokeBitmap (?ã xóa m?t ph?n)
+        // N?u ?ang v? v?i eraser, v? t? strokeBitmap (?ï¿½ xï¿½a m?t ph?n)
         val isDrawingEraser =
             currentBrush?.brush == Brush.HardEraser || currentBrush?.brush == Brush.SoftEraser
         if (isDrawingEraser && strokeBitmap != null) {
-            // V? strokeBitmap (?ang v? v?i eraser) - ?ã copy t? layerBitmap và xóa m?t ph?n
+            // V? strokeBitmap (?ang v? v?i eraser) - ?ï¿½ copy t? layerBitmap vï¿½ xï¿½a m?t ph?n
             strokeBitmap?.let { canvas.drawBitmap(it, 0f, 0f, null) }
         } else {
-            // V? bình th??ng: v? t? layerBitmap ho?c t? strokes
+            // V? bï¿½nh th??ng: v? t? layerBitmap ho?c t? strokes
             if (layerBitmap != null) {
-                // V? t? layerBitmap (?ã ???c update v?i eraser)
+                // V? t? layerBitmap (?ï¿½ ???c update v?i eraser)
                 canvas.drawBitmap(layerBitmap!!, 0f, 0f, null)
             } else {
-                // Fallback: v? t? strokes (khi ch?a có layerBitmap)
+                // Fallback: v? t? strokes (khi ch?a cï¿½ layerBitmap)
                 savedStrokes.forEach { stroke ->
                     if (stroke.brush != Brush.HardEraser && stroke.brush != Brush.SoftEraser) {
                         val path = DrawingStroke.stringToPath(stroke.pathData)
@@ -372,14 +378,14 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                 }
             }
 
-            // V? các paths hi?n t?i (?ang v? - không ph?i eraser)
+            // V? cï¿½c paths hi?n t?i (?ang v? - khï¿½ng ph?i eraser)
             paths.forEach { drawingPath -> canvas.drawPath(drawingPath.path, drawingPath.paint) }
         }
 
         // Update bitmap for eyedropper
         updateCanvasBitmap()
 
-        // V? ???ng divider n?u có
+        // V? ???ng divider n?u cï¿½
         if (dividerY > 0f) {
             val dividerPaint =
                 Paint().apply {
@@ -404,7 +410,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
                 strokeJoin = Paint.Join.ROUND
                 strokeCap = Paint.Cap.ROUND
 
-                // Set màu
+                // Set mï¿½u
                 try {
                     color = Color.parseColor(stroke.color)
                 } catch (e: Exception) {
@@ -433,7 +439,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         return paint
     }
 
-    /** C?p nh?t bitmap t? canvas ?? dùng cho eyedropper */
+    /** C?p nh?t bitmap t? canvas ?? dï¿½ng cho eyedropper */
     private fun updateCanvasBitmap() {
         if (width <= 0 || height <= 0) return
 
@@ -459,17 +465,17 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         paths.forEach { drawingPath -> bitmapCanvas.drawPath(drawingPath.path, drawingPath.paint) }
     }
 
-    /** L?y màu t?i v? trí (x, y) trên canvas */
+    /** L?y mï¿½u t?i v? trï¿½ (x, y) trï¿½n canvas */
     fun getColorAt(x: Int, y: Int): Int {
-        // N?u có bitmap, l?y màu t? bitmap
+        // N?u cï¿½ bitmap, l?y mï¿½u t? bitmap
         canvasBitmap?.let { bitmap ->
             if (x >= 0 && x < bitmap.width && y >= 0 && y < bitmap.height) {
                 return bitmap.getPixel(x, y)
             }
         }
 
-        // N?u không có bitmap, tìm màu t? paths g?n nh?t
-        // Ho?c tr? v? màu m?c ??nh (?en)
+        // N?u khï¿½ng cï¿½ bitmap, tï¿½m mï¿½u t? paths g?n nh?t
+        // Ho?c tr? v? mï¿½u m?c ??nh (?en)
         return Color.BLACK
     }
 
@@ -483,9 +489,14 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         invalidate()
     }
 
-    /** Set listener ?? nh?n màu khi pick b?ng eyedropper */
+    /** Set listener ?? nh?n mï¿½u khi pick b?ng eyedropper */
     fun setOnColorPickedListener(listener: (Int) -> Unit) {
         onColorPickedListener = listener
+    }
+
+    /** Notify on stroke change (undo/redo state) */
+    fun setOnStrokesChangedListener(listener: (() -> Unit)?) {
+        onStrokesChanged = listener
     }
 
     /** B?t/t?t ch? ?? zoom */
@@ -500,12 +511,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         invalidate()
     }
 
-    /** Ki?m tra xem zoom mode có ?ang b?t không */
+    /** Ki?m tra xem zoom mode cï¿½ ?ang b?t khï¿½ng */
     fun isZoomModeEnabled(): Boolean = isZoomModeEnabled
 
     fun clear() {
         paths.clear()
         savedStrokes.clear()
+        redoStrokes.clear()
         savedDrawingBitmap?.recycle()
         savedDrawingBitmap = null
         layerBitmap?.recycle()
@@ -516,79 +528,121 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         resultBitmap = null
         hasEraserBeenUsed = false
         invalidate()
+        onStrokesChanged?.invoke()
     }
 
-    fun undo() {
+    fun undo(): Boolean {
+        var handled = false
         if (paths.isNotEmpty()) {
             paths.removeAt(paths.size - 1)
-            invalidate()
+            handled = true
         } else if (savedStrokes.isNotEmpty()) {
-            savedStrokes.removeAt(savedStrokes.size - 1)
-            invalidate()
+            val removed = savedStrokes.removeAt(savedStrokes.size - 1)
+            redoStrokes.add(removed)
+            rebuildLayerBitmap()
+            handled = true
         }
+        if (handled) {
+            invalidate()
+            onStrokesChanged?.invoke()
+        }
+        return handled
     }
 
-    /** Set v? trí ???ng divider (phân ph?n có th? v? và không th? v?) */
+    fun redo(): Boolean {
+        if (redoStrokes.isNotEmpty()) {
+            val stroke = redoStrokes.removeAt(redoStrokes.size - 1)
+            savedStrokes.add(stroke)
+            rebuildLayerBitmap()
+            invalidate()
+            onStrokesChanged?.invoke()
+            return true
+        }
+        return false
+    }
+
+    fun canUndo(): Boolean = paths.isNotEmpty() || savedStrokes.isNotEmpty()
+    fun canRedo(): Boolean = redoStrokes.isNotEmpty()
+
+    /** Set v? trï¿½ ???ng divider (phï¿½n ph?n cï¿½ th? v? vï¿½ khï¿½ng th? v?) */
     fun setDividerY(y: Float) {
         dividerY = y
         invalidate()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // Canvas có chi?u cao c? ??nh, không t? ??ng m? r?ng
+        // Canvas cï¿½ chi?u cao c? ??nh, khï¿½ng t? ??ng m? r?ng
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
     }
 
-    /** B?t ??u v? v?i eraser: copy layerBitmap vào strokeBitmap */
+    /** B?t ??u v? v?i eraser: copy layerBitmap vï¿½o strokeBitmap */
     private fun startDrawingWithEraser() {
         ensureBitmapsInitialized()
 
         layerBitmap?.let { layer ->
             strokeBitmap?.let { stroke ->
-                // Xóa strokeBitmap
+                // Xï¿½a strokeBitmap
                 stroke.eraseColor(Color.TRANSPARENT)
 
-                // Copy layerBitmap vào strokeBitmap (?? có n?n ?? xóa)
+                // Copy layerBitmap vï¿½o strokeBitmap (?? cï¿½ n?n ?? xï¿½a)
                 Canvas(stroke).drawBitmap(layer, 0f, 0f, null)
             }
         }
     }
 
-    /** K?t thúc v? v?i eraser: x? lý xóa trên layerBitmap */
+    /** K?t thï¿½c v? v?i eraser: x? lï¿½ xï¿½a trï¿½n layerBitmap */
     private fun endDrawingWithEraser() {
         val path = currentPath?.path ?: return
 
         ensureBitmapsInitialized()
 
-        // strokeBitmap ?ã ???c update trong ACTION_MOVE v?i eraser path
-        // Gi? ch? c?n copy strokeBitmap (?ã xóa) vào layerBitmap
+        // strokeBitmap ?ï¿½ ???c update trong ACTION_MOVE v?i eraser path
+        // Gi? ch? c?n copy strokeBitmap (?ï¿½ xï¿½a) vï¿½o layerBitmap
         strokeBitmap?.let { stroke ->
-            // QUAN TR?NG: Thay th? hoàn toàn layerBitmap b?ng strokeBitmap (?ã xóa)
-            // ?ây là k?t qu? cu?i cùng sau khi xóa - layerBitmap gi? ch?a drawing ?ã b? xóa
+            // QUAN TR?NG: Thay th? hoï¿½n toï¿½n layerBitmap b?ng strokeBitmap (?ï¿½ xï¿½a)
+            // ?ï¿½y lï¿½ k?t qu? cu?i cï¿½ng sau khi xï¿½a - layerBitmap gi? ch?a drawing ?ï¿½ b? xï¿½a
             layerBitmap?.let { layer ->
-                // Xóa layerBitmap c? và v? l?i t? strokeBitmap (?ã xóa)
+                // Xï¿½a layerBitmap c? vï¿½ v? l?i t? strokeBitmap (?ï¿½ xï¿½a)
                 layer.eraseColor(Color.TRANSPARENT)
                 val layerCanvas = Canvas(layer)
-                // Gi? trong su?t ?? không che n?n background
+                // Gi? trong su?t ?? khï¿½ng che n?n background
                 layerCanvas.drawColor(Color.TRANSPARENT)
-                layerCanvas.drawBitmap(stroke, 0f, 0f, null) // V? strokeBitmap (?ã xóa)
+                layerCanvas.drawBitmap(stroke, 0f, 0f, null) // V? strokeBitmap (?ï¿½ xï¿½a)
             }
 
-            // ?ánh d?u ?ã dùng eraser (layerBitmap ?ã b? modify)
+            // ?ï¿½nh d?u ?ï¿½ dï¿½ng eraser (layerBitmap ?ï¿½ b? modify)
             hasEraserBeenUsed = true
         }
 
-        // L?u eraser stroke ?? có th? undo (tùy ch?n)
-        // Không l?u eraser stroke vào savedStrokes vì nó ch? là thao tác xóa
+        // L?u eraser stroke ?? cï¿½ th? undo/redo
+        val brush = currentBrush ?: return
+        val bounds = RectF()
+        path.computeBounds(bounds, true)
+        val stroke =
+            DrawingStroke(
+                id = UUID.randomUUID().toString(),
+                pathData = DrawingStroke.pathToString(path),
+                brush = brush.brush,
+                color = brush.color,
+                size = brush.sliderSize,
+                opacity = brush.opacity,
+                rectLeft = bounds.left,
+                rectTop = bounds.top,
+                rectRight = bounds.right,
+                rectBottom = bounds.bottom,
+            )
+        savedStrokes.add(stroke)
+        redoStrokes.clear()
 
         // Clear path hi?n t?i
         paths.remove(currentPath)
         currentPath = null
 
         invalidate()
+        onStrokesChanged?.invoke()
     }
 
-    /** ??m b?o các bitmaps ???c kh?i t?o */
+    /** ??m b?o cï¿½c bitmaps ???c kh?i t?o */
     private fun ensureBitmapsInitialized() {
         if (width <= 0 || height <= 0) return
 
@@ -596,26 +650,10 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             layerBitmap == null || layerBitmap!!.width != width || layerBitmap!!.height != height
 
         if (needRebuildLayer) {
-            layerBitmap?.recycle()
-            layerBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val layerCanvas = Canvas(layerBitmap!!)
-            // Gi? transparent ?? không che n?n background (màu/?nh)
-            layerCanvas.drawColor(Color.TRANSPARENT)
-
-            // V? t?t c? saved strokes lên layerBitmap (tr? eraser strokes)
-            savedStrokes.forEach { stroke ->
-                if (stroke.brush != Brush.HardEraser && stroke.brush != Brush.SoftEraser) {
-                    val path = DrawingStroke.stringToPath(stroke.pathData)
-                    val paint = createPaintFromStroke(stroke)
-                    layerCanvas.drawPath(path, paint)
-                }
-            }
-
-            // Reset flag khi rebuild (vì ?ã rebuild t? savedStrokes)
-            hasEraserBeenUsed = false
+            rebuildLayerBitmap()
         }
-        // QUAN TR?NG: N?u layerBitmap ?ã t?n t?i và size không ??i, KHÔNG rebuild t? savedStrokes
-        // Vì layerBitmap ?ã ch?a k?t qu? sau khi t?y, n?u rebuild s? m?t ph?n ?ã t?y
+        // QUAN TR?NG: N?u layerBitmap ?ï¿½ t?n t?i vï¿½ size khï¿½ng ??i, KHï¿½NG rebuild t? savedStrokes
+        // Vï¿½ layerBitmap ?ï¿½ ch?a k?t qu? sau khi t?y, n?u rebuild s? m?t ph?n ?ï¿½ t?y
 
         if (
             strokeBitmap == null || strokeBitmap!!.width != width || strokeBitmap!!.height != height
@@ -634,12 +672,12 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         }
     }
 
-    /** L?u stroke hi?n t?i vào danh sách savedStrokes */
+    /** L?u stroke hi?n t?i vï¿½o danh sï¿½ch savedStrokes */
     private fun saveCurrentStroke() {
         val path = currentPath?.path ?: return
         val brush = currentBrush ?: return
 
-        // Tính boundary c?a path
+        // Tï¿½nh boundary c?a path
         val bounds = RectF()
         path.computeBounds(bounds, true)
 
@@ -660,6 +698,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
         // L?u stroke
         savedStrokes.add(stroke)
+        redoStrokes.clear()
 
         // Update layerBitmap v?i stroke m?i
         ensureBitmapsInitialized()
@@ -669,21 +708,23 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             Canvas(layer).drawPath(pathObj, paintObj)
         }
 
-        // Clear path hi?n t?i sau khi ?ã l?u
+        // Clear path hi?n t?i sau khi ?ï¿½ l?u
         paths.remove(currentPath)
         currentPath = null
+        onStrokesChanged?.invoke()
     }
 
-    /** L?y t?t c? strokes ?ã v? (?? l?u) */
+    /** L?y t?t c? strokes ?ï¿½ v? (?? l?u) */
     fun getStrokes(): List<DrawingStroke> {
         return ArrayList(savedStrokes)
     }
 
-    /** Load và v? l?i strokes (restore drawing) */
+    /** Load vï¿½ v? l?i strokes (restore drawing) */
     fun loadStrokes(strokes: List<DrawingStroke>) {
         savedStrokes.clear()
         savedStrokes.addAll(strokes)
         paths.clear()
+        redoStrokes.clear()
 
         // Reset bitmaps ?? rebuild t? strokes m?i
         layerBitmap?.recycle()
@@ -695,12 +736,38 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         hasEraserBeenUsed = false
 
         invalidate()
+        onStrokesChanged?.invoke()
     }
 
-    /** L?y bitmap ?ã v? (?? l?u ho?c export) */
+    /** Rebuild layer bitmap from savedStrokes (supports undo/redo and eraser) */
+    private fun rebuildLayerBitmap() {
+        if (width <= 0 || height <= 0) {
+            layerBitmap?.recycle()
+            layerBitmap = null
+            return
+        }
+
+        layerBitmap?.recycle()
+        layerBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val layerCanvas = Canvas(layerBitmap!!)
+        layerCanvas.drawColor(Color.TRANSPARENT)
+
+        savedStrokes.forEach { stroke ->
+            val path = DrawingStroke.stringToPath(stroke.pathData)
+            val paintObj = createPaintFromStroke(stroke)
+            layerCanvas.drawPath(path, paintObj)
+        }
+
+        hasEraserBeenUsed =
+            savedStrokes.any {
+                it.brush == Brush.HardEraser || it.brush == Brush.SoftEraser
+            }
+    }
+
+    /** L?y bitmap ?ï¿½ v? (?? l?u ho?c export) */
     fun getDrawingBitmap(): Bitmap? {
         if (width <= 0 || height <= 0) {
-            // N?u ch?a có kích th??c, t?o bitmap t?i thi?u
+            // N?u ch?a cï¿½ kï¿½ch th??c, t?o bitmap t?i thi?u
             val minWidth = 100
             val minHeight = 100
             val bitmap = Bitmap.createBitmap(minWidth, minHeight, Bitmap.Config.ARGB_8888)

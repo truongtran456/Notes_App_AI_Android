@@ -5,10 +5,15 @@ import android.content.Context
 import android.graphics.Typeface
 import android.text.Editable
 import android.text.Spanned
+import android.graphics.Color
 import android.text.style.CharacterStyle
+import android.text.style.ForegroundColorSpan
+import android.text.style.LeadingMarginSpan
+import android.text.style.RelativeSizeSpan
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
+import android.text.style.UnderlineSpan
 import android.text.style.URLSpan
 import android.util.AttributeSet
 import android.view.ActionMode
@@ -111,6 +116,11 @@ class StylableEditTextWithHistory(context: Context, attrs: AttributeSet) :
             TextStyleType.MONOSPACE ->
                 spans.filter { it is TypefaceSpan && it.family == "monospace" }
             TextStyleType.STRIKETHROUGH -> spans.filterIsInstance<StrikethroughSpan>()
+            TextStyleType.UNDERLINE -> spans.filterIsInstance<UnderlineSpan>()
+            TextStyleType.TITLE -> spans.filter { it is RelativeSizeSpan && it.sizeChange == 1.5f }
+            TextStyleType.HEADING -> spans.filter { it is RelativeSizeSpan && it.sizeChange == 1.25f }
+            TextStyleType.BODY -> spans.filter { it is RelativeSizeSpan && it.sizeChange == 1.0f }
+            TextStyleType.TEXT_COLOR -> spans.filterIsInstance<ForegroundColorSpan>()
         }
     }
 
@@ -135,6 +145,11 @@ class StylableEditTextWithHistory(context: Context, attrs: AttributeSet) :
         ITALIC,
         MONOSPACE,
         STRIKETHROUGH,
+        UNDERLINE,
+        TITLE,
+        HEADING,
+        BODY,
+        TEXT_COLOR,
     }
 
     /**

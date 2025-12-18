@@ -9,6 +9,8 @@
     <string name="adding_files">Adding files</string>
     <string name="adding_images">Adding images</string>
     <string name="all">All</string>
+    <string name="today">Today</string>
+    <string name="task_list">Task List</string>
     <string name="app_name" translatable="false">NotallyX</string>
     <string name="appearance">Appearance</string>
     <string name="archive">Archive</string>
@@ -46,6 +48,8 @@
     <string name="biometrics_not_setup">Biometrics/PIN are not setup for your device yet</string>
     <string name="biometrics_setup_success">Biometric/PIN lock has been enabled</string>
     <string name="bold">Bold</string>
+    <string name="body">Body</string>
+    <string name="bullet_list">Bullet list</string>
     <string name="calculating">Calculating…</string>
     <string name="cancel">Cancel</string>
     <plurals name="cant_add_files">
@@ -146,6 +150,7 @@
     <string name="error_while_renaming_file">Error while renaming file</string>
     <string name="error_while_renaming_image">Error while renaming image</string>
     <string name="evernote">Evernote</string>
+    <string name="format">Format</string>
     <string name="evernote_help">In order to import your Notes from Evernote you must export your Evernote Notebook as ENEX. Click Help to get more information.\n\nIf you already have a ENEX file, click Import and choose it.</string>
     <string name="every">Every</string>
     <string name="export">Export</string>
@@ -190,6 +195,8 @@
     <string name="invalid_google_keep">Invalid Google Takeout ZIP File provided</string>
     <string name="invalid_image">Invalid image</string>
     <string name="invalid_link">Copy a valid link into your clipboard</string>
+    <string name="heading">Heading</string>
+    <string name="indent">Indent</string>
     <string name="italic">Italic</string>
     <string name="item">Item</string>
     <string name="label_exists">Label exists</string>
@@ -216,6 +223,7 @@
     <string name="minutes">Minutes</string>
     <string name="modified_date">Modified</string>
     <string name="monospace">Monospace</string>
+    <string name="numbered_list">Numbered list</string>
     <string name="monthly">Monthly</string>
     <string name="months">Months</string>
     <string name="more">%1$d more</string>
@@ -295,6 +303,9 @@
     <string name="start_view_hint">Select which View/Label should be shown when the app is started.\nDefaults to the main Notes View</string>
     <string name="stop">Stop</string>
     <string name="strikethrough">Strikethrough</string>
+    <string name="text_color">Text color</string>
+    <string name="underline">Underline</string>
+    <string name="outdent">Outdent</string>
     <string name="take_note">Take note</string>
     <string name="tap_for_more_options">Tap for more options</string>
     <string name="tap_to_set_up">Tap to set up</string>
@@ -424,4 +435,11 @@
     <string name="ai_raw_text">Processed Text</string>
     <string name="ai_raw_text_desc">Text đã được AI xử lý (OCR, transcription, spell check)</string>
     <string name="ai_copy_raw_text">Copy Text</string>
+    <string name="nav_storage">Storage</string>
+    <string name="nav_user_email_placeholder">user@example.com</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_theme">Theme</string>
+    <string name="nav_theme_system">System</string>
+    <string name="nav_menu">Menu</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
 </resources>

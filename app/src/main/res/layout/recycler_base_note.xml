@@ -7,7 +7,10 @@
     android:layout_marginEnd="4dp"
     android:layout_marginBottom="8dp"
     android:checkable="true"
-    app:cardElevation="0dp">
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp"
+    app:strokeWidth="0dp"
+    app:cardUseCompatPadding="false">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"

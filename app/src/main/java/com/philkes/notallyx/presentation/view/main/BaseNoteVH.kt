@@ -55,6 +55,9 @@ class BaseNoteVH(
     listener: ItemListener,
 ) : RecyclerView.ViewHolder(binding.root) {
 
+    // Cache drawables để tránh lag
+    private val drawableCache = mutableMapOf<Int, Drawable?>()
+
     init {
         val title = preferences.textSize.displayTitleSize
         val body = preferences.textSize.displayBodySize
@@ -82,11 +85,8 @@ class BaseNoteVH(
     }
 
     fun updateCheck(checked: Boolean, color: String) {
-        if (checked) {
-            binding.root.strokeWidth = 3.dp
-        } else {
-            binding.root.strokeWidth = if (color == BaseNote.COLOR_DEFAULT) 1.dp else 0
-        }
+        // Bỏ viền - không set strokeWidth và strokeColor
+        binding.root.strokeWidth = 0
         binding.root.isChecked = checked
     }
 
@@ -142,7 +142,7 @@ class BaseNoteVH(
                 isVisible = true
             }
         }
-        setColor(baseNote.color)
+        setColor(baseNote.color, baseNote.id)
 
         binding.RemindersView.isVisible = baseNote.reminders.any { it.hasUpcomingNotification() }
     }
@@ -201,11 +201,19 @@ class BaseNoteVH(
         }
     }
 
-    private fun setColor(color: String) {
+    private fun setColor(color: String, noteId: Long) {
         binding.root.apply {
             if (color == BaseNote.COLOR_DEFAULT) {
-                setCardBackgroundColor(0)
-                setControlsContrastColorForAllViews(context.getColorFromAttr(R.attr.colorSurface))
+                // Sử dụng gradient distributor để phân phối gradient không trùng
+                val gradientRes = GradientDistributor.getGradientForNote(noteId)
+                
+                // Cache drawable để tránh lag
+                val drawable = drawableCache.getOrPut(gradientRes) {
+                    context.getDrawable(gradientRes)
+                }
+                background = drawable
+                setCardBackgroundColor(0) // Transparent để hiển thị gradient background
+                setControlsContrastColorForAllViews(android.graphics.Color.WHITE) // Text màu trắng trên gradient
             } else {
                 val colorInt = context.extractColor(color)
                 setCardBackgroundColor(colorInt)

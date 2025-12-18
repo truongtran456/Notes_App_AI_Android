@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Checked: tím -->
-    <item android:state_checked="true" android:color="#6E6CFB" />
-    <!-- Default: xám nhạt để giống mockup -->
-    <item android:color="#F4F5FB" />
+    <!-- Selected background -->
+    <item android:state_checked="true" android:color="@color/nav_item_selected_bg" />
+    <!-- Default transparent -->
+    <item android:color="@color/nav_item_unselected_bg" />
 </selector>
 

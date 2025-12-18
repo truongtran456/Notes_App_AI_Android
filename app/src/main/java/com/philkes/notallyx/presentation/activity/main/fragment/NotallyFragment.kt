@@ -21,6 +21,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.model.BaseNote
 import com.philkes.notallyx.data.model.Folder
+import com.philkes.notallyx.data.model.Header
 import com.philkes.notallyx.data.model.Item
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.databinding.FragmentNotesBinding
@@ -39,6 +40,7 @@ import com.philkes.notallyx.presentation.movedToResId
 import com.philkes.notallyx.presentation.showKeyboard
 import com.philkes.notallyx.presentation.view.main.BaseNoteAdapter
 import com.philkes.notallyx.presentation.view.main.BaseNoteVHPreferences
+import com.philkes.notallyx.presentation.view.main.PinnedNoteAdapter
 import com.philkes.notallyx.presentation.view.misc.ItemListener
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
 import com.philkes.notallyx.presentation.viewmodel.preference.NotesView
@@ -47,6 +49,7 @@ import com.philkes.notallyx.presentation.viewmodel.preference.Theme
 abstract class NotallyFragment : Fragment(), ItemListener {
 
     private var notesAdapter: BaseNoteAdapter? = null
+    private var pinnedNotesAdapter: PinnedNoteAdapter? = null
     private lateinit var openNoteActivityResultLauncher: ActivityResultLauncher<Intent>
     private var lastSelectedNotePosition = -1
 
@@ -58,6 +61,7 @@ abstract class NotallyFragment : Fragment(), ItemListener {
         super.onDestroyView()
         binding = null
         notesAdapter = null
+        pinnedNotesAdapter = null
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -141,6 +145,7 @@ abstract class NotallyFragment : Fragment(), ItemListener {
 
     // See [RecyclerView.ViewHolder.getAdapterPosition]
     override fun onClick(position: Int) {
+        // Xử lý click từ other notes (position bình thường)
         if (position != -1) {
             notesAdapter?.getItem(position)?.let { item ->
                 if (item is BaseNote) {
@@ -156,8 +161,19 @@ abstract class NotallyFragment : Fragment(), ItemListener {
             }
         }
     }
+    
+    private fun findNotePositionInList(noteId: Long): Int {
+        // Tìm position trong list gốc
+        getObservable().value?.forEachIndexed { index, item ->
+            if (item is BaseNote && item.id == noteId) {
+                return index
+            }
+        }
+        return -1
+    }
 
     override fun onLongClick(position: Int) {
+        // Xử lý long click từ other notes (position bình thường)
         if (position != -1) {
             if (model.actionMode.selectedNotes.isNotEmpty()) {
                 if (lastSelectedNotePosition > position) {
@@ -185,38 +201,16 @@ abstract class NotallyFragment : Fragment(), ItemListener {
     }
 
     private fun setupSearch() {
-        binding?.EnterSearchKeyword?.apply {
-            setText(model.keyword)
-            val navController = findNavController()
-            navController.addOnDestinationChangedListener { controller, destination, arguments ->
-                if (destination.id == R.id.Search) {
-                    //                setText("")
-                    visibility = View.VISIBLE
-                    requestFocus()
-                    activity?.showKeyboard(this)
-                } else {
-                    //                visibility = View.GONE
-                    setText("")
-                    clearFocus()
-                    activity?.hideKeyboard(this)
-                }
-            }
-            doAfterTextChanged { text ->
-                model.keyword = requireNotNull(text).trim().toString()
+        // Setup search từ toolbar thay vì search bar ở dưới (đã xóa EnterSearchKeywordLayout)
+        (activity as? MainActivity)?.setupNotesSearch { query ->
+            val trimmedQuery = query.trim()
+            model.keyword = trimmedQuery
+            view?.let { view ->
+                val navController = view.findNavController()
                 if (
-                    model.keyword.isNotEmpty() &&
-                        navController.currentDestination?.id != R.id.Search
+                    trimmedQuery.isNotEmpty() &&
+                    navController.currentDestination?.id != R.id.Search
                 ) {
-                    val bundle =
-                        Bundle().apply {
-                            putSerializable(EXTRA_INITIAL_FOLDER, model.folder.value)
-                            putSerializable(EXTRA_INITIAL_LABEL, model.currentLabel)
-                        }
-                    navController.navigate(R.id.Search, bundle)
-                }
-            }
-            setOnFocusChangeListener { v, hasFocus ->
-                if (hasFocus && navController.currentDestination?.id != R.id.Search) {
                     val bundle =
                         Bundle().apply {
                             putSerializable(EXTRA_INITIAL_FOLDER, model.folder.value)
@@ -239,23 +233,69 @@ abstract class NotallyFragment : Fragment(), ItemListener {
     }
 
     private fun setupAdapter() {
+        val preferences = with(model.preferences) {
+            BaseNoteVHPreferences(
+                textSize.value,
+                maxItems.value,
+                maxLines.value,
+                maxTitle.value,
+                labelsHiddenInOverview.value,
+            )
+        }
+        
+        // Setup adapter cho other notes
         notesAdapter =
             with(model.preferences) {
                 BaseNoteAdapter(
                     model.actionMode.selectedIds,
                     dateFormat.value,
                     notesSorting.value,
-                    BaseNoteVHPreferences(
-                        textSize.value,
-                        maxItems.value,
-                        maxLines.value,
-                        maxTitle.value,
-                        labelsHiddenInOverview.value,
-                    ),
+                    preferences,
                     model.imageRoot,
                     this@NotallyFragment,
                 )
             }
+        
+        // Setup adapter cho pinned notes
+        pinnedNotesAdapter = PinnedNoteAdapter(
+            model.actionMode.selectedIds,
+            model.preferences.dateFormat.value,
+            preferences,
+            model.imageRoot,
+            this@NotallyFragment,
+            onNoteClick = { note ->
+                // Xử lý click vào pinned note
+                if (model.actionMode.isEnabled()) {
+                    val position = findNotePositionInList(note.id)
+                    handleNoteSelection(note.id, position, note)
+                } else {
+                    when (note.type) {
+                        Type.NOTE -> goToActivity(EditNoteActivity::class.java, note)
+                        Type.LIST -> goToActivity(EditListActivity::class.java, note)
+                    }
+                }
+            },
+            onNoteLongClick = { note ->
+                // Xử lý long click vào pinned note
+                val position = findNotePositionInList(note.id)
+                if (model.actionMode.selectedNotes.isNotEmpty()) {
+                    // Xử lý range selection
+                    if (lastSelectedNotePosition > position) {
+                        position..lastSelectedNotePosition
+                    } else {
+                        lastSelectedNotePosition..position
+                    }.forEach { pos ->
+                        getObservable().value?.getOrNull(pos)?.let { item ->
+                            if (item is BaseNote && !model.actionMode.selectedNotes.contains(item.id)) {
+                                handleNoteSelection(item.id, pos, item)
+                            }
+                        }
+                    }
+                } else {
+                    handleNoteSelection(note.id, position, note)
+                }
+            }
+        )
 
         notesAdapter?.registerAdapterDataObserver(
             object : RecyclerView.AdapterDataObserver() {
@@ -270,7 +310,17 @@ abstract class NotallyFragment : Fragment(), ItemListener {
             adapter = notesAdapter
             setHasFixedSize(false)
         }
-        model.actionMode.addListener = { notesAdapter?.notifyDataSetChanged() }
+        
+        // Setup RecyclerView ngang cho pinned notes
+        binding?.PinnedRecyclerView?.apply {
+            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            adapter = pinnedNotesAdapter
+            setHasFixedSize(false)
+        }
+        model.actionMode.addListener = { 
+            notesAdapter?.notifyDataSetChanged()
+            pinnedNotesAdapter?.notifyDataSetChanged()
+        }
         if (activity is MainActivity) {
             (activity as MainActivity).getCurrentFragmentNotes = {
                 notesAdapter?.currentList?.filterIsInstance<BaseNote>()
@@ -280,7 +330,52 @@ abstract class NotallyFragment : Fragment(), ItemListener {
 
     private fun setupObserver() {
         getObservable().observe(viewLifecycleOwner) { list ->
-            notesAdapter?.submitList(list)
+            // Tách pinned notes và other notes
+            val pinnedNotes = mutableListOf<BaseNote>()
+            val otherItems = mutableListOf<Item>()
+            var foundOthersHeader = false
+            
+            list.forEach { item ->
+                when {
+                    item is BaseNote && item.pinned -> {
+                        pinnedNotes.add(item)
+                    }
+                    item is Header -> {
+                        if (item.label == requireContext().getString(R.string.others)) {
+                            foundOthersHeader = true
+                            // Không thêm header "Others" vào otherItems vì đã có TextView riêng
+                        }
+                        // Bỏ qua header "Pinned" vì đã có TextView riêng
+                    }
+                    foundOthersHeader && item is BaseNote && !item.pinned -> {
+                        otherItems.add(item)
+                    }
+                    !foundOthersHeader && item is BaseNote && !item.pinned -> {
+                        // Nếu chưa có header "Others" nhưng có unpinned notes, thêm vào
+                        otherItems.add(item)
+                    }
+                }
+            }
+            
+            // Cập nhật pinned notes RecyclerView
+            if (pinnedNotes.isNotEmpty()) {
+                binding?.PinnedHeader?.visibility = View.VISIBLE
+                binding?.PinnedRecyclerView?.visibility = View.VISIBLE
+                pinnedNotesAdapter?.submitList(pinnedNotes)
+            } else {
+                binding?.PinnedHeader?.visibility = View.GONE
+                binding?.PinnedRecyclerView?.visibility = View.GONE
+            }
+            
+            // Cập nhật other notes RecyclerView
+            if (otherItems.isNotEmpty()) {
+                binding?.OthersHeader?.visibility = View.VISIBLE
+                notesAdapter?.submitList(otherItems)
+            } else {
+                binding?.OthersHeader?.visibility = View.GONE
+                notesAdapter?.submitList(emptyList())
+            }
+            
             binding?.ImageView?.isVisible = list.isEmpty()
         }
 
