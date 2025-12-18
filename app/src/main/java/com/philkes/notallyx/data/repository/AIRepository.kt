@@ -63,12 +63,10 @@ class AIRepository(private val context: Context) {
                             review?.vocabStory != null ||
                                 !review?.vocabMcqs.isNullOrEmpty() ||
                                 !review?.flashcards.isNullOrEmpty() ||
-                                review?.mindmap != null ||
                                 !review?.summaryTable.isNullOrEmpty() ||
                                 cachedNote.vocabStory != null ||
                                 !cachedNote.vocabMcqs.isNullOrEmpty() ||
                                 !cachedNote.flashcards.isNullOrEmpty() ||
-                                cachedNote.mindmap != null ||
                                 !cachedNote.summaryTable.isNullOrEmpty()
                         } else {
                             false
@@ -87,6 +85,13 @@ class AIRepository(private val context: Context) {
             }
             null
         }
+
+    // Public wrapper to reuse cache logic from callers
+    suspend fun getCachedNote(
+        userId: String?,
+        noteId: String?,
+        checkVocabData: Boolean = false,
+    ): SummaryResponse? = getNoteFromCache(userId, noteId, checkVocabData)
 
     // ==================== SUMMARIZE TEXT ====================
 
@@ -576,10 +581,7 @@ class AIRepository(private val context: Context) {
 
     // ==================== TRANSLATION ====================
 
-    suspend fun translateText(
-        text: String,
-        targetLanguage: String = "Vietnamese",
-    ): AIResult<String> =
+    suspend fun translateText(text: String, targetLanguage: String = "vi"): AIResult<String> =
         withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Translating text to $targetLanguage: ${text.take(100)}...")

@@ -159,6 +159,9 @@
     <string name="filter">Filter</string>
     <string name="folder">Folder</string>
     <string name="follow_system">Follow system</string>
+    <!-- AI additions -->
+    <string name="ai_match_reset">Reset</string>
+    <string name="ai_tts_not_ready">Text-to-Speech not ready</string>
     <string name="google_keep">Google Keep</string>
     <string name="google_keep_help">In order to import your Notes from Google Keep you must download your Google Takeout ZIP file. Only select the \"Keep\" data. Click Help to get more information.\n\nIf you already have a Takeout ZIP file, click Import and choose the ZIP file.</string>
     <string name="grid">Grid</string>
@@ -360,6 +363,21 @@
     <string name="ai_vocab_flashcards">AI Flashcards</string>
     <string name="ai_vocab_mindmap">AI Mindmap</string>
     <string name="ai_vocab_summary_table">Vocabulary Summary Table</string>
+    <string name="ai_vocab_cloze">Cloze Test</string>
+    <string name="ai_vocab_match_pairs">Match Pairs</string>
+    <string name="ai_fill_answer">Fill in the answer</string>
+    <string name="ai_check_answer">Check Answer</string>
+    <string name="ai_action_cloze_desc">Điền từ vào chỗ trống (4-8 blank)</string>
+    <string name="ai_action_match_desc">Ghép 8 cặp từ - nghĩa (4x4)</string>
+    <string name="ai_vocab_overall_stats">Overall Stats</string>
+    <string name="ai_action_overall_desc">Xem % từng từ và % tổng ghi chú</string>
+    <string name="ai_overall_not_ready">Bạn chưa hoàn thành đủ 3 bài (MCQ, Cloze, Match Pairs)</string>
+    <string name="ai_prev">Prev</string>
+    <string name="ai_next">Next</string>
+    <string name="ai_flip">Flip</string>
+    <string name="ai_got_it">Got it</string>
+    <string name="ai_again">Again</string>
+    <string name="ai_flashcard_tap_to_flip">Nhấn Flip để xem mặt sau</string>
     <string name="translate_to_vietnamese">Translate to Vietnamese</string>
     <string name="translate_to_chinese">Translate to Chinese</string>
     <string name="translate_to_japanese">Translate to Japanese</string>

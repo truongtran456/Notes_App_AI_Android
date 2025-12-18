@@ -11,11 +11,13 @@ data class SummaryResponse(
     @SerializedName("raw_text") val rawText: String? = null,
     @SerializedName("processed_text") val processedText: String? = null,
     @SerializedName("sources") val sources: List<AISource>? = null,
-    @SerializedName("story") val vocabStory: VocabStory? = null,
+    @SerializedName("vocab_story") val vocabStory: VocabStory? = null,
     @SerializedName("vocab_mcqs") val vocabMcqs: List<VocabQuiz>? = null,
     @SerializedName("flashcards") val flashcards: List<Flashcard>? = null,
     @SerializedName("mindmap") val mindmap: MindmapBundle? = null,
     @SerializedName("summary_table") val summaryTable: List<VocabSummaryRow>? = null,
+    @SerializedName("cloze_tests") val clozeTests: List<ClozeTest>? = null,
+    @SerializedName("match_pairs") val matchPairs: List<MatchPair>? = null,
     @SerializedName("error") val error: String? = null,
 )
 
@@ -61,6 +63,8 @@ data class Review(
     @SerializedName("flashcards") val flashcards: List<Flashcard>? = null,
     @SerializedName("mindmap") val mindmap: MindmapBundle? = null,
     @SerializedName("summary_table") val summaryTable: List<VocabSummaryRow>? = null,
+    @SerializedName("cloze_tests") val clozeTests: List<ClozeTest>? = null,
+    @SerializedName("match_pairs") val matchPairs: List<MatchPair>? = null,
 )
 
 data class VocabStory(
@@ -76,7 +80,9 @@ data class VocabUsedWord(
 
 data class VocabQuiz(
     @SerializedName("id") val id: Int? = null,
+    @SerializedName("set_id") val setId: Int? = null,
     @SerializedName("type") val type: String? = null,
+    @SerializedName("question_type") val questionType: String? = null,
     @SerializedName("vocab_target") val vocabTarget: String? = null,
     @SerializedName("question") val question: String? = null,
     @SerializedName("options") val options: Map<String, String>? = null,
@@ -142,11 +148,37 @@ data class MindmapRelationGroup(
 data class VocabSummaryRow(
     @SerializedName("word") val word: String? = null,
     @SerializedName("translation") val translation: String? = null,
+    @SerializedName("phonetic") val phonetic: String? = null,
     @SerializedName("part_of_speech") val partOfSpeech: String? = null,
     @SerializedName("definition") val definition: String? = null,
     @SerializedName("usage_note") val usageNote: String? = null,
     @SerializedName("common_structures") val commonStructures: List<String>? = null,
     @SerializedName("collocations") val collocations: List<String>? = null,
+)
+
+data class ClozeTest(
+    @SerializedName("id") val id: Int? = null,
+    @SerializedName("set_id") val setId: Int? = null,
+    @SerializedName("vocab") val vocab: String? = null,
+    @SerializedName("type") val type: String? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("paragraph") val paragraph: String? = null,
+    @SerializedName("blanks") val blanks: List<ClozeBlank>? = null,
+)
+
+data class ClozeBlank(
+    @SerializedName("id") val id: Int? = null,
+    @SerializedName("answer") val answer: String? = null,
+    @SerializedName("explanation") val explanation: String? = null,
+    @SerializedName("on_correct_example") val onCorrectExample: String? = null,
+)
+
+data class MatchPair(
+    @SerializedName("id") val id: Int? = null,
+    @SerializedName("set_id") val setId: Int? = null,
+    @SerializedName("word") val word: String? = null,
+    @SerializedName("meaning") val meaning: String? = null,
+    @SerializedName("hint") val hint: String? = null,
 )
 
 data class AsyncJobResponse(

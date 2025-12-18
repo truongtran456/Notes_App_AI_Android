@@ -25,22 +25,24 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.updateLayoutParams
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.philkes.notallyx.R
+import com.philkes.notallyx.data.api.models.AIResult
+import com.philkes.notallyx.data.api.models.SummaryResponse
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.model.createNoteUrl
 import com.philkes.notallyx.data.model.getNoteIdFromUrl
 import com.philkes.notallyx.data.model.getNoteTypeFromUrl
 import com.philkes.notallyx.data.model.isNoteUrl
 import com.philkes.notallyx.data.preferences.getAiUserId
+import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.databinding.BottomTextFormattingMenuBinding
 import com.philkes.notallyx.databinding.RecyclerToggleBinding
-import com.philkes.notallyx.presentation.activity.ai.AIFileProcessActivity
-import com.philkes.notallyx.presentation.activity.ai.AIHistoryActivity
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_EXCLUDE_NOTE_ID
 import com.philkes.notallyx.presentation.activity.note.PickNoteActivity.Companion.EXTRA_PICKED_NOTE_ID
@@ -62,6 +64,9 @@ import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
 import com.philkes.notallyx.utils.wrapWithChooser
 import java.io.File
+import java.security.MessageDigest
+import java.util.UUID
+import kotlinx.coroutines.launch
 
 class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
 
@@ -71,6 +76,10 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     private lateinit var textFormatMenu: View
 
     private var textFormattingAdapter: TextFormattingAdapter? = null
+
+    // Cache AI result cho note text (t??ng t? checklist)
+    private var cachedTextResult: SummaryResponse? = null
+    private var aiRepository: AIRepository? = null
 
     private var searchResultIndices: List<Pair<Int, Int>>? = null
 
@@ -384,106 +393,71 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
 
     override fun openAIActionsMenu() {
         val noteText = binding.EnterBody.text?.toString().orEmpty()
-        val attachmentUris = getAttachedFileUris()
+        if (noteText.isBlank()) {
+            showToast(R.string.ai_error_empty_note)
+            return
+        }
+        runTextAIAndShowActions(noteText)
+    }
+
+    private fun showTextActionsBottomSheet(cachedResult: SummaryResponse, backendNoteId: String) {
         val dialog = BottomSheetDialog(this)
         val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_actions, null)
 
         sheetView.findViewById<View>(R.id.ActionSummary).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
             dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
-                    noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.SUMMARY,
-                )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.SUMMARY)
-            }
-        }
-
-        sheetView.findViewById<View>(R.id.ActionBullet).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
-                    noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.BULLET_POINTS,
-                )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.BULLET_POINTS)
-            }
-        }
-
-        sheetView.findViewById<View>(R.id.ActionQuestions).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
-                    noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.QUESTIONS,
-                )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.QUESTIONS)
-            }
-        }
-
-        sheetView.findViewById<View>(R.id.ActionMCQ).setOnClickListener {
-            if (noteText.isBlank() && attachmentUris.isEmpty()) {
-                showToast(R.string.ai_error_empty_note)
-                return@setOnClickListener
-            }
-            dialog.dismiss()
-            if (attachmentUris.isNotEmpty()) {
-                AIFileProcessActivity.startWithAttachments(
-                    context = this,
-                    noteText = noteText.ifBlank { null },
-                    noteId = notallyModel.id,
-                    attachments = attachmentUris,
-                    initialSection = AISummaryActivity.AISection.MCQ,
-                )
-            } else {
-                launchAISummary(noteText, AISummaryActivity.AISection.MCQ)
-            }
-        }
-
-        sheetView.findViewById<View>(R.id.ActionFile).setOnClickListener {
-            dialog.dismiss()
-            AIFileProcessActivity.start(
+            AISummaryActivity.startWithResult(
                 context = this,
-                noteText = noteText,
+                summaryResponse = cachedResult,
                 noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.SUMMARY,
+                isVocabMode = false,
             )
         }
 
-        sheetView.findViewById<View>(R.id.ActionHistory).setOnClickListener {
+        sheetView.findViewById<View>(R.id.ActionBullet).setOnClickListener {
             dialog.dismiss()
-            AIHistoryActivity.start(this, userId = getAiUserId())
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.BULLET_POINTS,
+                isVocabMode = false,
+            )
         }
+
+        sheetView.findViewById<View>(R.id.ActionQuestions).setOnClickListener {
+            dialog.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.QUESTIONS,
+                isVocabMode = false,
+            )
+        }
+
+        sheetView.findViewById<View>(R.id.ActionMCQ).setOnClickListener {
+            dialog.dismiss()
+            AISummaryActivity.startWithResult(
+                context = this,
+                summaryResponse = cachedResult,
+                noteId = notallyModel.id,
+                showAllSections = false,
+                initialSection = AISummaryActivity.AISection.MCQ,
+                isVocabMode = false,
+            )
+        }
+
+        // ?n 2 ch?c n?ng: AI from File và View History (ch? gi? 4 ch?c n?ng ??u)
+        sheetView.findViewById<View>(R.id.ActionFile).visibility = View.GONE
+        sheetView.findViewById<View>(R.id.ActionHistory).visibility = View.GONE
 
         dialog.setContentView(sheetView)
         dialog.show()
-    }
-
-    private fun launchAISummary(noteText: String, section: AISummaryActivity.AISection) {
-        AISummaryActivity.start(this, noteText, notallyModel.id, section)
     }
 
     private fun getAttachedFileUris(): List<Uri> {
@@ -526,6 +500,207 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         }
 
         return uris.distinct()
+    }
+
+    /**
+     * Ch?y AI cho note text m?t l?n, sau ?ó hi?n th? bottom sheet ch?c n?ng N?u n?i dung không ??i,
+     * th? dùng k?t qu? cache (hash + GET note theo note_id)
+     */
+    private fun runTextAIAndShowActions(noteText: String) {
+        val userId = getAiUserId()
+        // V?n l?y attachments (image/audio/file) n?u ghi chú có, ?? g?i /process/combined
+        val attachmentUris = getAttachedFileUris()
+        val mode = "text"
+        val currentHash = computeContentHash(noteText, attachmentUris)
+        val localNoteId = notallyModel.id
+
+        // N?u có cachedResult và hash kh?p -> dùng ngay
+        if (cachedTextResult != null && localNoteId != -1L && currentHash != null) {
+            val storedHash =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                    this,
+                    localNoteId,
+                    mode,
+                )
+            if (currentHash == storedHash) {
+                val backendNoteId =
+                    com.philkes.notallyx.data.preferences.AIUserPreferences.getBackendNoteId(
+                        this,
+                        localNoteId,
+                    ) ?: ensureBackendNoteIdForCurrentNote(noteText, attachmentUris)
+                showTextActionsBottomSheet(cachedTextResult!!, backendNoteId)
+                return
+            }
+        }
+
+        val backendNoteId = ensureBackendNoteIdForCurrentNote(noteText, attachmentUris)
+
+        if (aiRepository == null) {
+            aiRepository = AIRepository(this)
+        }
+
+        // Th? GET cache trên server tr??c khi g?i POST
+        lifecycleScope.launch {
+            try {
+                val serverCached =
+                    aiRepository!!.getCachedNote(userId, backendNoteId, checkVocabData = false)
+                if (serverCached != null) {
+                    cachedTextResult = serverCached
+                    // L?u hash ?? l?n sau kh?p
+                    if (localNoteId != -1L && currentHash != null) {
+                        com.philkes.notallyx.data.preferences.AIUserPreferences.setNoteContentHash(
+                            this@EditNoteActivity,
+                            localNoteId,
+                            mode,
+                            currentHash,
+                        )
+                        com.philkes.notallyx.data.preferences.AIUserPreferences.setBackendNoteId(
+                            this@EditNoteActivity,
+                            localNoteId,
+                            backendNoteId,
+                        )
+                    }
+                    showTextActionsBottomSheet(serverCached, backendNoteId)
+                    return@launch
+                }
+            } catch (_: Exception) {
+                // ignore GET cache errors, s? g?i POST
+            }
+
+            // G?i POST summarize
+            val loadingDialog =
+                android.app.ProgressDialog(this@EditNoteActivity).apply {
+                    setMessage(getString(R.string.ai_processing))
+                    setCancelable(false)
+                    show()
+                }
+            try {
+                val result =
+                    aiRepository!!.processCombinedInputs(
+                        noteText = noteText,
+                        attachments = attachmentUris,
+                        userId = userId,
+                        noteId = backendNoteId,
+                        contentType = null,
+                        checkedVocabItems = null,
+                        useCache = true,
+                    )
+                loadingDialog.dismiss()
+                when (result) {
+                    is AIResult.Success -> {
+                        cachedTextResult = result.data
+                        // L?u hash và backend_note_id
+                        if (localNoteId != -1L && currentHash != null) {
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setNoteContentHash(
+                                    this@EditNoteActivity,
+                                    localNoteId,
+                                    mode,
+                                    currentHash,
+                                )
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setBackendNoteId(this@EditNoteActivity, localNoteId, backendNoteId)
+                        }
+                        showTextActionsBottomSheet(result.data, backendNoteId)
+                    }
+                    is AIResult.Error -> {
+                        showToast(result.message ?: getString(R.string.ai_error_generic))
+                    }
+                    is AIResult.Loading -> {
+                        // ignore
+                    }
+                }
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                showToast("Error: ${e.message ?: "Unknown error"}")
+            }
+        }
+    }
+
+    /**
+     * ??m b?o dùng cùng backend_note_id cho cùng n?i dung.
+     * - N?u ?ã có mapping và hash kh?p ? dùng l?i backend_note_id c?.
+     * - N?u ch?a có ho?c n?i dung ??i ? sinh UUID m?i, l?u mapping và hash.
+     */
+    private fun ensureBackendNoteIdForCurrentNote(
+        noteText: String,
+        attachments: List<Uri>,
+    ): String {
+        val mode = if (attachments.isEmpty()) "text" else "combined"
+        val currentHash = computeContentHash(noteText, attachments)
+        val localNoteId = notallyModel.id
+
+        if (localNoteId != -1L && currentHash != null) {
+            val storedHash =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                    this,
+                    localNoteId,
+                    mode,
+                )
+            val storedBackend =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getBackendNoteId(
+                    this,
+                    localNoteId,
+                )
+
+            android.util.Log.d(
+                "EditNoteActivity",
+                "ensureBackendNoteIdForCurrentNote: localNoteId=$localNoteId, mode=$mode, currentHash=${currentHash.take(16)}..., storedHash=${storedHash?.take(16)}..., storedBackend=$storedBackend",
+            )
+
+            if (currentHash == storedHash && storedBackend != null) {
+                android.util.Log.d(
+                    "EditNoteActivity",
+                    "ensureBackendNoteIdForCurrentNote: Reusing existing backend_note_id=$storedBackend",
+                )
+                return storedBackend
+            }
+        }
+
+        // Generate new UUID and persist mapping/hash if possible
+        android.util.Log.d(
+            "EditNoteActivity",
+            "ensureBackendNoteIdForCurrentNote: Hash mismatch or no mapping, generating new UUID. currentHash=${currentHash?.take(16)}...",
+        )
+        val generated = UUID.randomUUID().toString()
+        if (localNoteId != -1L) {
+            com.philkes.notallyx.data.preferences.AIUserPreferences.setBackendNoteId(
+                this,
+                localNoteId,
+                generated,
+            )
+            currentHash?.let {
+                com.philkes.notallyx.data.preferences.AIUserPreferences.setNoteContentHash(
+                    this,
+                    localNoteId,
+                    mode,
+                    it,
+                )
+            }
+            android.util.Log.d(
+                "EditNoteActivity",
+                "ensureBackendNoteIdForCurrentNote: Generated and saved new backend_note_id=$generated",
+            )
+        }
+        return generated
+    }
+
+    private fun computeContentHash(noteText: String, attachments: List<Uri>): String? {
+        val trimmed = noteText.trim()
+        val hasAttachments = attachments.isNotEmpty()
+        if (trimmed.isBlank() && !hasAttachments) return null
+
+        val digest = MessageDigest.getInstance("SHA-256")
+        digest.update(if (hasAttachments) "combined::".toByteArray() else "text::".toByteArray())
+        if (trimmed.isNotBlank()) {
+            digest.update(trimmed.toByteArray())
+        }
+        if (hasAttachments) {
+            attachments
+                .sortedBy { it.toString() }
+                .forEach { uri -> digest.update(uri.toString().toByteArray()) }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun initBottomTextFormattingMenu() {
