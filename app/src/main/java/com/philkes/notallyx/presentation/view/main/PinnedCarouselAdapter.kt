@@ -33,12 +33,24 @@ class PinnedCarouselAdapter(
         super.onViewRecycled(holder)
         // Clear any heavy references if needed
     }
+    
+    // Public method to get item by position (for transition)
+    fun getItemAt(position: Int): BaseNote? {
+        return if (position >= 0 && position < itemCount) {
+            getItem(position)
+        } else {
+            null
+        }
+    }
 
     class ViewHolder(
         private val binding: ItemPinnedCarouselBinding,
         private val onClick: (BaseNote) -> Unit,
     ) : RecyclerView.ViewHolder(binding.root) {
         fun bind(note: BaseNote, gradientRes: Int) {
+            // Set transition name cho Material Container Transform
+            binding.root.transitionName = "note_card_${note.id}"
+            
             binding.root.setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
             binding.root.setBackgroundResource(gradientRes)
             binding.Title.text = note.title.ifEmpty { binding.root.context.getString(com.philkes.notallyx.R.string.empty_note) }

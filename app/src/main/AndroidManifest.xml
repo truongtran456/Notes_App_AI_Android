@@ -97,6 +97,11 @@
         <activity 
             android:name=".presentation.activity.ai.AISummaryActivity"
             android:label="@string/ai_summarize" />
+        <activity
+            android:name=".presentation.activity.ai.TextMcqQuizActivity"
+            android:label="AI MCQ Practice"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
 
         <activity
             android:name=".presentation.activity.ai.AIFileProcessActivity"

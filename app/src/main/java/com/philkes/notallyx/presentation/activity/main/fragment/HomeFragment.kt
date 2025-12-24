@@ -23,9 +23,11 @@ import com.philkes.notallyx.data.model.Item
 import com.philkes.notallyx.data.model.hasAnyUpcomingNotifications
 import com.philkes.notallyx.databinding.FragmentHomeBinding
 import com.philkes.notallyx.data.model.Type
+import com.philkes.notallyx.presentation.activity.note.EditActivity
 import com.philkes.notallyx.presentation.activity.note.EditListActivity
 import com.philkes.notallyx.presentation.activity.note.EditNoteActivity
 import com.philkes.notallyx.presentation.view.main.HomeTaskAdapter
+import com.philkes.notallyx.presentation.view.main.HomeTaskViewHolder
 import com.philkes.notallyx.presentation.view.main.PinnedCarouselAdapter
 import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
 import kotlinx.coroutines.launch
@@ -78,7 +80,6 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         
         setupRecyclerView()
-        setupFilterPills()
         setupSearch()
         setupHeader()
         setupObserver()
@@ -97,7 +98,7 @@ class HomeFragment : Fragment() {
                     Type.NOTE -> android.content.Intent(context, EditNoteActivity::class.java)
                     Type.LIST -> android.content.Intent(context, EditListActivity::class.java)
                 }
-                intent.putExtra("EXTRA_SELECTED_BASE_NOTE", note.id)
+                intent.putExtra(EditActivity.EXTRA_SELECTED_BASE_NOTE, note.id)
                 startActivity(intent)
             }
 
@@ -106,15 +107,8 @@ class HomeFragment : Fragment() {
             clipToPadding = false
         }
 
-        // Filter bar pinned in AppBar
-        binding?.FilterPillsRecyclerView?.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
-            setHasFixedSize(true) // Fixed size for filter pills
-            filterPillAdapter = HomeFilterPillAdapter { filterType ->
-                selectFilter(filterType)
-            }
-            adapter = filterPillAdapter
-        }
+        // Ẩn filter All/Archived trên Home Today
+        binding?.FilterPillsRecyclerView?.visibility = View.GONE
 
         // Pinned carousel
         binding?.PinnedCarouselRecyclerView?.apply {
@@ -270,6 +264,9 @@ class HomeFragment : Fragment() {
             .filter { it.pinned }
             .sortedByDescending { it.modifiedTimestamp } // mới ghim lên đầu
         pinnedCarouselAdapter?.submitList(pinned)
+        
+        // Hiển thị icon ghim ở header nếu có pinned notes
+        binding?.PinnedIcon?.visibility = if (pinned.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE
     }
 
     private fun refreshDayChips() {
@@ -307,8 +304,24 @@ class HomeFragment : Fragment() {
             Type.NOTE -> android.content.Intent(context, EditNoteActivity::class.java)
             Type.LIST -> android.content.Intent(context, EditListActivity::class.java)
         }
-        intent.putExtra("EXTRA_SELECTED_BASE_NOTE", note.id)
-        startActivity(intent)
+        intent.putExtra(EditActivity.EXTRA_SELECTED_BASE_NOTE, note.id)
+        
+        // Đơn giản: Chỉ dùng fade animation chậm hơn
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val options = androidx.core.app.ActivityOptionsCompat.makeCustomAnimation(
+                    requireContext(),
+                    com.philkes.notallyx.R.anim.fade_in_slow,
+                    com.philkes.notallyx.R.anim.fade_out_slow
+                )
+                startActivity(intent, options.toBundle())
+            } catch (e: Exception) {
+                // Fallback nếu animation fail
+                startActivity(intent)
+            }
+        } else {
+            startActivity(intent)
+        }
     }
     
     private fun showAddNoteDialog() {
@@ -400,12 +413,23 @@ class HomeFragment : Fragment() {
     
     override fun onDestroyView() {
         super.onDestroyView()
+        // Cleanup MediatorLiveData sources to prevent memory leaks
+        currentSource?.let { source ->
+            filteredNotes?.removeSource(source)
+        }
+        currentSource = null
+        filteredNotes = null
         // Clear caches to free memory
         dateCache.clear()
         baseNoteCache.clear()
         cachedContext = null
         cachedAllString = null
         cachedArchivedString = null
+        // Clear adapters
+        binding?.HomeRecyclerView?.adapter = null
+        binding?.FilterPillsRecyclerView?.adapter = null
+        binding?.PinnedCarouselRecyclerView?.adapter = null
+        binding?.DayStripRecyclerView?.adapter = null
         binding = null
         homeTaskAdapter = null
         pinnedCarouselAdapter = null

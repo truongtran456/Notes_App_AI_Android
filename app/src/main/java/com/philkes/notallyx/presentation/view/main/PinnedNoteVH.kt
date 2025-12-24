@@ -71,7 +71,7 @@ class PinnedNoteVH(
     }
 
     fun updateCheck(checked: Boolean, color: String) {
-        // Bỏ viền - không set strokeWidth và strokeColor
+        // Không dùng stroke của MaterialCardView để tránh bị cắt viền ở 4 góc
         binding.root.strokeWidth = 0
         binding.root.isChecked = checked
     }
@@ -210,6 +210,9 @@ class PinnedNoteVH(
     }
 
     private fun setImages(images: List<FileAttachment>, mediaRoot: File?) {
+        // Clear previous Glide request to prevent memory leaks
+        clearGlideRequests()
+        
         binding.apply {
             if (images.isNotEmpty()) {
                 ImageView.visibility = VISIBLE
@@ -218,35 +221,46 @@ class PinnedNoteVH(
                 val image = images[0]
                 val file = if (mediaRoot != null) File(mediaRoot, image.localName) else null
 
-                Glide.with(ImageView)
-                    .load(file)
-                    .centerCrop()
-                    .transition(DrawableTransitionOptions.withCrossFade())
-                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                    .listener(
-                        object : RequestListener<android.graphics.drawable.Drawable> {
-                            override fun onLoadFailed(
-                                e: GlideException?,
-                                model: Any?,
-                                target: Target<android.graphics.drawable.Drawable>?,
-                                isFirstResource: Boolean,
-                            ): Boolean {
-                                Message.visibility = VISIBLE
-                                return false
-                            }
+                try {
+                    Glide.with(ImageView)
+                        .load(file)
+                        .centerCrop()
+                        .transition(DrawableTransitionOptions.withCrossFade())
+                        .diskCacheStrategy(DiskCacheStrategy.NONE)
+                        .listener(
+                            object : RequestListener<android.graphics.drawable.Drawable> {
+                                override fun onLoadFailed(
+                                    e: GlideException?,
+                                    model: Any?,
+                                    target: Target<android.graphics.drawable.Drawable>?,
+                                    isFirstResource: Boolean,
+                                ): Boolean {
+                                    // Don't crash on error, just show message
+                                    try {
+                                        Message.visibility = VISIBLE
+                                    } catch (e: Exception) {
+                                        // Ignore if view is recycled
+                                    }
+                                    return false
+                                }
 
-                            override fun onResourceReady(
-                                resource: android.graphics.drawable.Drawable?,
-                                model: Any?,
-                                target: Target<android.graphics.drawable.Drawable>?,
-                                dataSource: DataSource?,
-                                isFirstResource: Boolean,
-                            ): Boolean {
-                                return false
+                                override fun onResourceReady(
+                                    resource: android.graphics.drawable.Drawable?,
+                                    model: Any?,
+                                    target: Target<android.graphics.drawable.Drawable>?,
+                                    dataSource: DataSource?,
+                                    isFirstResource: Boolean,
+                                ): Boolean {
+                                    return false
+                                }
                             }
-                        }
-                    )
-                    .into(ImageView)
+                        )
+                        .into(ImageView)
+                } catch (e: Exception) {
+                    // Handle Glide errors gracefully to prevent crashes
+                    Message.visibility = VISIBLE
+                }
+                
                 if (images.size > 1) {
                     ImageViewMore.apply {
                         text = images.size.toString()
@@ -259,8 +273,16 @@ class PinnedNoteVH(
                 ImageView.visibility = GONE
                 Message.visibility = GONE
                 ImageViewMore.visibility = GONE
-                Glide.with(ImageView).clear(ImageView)
+                clearGlideRequests()
             }
+        }
+    }
+    
+    fun clearGlideRequests() {
+        try {
+            Glide.with(binding.ImageView).clear(binding.ImageView)
+        } catch (e: Exception) {
+            // Ignore errors if view is already recycled
         }
     }
 

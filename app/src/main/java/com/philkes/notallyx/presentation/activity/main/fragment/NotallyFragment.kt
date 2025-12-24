@@ -39,6 +39,7 @@ import com.philkes.notallyx.presentation.hideKeyboard
 import com.philkes.notallyx.presentation.movedToResId
 import com.philkes.notallyx.presentation.showKeyboard
 import com.philkes.notallyx.presentation.view.main.BaseNoteAdapter
+import com.philkes.notallyx.presentation.view.main.BaseNoteVH
 import com.philkes.notallyx.presentation.view.main.BaseNoteVHPreferences
 import com.philkes.notallyx.presentation.view.main.PinnedNoteAdapter
 import com.philkes.notallyx.presentation.view.misc.ItemListener
@@ -52,6 +53,7 @@ abstract class NotallyFragment : Fragment(), ItemListener {
     private var pinnedNotesAdapter: PinnedNoteAdapter? = null
     private lateinit var openNoteActivityResultLauncher: ActivityResultLauncher<Intent>
     private var lastSelectedNotePosition = -1
+    private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
 
     internal var binding: FragmentNotesBinding? = null
 
@@ -59,9 +61,17 @@ abstract class NotallyFragment : Fragment(), ItemListener {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        binding = null
+        // Unregister adapter data observer to prevent memory leaks
+        adapterDataObserver?.let { observer ->
+            notesAdapter?.unregisterAdapterDataObserver(observer)
+        }
+        adapterDataObserver = null
+        // Clear adapters
+        binding?.RecyclerView?.adapter = null
+        binding?.PinnedRecyclerView?.adapter = null
         notesAdapter = null
         pinnedNotesAdapter = null
+        binding = null
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -135,10 +145,8 @@ abstract class NotallyFragment : Fragment(), ItemListener {
         setHasOptionsMenu(true)
         binding = FragmentNotesBinding.inflate(inflater)
         
-        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ fragment
-        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
-            binding?.root?.setBackgroundResource(R.drawable.bg_background)
-        }
+        // Dùng nền gradient Home Today cho toàn bộ fragment Notes
+        binding?.root?.setBackgroundResource(R.drawable.bg_background_layer)
         
         return binding?.root
     }
@@ -297,15 +305,14 @@ abstract class NotallyFragment : Fragment(), ItemListener {
             }
         )
 
-        notesAdapter?.registerAdapterDataObserver(
-            object : RecyclerView.AdapterDataObserver() {
-                override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
-                    if (itemCount > 0) {
-                        binding?.RecyclerView?.scrollToPosition(positionStart)
-                    }
+        adapterDataObserver = object : RecyclerView.AdapterDataObserver() {
+            override fun onItemRangeInserted(positionStart: Int, itemCount: Int) {
+                if (itemCount > 0) {
+                    binding?.RecyclerView?.scrollToPosition(positionStart)
                 }
             }
-        )
+        }
+        notesAdapter?.registerAdapterDataObserver(adapterDataObserver!!)
         binding?.RecyclerView?.apply {
             adapter = notesAdapter
             setHasFixedSize(false)
@@ -395,25 +402,49 @@ abstract class NotallyFragment : Fragment(), ItemListener {
     }
 
     private fun setupRecyclerView() {
-        binding?.RecyclerView?.layoutManager =
-            if (model.preferences.notesView.value == NotesView.GRID) {
-                StaggeredGridLayoutManager(2, RecyclerView.VERTICAL)
-            } else LinearLayoutManager(requireContext())
-        
-        // Thêm padding bottom để các item cuối cùng không bị che bởi bottom bar
-        // Bottom bar có margin 20dp + chiều cao của nó (khoảng 56dp) + margin bottom từ window insets
-        binding?.RecyclerView?.setPadding(
-            binding?.RecyclerView?.paddingLeft ?: 0,
-            binding?.RecyclerView?.paddingTop ?: 0,
-            binding?.RecyclerView?.paddingRight ?: 0,
-            resources.getDimensionPixelSize(R.dimen.dp_100) // Padding bottom đủ lớn để không bị che
-        )
+        binding?.RecyclerView?.apply {
+            layoutManager =
+                if (model.preferences.notesView.value == NotesView.GRID) {
+                    StaggeredGridLayoutManager(2, RecyclerView.VERTICAL)
+                } else LinearLayoutManager(requireContext())
+            
+            // Optimize RecyclerView performance
+            setHasFixedSize(false) // Dynamic content size
+            setItemViewCacheSize(20) // Cache more views for smoother scrolling
+            recycledViewPool.setMaxRecycledViews(0, 20) // Cache more header views
+            recycledViewPool.setMaxRecycledViews(1, 20) // Cache more note views
+            
+            // Thêm padding bottom để các item cuối cùng không bị che bởi bottom bar
+            // Bottom bar có margin 20dp + chiều cao của nó (khoảng 56dp) + margin bottom từ window insets
+            setPadding(
+                paddingLeft,
+                paddingTop,
+                paddingRight,
+                resources.getDimensionPixelSize(R.dimen.dp_100) // Padding bottom đủ lớn để không bị che
+            )
+        }
     }
 
     private fun goToActivity(activity: Class<*>, baseNote: BaseNote) {
         val intent = Intent(requireContext(), activity)
         intent.putExtra(EXTRA_SELECTED_BASE_NOTE, baseNote.id)
-        openNoteActivityResultLauncher.launch(intent)
+        
+        // Đơn giản: Chỉ dùng fade animation chậm hơn
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                val options = androidx.core.app.ActivityOptionsCompat.makeCustomAnimation(
+                    requireContext(),
+                    R.anim.fade_in_slow,
+                    R.anim.fade_out_slow
+                )
+                openNoteActivityResultLauncher.launch(intent, options)
+            } catch (e: Exception) {
+                // Fallback nếu animation fail
+                openNoteActivityResultLauncher.launch(intent)
+            }
+        } else {
+            openNoteActivityResultLauncher.launch(intent)
+        }
     }
 
     abstract fun getBackground(): Int

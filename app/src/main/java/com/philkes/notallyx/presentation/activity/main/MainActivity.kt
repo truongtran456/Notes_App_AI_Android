@@ -308,7 +308,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             binding.Toolbar?.isVisible = false
             binding.HomeToolbar?.isVisible = true
             binding.NotesToolbar?.isVisible = false
-        } else if (currentDestination == R.id.Notes || currentDestination == R.id.DisplayLabel || currentDestination == R.id.Unlabeled) {
+        } else if (currentDestination == R.id.Notes || currentDestination == R.id.DisplayLabel || currentDestination == R.id.Unlabeled || currentDestination == R.id.Checklist) {
             binding.Toolbar?.isVisible = false
             binding.HomeToolbar?.isVisible = false
             binding.NotesToolbar?.isVisible = true
@@ -370,6 +370,9 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     private val fabOpen by lazy { android.view.animation.AnimationUtils.loadAnimation(this, R.anim.fab_open) }
     private val fabClose by lazy { android.view.animation.AnimationUtils.loadAnimation(this, R.anim.fab_close) }
     
+    // Track postDelayed runnables for cleanup
+    private val fabPostRunnables = mutableListOf<Runnable>()
+    
     private fun setupFAB() {
         // Main FAB (dấu +) - click để toggle expand/collapse menu
         binding.MainFab.setOnClickListener {
@@ -410,12 +413,12 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             binding.MakeList.isClickable = false
             
             // Ẩn sau khi animation xong
-            binding.TakeNote.postDelayed({
-                binding.TakeNote.visibility = View.INVISIBLE
-            }, 300)
-            binding.MakeList.postDelayed({
-                binding.MakeList.visibility = View.INVISIBLE
-            }, 300)
+            val hideTakeNoteRunnable = Runnable { binding.TakeNote.visibility = View.INVISIBLE }
+            val hideMakeListRunnable = Runnable { binding.MakeList.visibility = View.INVISIBLE }
+            fabPostRunnables.add(hideTakeNoteRunnable)
+            fabPostRunnables.add(hideMakeListRunnable)
+            binding.TakeNote.postDelayed(hideTakeNoteRunnable, 300)
+            binding.MakeList.postDelayed(hideMakeListRunnable, 300)
             
             // Cập nhật trạng thái
             isFabOpen = false
@@ -469,6 +472,13 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         val btnSystem = binding.root.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnThemeSystem)
         val btnLight = binding.root.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnThemeLight)
         val btnDark = binding.root.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnThemeDark)
+        val navHomeBtn = binding.root.findViewById<com.google.android.material.card.MaterialCardView>(R.id.NavSettingsBtn)
+        navHomeBtn?.setOnClickListener {
+            // Đi tới Home Today khi ấn icon ở header
+            navigateWithAnimation(R.id.Home)
+            binding.DrawerLayout.closeDrawer(GravityCompat.START)
+        }
+
         drawerAdapter =
             DrawerAdapter(
                 onItemClick = { entry ->
@@ -500,10 +510,11 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             val systemBtn = btnSystem ?: return
             val lightBtn = btnLight ?: return
             val darkBtn = btnDark ?: return
-            val selectedTint = ColorStateList.valueOf(Color.parseColor("#EEF0FF"))
+            // Phối màu toggle theo nền kem của app
+            val selectedTint = ColorStateList.valueOf(Color.parseColor("#FFE8C2"))
             val unselectedTint = ColorStateList.valueOf(Color.TRANSPARENT)
-            val selectedText = Color.parseColor("#1A1A1A")
-            val unselectedText = Color.parseColor("#5A5A5A")
+            val selectedText = Color.parseColor("#B06A1F")
+            val unselectedText = Color.parseColor("#6E6E6E")
 
             fun style(btn: com.google.android.material.button.MaterialButton, selected: Boolean) {
                 btn.backgroundTintList = if (selected) selectedTint else unselectedTint
@@ -548,7 +559,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         }
             }
 
-    private val searchDebounceRunnable = android.os.Handler(android.os.Looper.getMainLooper())
+    private val searchDebounceHandler = android.os.Handler(android.os.Looper.getMainLooper())
     
     private fun setupHomeTopBar() {
         binding.HomeMenuButton?.setOnClickListener {
@@ -562,10 +573,10 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 // Remove previous pending search
-                searchDebounceRunnable.removeCallbacksAndMessages(null)
+                searchDebounceHandler.removeCallbacksAndMessages(null)
                 // Debounce search by 300ms
                 val query = s?.toString().orEmpty()
-                searchDebounceRunnable.postDelayed({
+                searchDebounceHandler.postDelayed({
                     homeSearchListener?.invoke(query)
                 }, 300)
             }
@@ -575,13 +586,19 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     }
 
     private fun setupNotesTopBar() {
-        binding.NotesMenuButton?.setOnClickListener {
-            binding.DrawerLayout.openDrawer(GravityCompat.START)
-        }
-        binding.NotesSearchButton?.setOnClickListener { toggleNotesSearch() }
+        // NotesMenuButton và NotesSearchButton sẽ được setup trong setupActionMode()
+        // để xử lý cả normal mode và action mode
+        
+        // Setup more button cho normal mode (appearance menu)
         binding.NotesMoreButton?.setOnClickListener {
-            // Mở menu options (3 chấm)
-            openOptionsMenu()
+            if (baseModel.actionMode.isEnabled()) {
+                // Trong action mode, menu sẽ được setup trong setupActionModeMoreMenu
+                // Nhưng để đảm bảo, ta check lại
+                return@setOnClickListener
+            } else {
+                // Normal mode: mở appearance popup
+                showAppearancePopup(it)
+            }
         }
         // Đảm bảo icon more luôn hiển thị và có màu đen
         binding.NotesMoreButton?.visibility = View.VISIBLE
@@ -592,10 +609,10 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 // Remove previous pending search
-                searchDebounceRunnable.removeCallbacksAndMessages(null)
+                searchDebounceHandler.removeCallbacksAndMessages(null)
                 // Debounce search by 300ms
                 val query = s?.toString().orEmpty()
-                searchDebounceRunnable.postDelayed({
+                searchDebounceHandler.postDelayed({
                     notesSearchListener?.invoke(query)
                 }, 300)
             }
@@ -696,7 +713,16 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
 
     private fun buildDrawerEntries(labels: List<String>): List<DrawerEntry> {
         val list = mutableListOf<DrawerEntry>()
-        list.add(DrawerEntry.Item("notes", getString(R.string.notes), R.drawable.home))
+        // Notes
+        list.add(DrawerEntry.Item("notes", getString(R.string.notes), R.drawable.notebook))
+        // Study Sets (học từ vựng) ngay dưới Notes
+        list.add(
+            DrawerEntry.Item(
+                "studysets",
+                getString(R.string.study_sets_title),
+                R.drawable.checkbox,
+            )
+        )
         list.add(
             DrawerEntry.Item(
                 "unlabeled",
@@ -738,12 +764,20 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 R.drawable.settings,
             )
         )
+        list.add(
+            DrawerEntry.Item(
+                "logout",
+                getString(R.string.logout),
+                R.drawable.ic_arrow_right,
+            )
+        )
         return list
     }
 
     private fun handleDrawerItemClick(id: String) {
         when {
             id == "notes" -> navigateWithAnimation(R.id.Notes)
+            id == "studysets" -> navigateWithAnimation(R.id.Checklist)
             id == "unlabeled" -> navigateWithAnimation(R.id.Unlabeled)
             id.startsWith("label:") -> {
                 val label = id.removePrefix("label:")
@@ -753,6 +787,11 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             id == "archived" -> navigateWithAnimation(R.id.Archived)
             id == "reminders" -> navigateWithAnimation(R.id.Reminders)
             id == "settings" -> navigateWithAnimation(R.id.Settings)
+            id == "logout" -> {
+                // Placeholder: sau này sẽ xử lý đăng xuất (Google, v.v.)
+                // Hiện tại chỉ đóng drawer và về Home
+                navigateWithAnimation(R.id.Home)
+            }
         }
         selectedDrawerId = id
         drawerAdapter?.selectedId = selectedDrawerId
@@ -768,7 +807,39 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     }
 
     private fun setupActionMode() {
-        binding.ActionMode.setNavigationOnClickListener { baseModel.actionMode.close(true) }
+        // Ẩn ActionMode toolbar cũ - không dùng nữa
+        binding.ActionMode.visibility = View.GONE
+        
+        // Setup click listeners cho các nút action mode trong NotesToolbar
+        binding.NotesMenuButton?.setOnClickListener {
+            if (baseModel.actionMode.isEnabled()) {
+                // Trong action mode: nút X để close
+                baseModel.actionMode.close(true)
+            } else {
+                // Normal mode: mở drawer
+                binding.DrawerLayout.openDrawer(GravityCompat.START)
+            }
+        }
+        
+        binding.NotesLabelButton?.setOnClickListener {
+            label()
+        }
+        
+        binding.NotesSelectAllButton?.setOnClickListener {
+            getCurrentFragmentNotes?.invoke()?.let { baseModel.actionMode.add(it) }
+        }
+        
+        binding.NotesSearchButton?.setOnClickListener {
+            if (baseModel.actionMode.isEnabled()) {
+                // Trong action mode: delete
+                moveNotes(Folder.DELETED)
+            } else {
+                // Normal mode: toggle search
+                toggleNotesSearch()
+            }
+        }
+        
+        // More button sẽ được setup trong setupNotesTopBar và update khi action mode
 
         val transition =
             MaterialFade().apply {
@@ -784,19 +855,239 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         baseModel.actionMode.enabled.observe(this) { enabled ->
             TransitionManager.beginDelayedTransition(binding.RelativeLayout, transition)
             if (enabled) {
-                binding.Toolbar.visibility = View.GONE
-                binding.ActionMode.visibility = View.VISIBLE
+                // Chuyển NotesToolbar sang action mode
+                switchNotesToolbarToActionMode()
                 binding.DrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             } else {
-                binding.Toolbar.visibility = View.VISIBLE
-                binding.ActionMode.visibility = View.GONE
+                // Trả NotesToolbar về normal mode
+                switchNotesToolbarToNormalMode()
                 binding.DrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNDEFINED)
             }
             actionModeCancelCallback.isEnabled = enabled
         }
 
-        val menu = binding.ActionMode.menu
-        baseModel.folder.observe(this@MainActivity, ModelFolderObserver(menu, baseModel))
+        // Setup action mode menu cho more button khi folder thay đổi
+        baseModel.folder.observe(this@MainActivity) { folder ->
+            // Chỉ update menu nếu đang trong action mode
+            if (baseModel.actionMode.isEnabled()) {
+                setupActionModeMoreMenu(folder)
+            }
+        }
+        
+        // Update count trong toolbar (có thể hiển thị ở đâu đó nếu cần)
+        baseModel.actionMode.count.observe(this) { count ->
+            // Có thể hiển thị count ở đâu đó nếu cần
+        }
+    }
+    
+    private fun switchNotesToolbarToActionMode() {
+        // Đổi icon menu thành X
+        binding.NotesMenuButton?.setImageResource(R.drawable.close)
+        binding.NotesMenuButton?.contentDescription = getString(R.string.cancel)
+        
+        // Ẩn search hint và input - đảm bảo hoàn toàn ẩn
+        binding.NotesSearchHint?.visibility = View.GONE
+        binding.NotesSearchHint?.alpha = 0f
+        binding.NotesSearchInput?.visibility = View.GONE
+        binding.NotesSearchInput?.alpha = 0f
+        collapseNotesSearch(clearText = true, hideKeyboard = true)
+        
+        // Hiển thị label và select all buttons
+        binding.NotesLabelButton?.visibility = View.VISIBLE
+        binding.NotesSelectAllButton?.visibility = View.VISIBLE
+        
+        // Đổi icon search thành delete
+        binding.NotesSearchButton?.setImageResource(R.drawable.delete)
+        binding.NotesSearchButton?.contentDescription = getString(R.string.delete)
+        
+        // More button: setup action mode menu
+        setupActionModeMoreMenu(baseModel.folder.value ?: Folder.NOTES)
+    }
+    
+    private fun switchNotesToolbarToNormalMode() {
+        // Đổi icon X thành menu
+        binding.NotesMenuButton?.setImageResource(R.drawable.menu)
+        binding.NotesMenuButton?.contentDescription = getString(R.string.navigation_drawer_open)
+        
+        // Hiển thị search hint
+        binding.NotesSearchHint?.visibility = View.VISIBLE
+        binding.NotesSearchHint?.alpha = 1f
+        binding.NotesSearchInput?.visibility = View.GONE
+        binding.NotesSearchInput?.alpha = 1f
+        
+        // Ẩn label và select all buttons
+        binding.NotesLabelButton?.visibility = View.GONE
+        binding.NotesSelectAllButton?.visibility = View.GONE
+        
+        // Đổi icon delete thành search
+        binding.NotesSearchButton?.setImageResource(R.drawable.ic_search)
+        binding.NotesSearchButton?.contentDescription = getString(R.string.search)
+        
+        // More button trở về menu appearance
+        binding.NotesMoreButton?.setOnClickListener {
+            showAppearancePopup(it)
+        }
+    }
+    
+    private fun setupActionModeMoreMenu(folder: Folder) {
+        // Update more button click listener khi folder thay đổi
+        // Chỉ update nếu đang trong action mode
+        if (!baseModel.actionMode.isEnabled()) {
+            return
+        }
+        
+        // Tạo PopupMenu cho more button trong action mode
+        binding.NotesMoreButton?.setOnClickListener {
+            val popup = PopupMenu(this, it)
+            val menu = popup.menu
+            
+            when (folder) {
+                Folder.NOTES -> {
+                    val pinnedItem = menu.add(R.string.pin, R.drawable.pin) {
+                        val baseNotes = baseModel.actionMode.selectedNotes.values
+                        if (baseNotes.any { !it.pinned }) {
+                            baseModel.pinBaseNotes(true)
+                        } else {
+                            baseModel.pinBaseNotes(false)
+                        }
+                    }
+                    // Update pin/unpin text và icon dựa trên selected notes
+                    val baseNotes = baseModel.actionMode.selectedNotes.values
+                    if (baseNotes.any { !it.pinned }) {
+                        pinnedItem.setTitle(R.string.pin).setIcon(R.drawable.pin)
+                    } else {
+                        pinnedItem.setTitle(R.string.unpin).setIcon(R.drawable.unpin)
+                    }
+                    menu.add(R.string.archive, R.drawable.archive) {
+                        moveNotes(Folder.ARCHIVED)
+                    }
+                    menu.add(R.string.change_color, R.drawable.change_color) {
+                        lifecycleScope.launch {
+                            val colors = withContext(Dispatchers.IO) {
+                                NotallyDatabase.getDatabase(
+                                    this@MainActivity,
+                                    observePreferences = false,
+                                ).value.getBaseNoteDao().getAllColors()
+                            }
+                            val currentColor = baseModel.actionMode.selectedNotes.values
+                                .map { it.color }
+                                .distinct()
+                                .takeIf { it.size == 1 }
+                                ?.firstOrNull()
+                            showColorSelectDialog(
+                                colors,
+                                currentColor,
+                                null,
+                                { selectedColor, oldColor ->
+                                    if (oldColor != null) {
+                                        baseModel.changeColor(oldColor, selectedColor)
+                                    }
+                                    baseModel.colorBaseNote(selectedColor)
+                                },
+                            ) { colorToDelete, newColor ->
+                                baseModel.changeColor(colorToDelete, newColor)
+                            }
+                        }
+                    }
+                    menu.add(R.string.share, R.drawable.share) {
+                        if (baseModel.actionMode.selectedNotes.size == 1) {
+                            share()
+                        }
+                    }.isVisible = baseModel.actionMode.selectedNotes.size == 1
+                    // Export - hiện dialog với các options
+                    menu.add(R.string.export, R.drawable.export) {
+                        val exportOptions = ExportMimeType.entries.map { it.name }.toTypedArray()
+                        MaterialAlertDialogBuilder(this@MainActivity)
+                            .setTitle(R.string.export)
+                            .setItems(exportOptions) { _, which ->
+                                exportSelectedNotes(ExportMimeType.entries[which])
+                            }
+                            .show()
+                    }
+                }
+                Folder.ARCHIVED -> {
+                    menu.add(R.string.unarchive, R.drawable.unarchive) {
+                        moveNotes(Folder.NOTES)
+                    }
+                    menu.add(R.string.change_color, R.drawable.change_color) {
+                        lifecycleScope.launch {
+                            val colors = withContext(Dispatchers.IO) {
+                                NotallyDatabase.getDatabase(
+                                    this@MainActivity,
+                                    observePreferences = false,
+                                ).value.getBaseNoteDao().getAllColors()
+                            }
+                            val currentColor = baseModel.actionMode.selectedNotes.values
+                                .map { it.color }
+                                .distinct()
+                                .takeIf { it.size == 1 }
+                                ?.firstOrNull()
+                            showColorSelectDialog(
+                                colors,
+                                currentColor,
+                                null,
+                                { selectedColor, oldColor ->
+                                    if (oldColor != null) {
+                                        baseModel.changeColor(oldColor, selectedColor)
+                                    }
+                                    baseModel.colorBaseNote(selectedColor)
+                                },
+                            ) { colorToDelete, newColor ->
+                                baseModel.changeColor(colorToDelete, newColor)
+                            }
+                        }
+                    }
+                    menu.add(R.string.share, R.drawable.share) {
+                        if (baseModel.actionMode.selectedNotes.size == 1) {
+                            share()
+                        }
+                    }.isVisible = baseModel.actionMode.selectedNotes.size == 1
+                }
+                Folder.DELETED -> {
+                    menu.add(R.string.restore, R.drawable.restore) {
+                        moveNotes(Folder.NOTES)
+                    }
+                    menu.add(R.string.delete_forever, R.drawable.delete) {
+                        deleteForever()
+                    }
+                    menu.add(R.string.change_color, R.drawable.change_color) {
+                        lifecycleScope.launch {
+                            val colors = withContext(Dispatchers.IO) {
+                                NotallyDatabase.getDatabase(
+                                    this@MainActivity,
+                                    observePreferences = false,
+                                ).value.getBaseNoteDao().getAllColors()
+                            }
+                            val currentColor = baseModel.actionMode.selectedNotes.values
+                                .map { it.color }
+                                .distinct()
+                                .takeIf { it.size == 1 }
+                                ?.firstOrNull()
+                            showColorSelectDialog(
+                                colors,
+                                currentColor,
+                                null,
+                                { selectedColor, oldColor ->
+                                    if (oldColor != null) {
+                                        baseModel.changeColor(oldColor, selectedColor)
+                                    }
+                                    baseModel.colorBaseNote(selectedColor)
+                                },
+                            ) { colorToDelete, newColor ->
+                                baseModel.changeColor(colorToDelete, newColor)
+                            }
+                        }
+                    }
+                    menu.add(R.string.share, R.drawable.share) {
+                        if (baseModel.actionMode.selectedNotes.size == 1) {
+                            share()
+                        }
+                    }.isVisible = baseModel.actionMode.selectedNotes.size == 1
+                }
+            }
+            
+            popup.show()
+        }
     }
 
     private fun moveNotes(folderTo: Folder) {
@@ -992,7 +1283,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 binding.HomeToolbar?.isVisible = true // Hiển thị Home toolbar
                 binding.NotesToolbar?.isVisible = false
                 collapseNotesSearch(clearText = true, hideKeyboard = true)
-            } else if (destination.id == R.id.Notes || destination.id == R.id.DisplayLabel || destination.id == R.id.Unlabeled) {
+            } else if (destination.id == R.id.Notes || destination.id == R.id.DisplayLabel || destination.id == R.id.Unlabeled || destination.id == R.id.Checklist) {
                 // Hiển thị Notes toolbar (giống Home nhưng không có avatar và có nút more)
                 supportActionBar?.setDisplayShowTitleEnabled(false)
                 binding.Toolbar?.isVisible = false // Ẩn toolbar mặc định
@@ -1047,14 +1338,9 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     private fun setupExpandableBottomBar() {
         val bottomBar = binding.root.findViewById<ExpandableBottomBar>(R.id.expandable_bottom_bar)
             ?: return
-        
-        // Đặt nền bottom bar theo màu nền app
-        val backgroundColor = ContextCompat.getColor(this, R.color.md_theme_background)
-        bottomBar.setBackgroundColor(backgroundColor)
-        
-        // Cũng set cho container để đảm bảo
-        val container = binding.root.findViewById<ViewGroup>(R.id.BottomBarContainer)
-        container?.setBackgroundColor(backgroundColor)
+
+        // Set background drawable glassy bo tròn cho chính ExpandableBottomBar
+        bottomBar.setBackgroundResource(R.drawable.bg_bottom_bar_app)
 
         // Map menu item IDs với destination IDs
         val menuItemToDestinationMap = mapOf(
@@ -1369,6 +1655,39 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     fun setupHomeAddButton(onClick: () -> Unit) {
         homeAddListener = onClick
         binding.HomeAddButton?.setOnClickListener { homeAddListener?.invoke() }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Cleanup Handler to prevent memory leaks
+        searchDebounceHandler.removeCallbacksAndMessages(null)
+        // Cleanup FAB postDelayed runnables
+        fabPostRunnables.forEach { runnable ->
+            try {
+                binding.root.removeCallbacks(runnable)
+                binding.TakeNote?.removeCallbacks(runnable)
+                binding.MakeList?.removeCallbacks(runnable)
+            } catch (e: Exception) {
+                // Ignore if views are already destroyed
+            }
+        }
+        fabPostRunnables.clear()
+        // Cancel animations
+        try {
+            binding.MainFab?.clearAnimation()
+            binding.TakeNote?.clearAnimation()
+            binding.MakeList?.clearAnimation()
+        } catch (e: Exception) {
+            // Ignore if views are already destroyed
+        }
+        // Clear listeners to prevent leaks
+        homeSearchListener = null
+        homeAddListener = null
+        notesSearchListener = null
+        getCurrentFragmentNotes = null
+        // Remove observers
+        labelsLiveData?.removeObservers(this)
+        labelsLiveData = null
     }
 
     companion object {

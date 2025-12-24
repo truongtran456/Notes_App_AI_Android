@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_app_gradient">
+    android:background="@drawable/bg_background_layer">
 
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/AppBarLayout"
@@ -62,8 +62,24 @@
                             android:textSize="36sp"
                             android:textStyle="bold"
                             android:textColor="@color/text_primary"
-                            android:letterSpacing="-0.02" />
+                            android:letterSpacing="-0.02"
+                            android:layout_marginTop="4dp" />
                     </LinearLayout>
+
+                    <!-- Icon ghim ở trên cùng, bên phải chữ "Today", phía trước card đầu tiên -->
+                    <ImageView
+                        android:id="@+id/PinnedIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="8dp"
+                        android:src="@drawable/pin"
+                        android:tint="@color/text_primary"
+                        android:alpha="0.6"
+                        android:contentDescription="@string/pin"
+                        android:visibility="gone"
+                        app:layout_constraintStart_toEndOf="@id/TitleToday"
+                        app:layout_constraintTop_toTopOf="@id/TitleToday"
+                        app:layout_constraintEnd_toStartOf="@id/PinnedCarouselRecyclerView" />
 
                     <!-- Horizontal pinned carousel to the right of title -->
                     <androidx.recyclerview.widget.RecyclerView

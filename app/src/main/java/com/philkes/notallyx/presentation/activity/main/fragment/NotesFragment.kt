@@ -80,4 +80,15 @@ class NotesFragment : NotallyFragment() {
     }
 
     override fun getBackground() = R.drawable.notebook
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // Cleanup MediatorLiveData sources to prevent memory leaks
+        currentSource?.let { source ->
+            filteredNotes?.removeSource(source)
+        }
+        currentSource = null
+        filteredNotes = null
+        filterTabAdapter = null
+    }
 }

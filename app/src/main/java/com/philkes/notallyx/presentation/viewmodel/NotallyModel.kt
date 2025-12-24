@@ -14,6 +14,7 @@ import android.text.style.URLSpan
 import androidx.core.text.getSpans
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -109,8 +110,26 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
 
     private lateinit var originalNote: BaseNote
 
+    private var databaseObserver: Observer<NotallyDatabase>? = null
+
     init {
-        database.observeForever { baseNoteDao = it.getBaseNoteDao() }
+        databaseObserver = Observer { db ->
+            baseNoteDao = db.getBaseNoteDao()
+        }
+        database.observeForever(databaseObserver!!)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Remove observer to prevent memory leaks
+        databaseObserver?.let { observer ->
+            try {
+                database.removeObserver(observer)
+            } catch (e: Exception) {
+                // Ignore if already removed
+            }
+        }
+        databaseObserver = null
     }
 
     fun addAudio() {
@@ -349,7 +368,7 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
         val body = this.body.toString()
         val nonEmptyItems = this.items.filter { item -> item.body.isNotEmpty() }
 
-        // Serialize drawing strokes thành JSON
+        // Serialize drawing strokes thï¿½nh JSON
         val drawingStrokesJson =
             if (drawingStrokes.isNotEmpty()) {
                 try {

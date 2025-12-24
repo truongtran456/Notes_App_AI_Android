@@ -91,7 +91,7 @@
         <item name="android:textColorHighlight">?attr/colorOnSurface</item>
         <item name="cursorColor">?attr/colorOnSurface</item>
 
-        <item name="android:windowBackground">?attr/colorSurface</item>
+        <item name="android:windowBackground">@drawable/bg_background_layer</item>
     </style>
 
     <style name="NavigationView" parent="Widget.Material3.NavigationView">

@@ -38,6 +38,7 @@ import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePadding
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
+import androidx.transition.Transition
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
@@ -186,20 +187,28 @@ abstract class EditActivity(private val type: Type) :
     override fun finish() {
         if (isFinishing || isDestroyed) return
 
-        lifecycleScope.launch(Dispatchers.Main) {
+        // Use IO dispatcher for database operations to avoid blocking main thread
+        lifecycleScope.launch {
             if (isFinishing || isDestroyed) return@launch
 
             try {
+                withContext(Dispatchers.IO) {
                 if (notallyModel.isEmpty()) {
                     notallyModel.deleteBaseNote(checkAutoSave = false)
                 } else if (notallyModel.isModified()) {
+                        // saveNote() may contain database operations, ensure it runs on IO
                     saveNote()
+                    }
                 }
             } catch (e: Exception) {
+                // Log error but don't crash
                 e.printStackTrace()
             } finally {
-                if (!isDestroyed) {
+                // Switch back to Main thread for UI operations
+                withContext(Dispatchers.Main) {
+                    if (!isDestroyed && !isFinishing) {
                     super.finish()
+                    }
                 }
             }
         }
@@ -300,8 +309,19 @@ abstract class EditActivity(private val type: Type) :
         inputMethodManager =
             ContextCompat.getSystemService(baseContext, InputMethodManager::class.java)
         notallyModel.type = type
+        
         initialiseBinding()
         setContentView(binding.root)
+        
+        // Set transition name đơn giản cho shared element (nếu có)
+        val selectedId = intent.getLongExtra(EXTRA_SELECTED_BASE_NOTE, 0L)
+        if (selectedId > 0 && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            try {
+                binding.root.transitionName = "note_card_$selectedId"
+            } catch (e: Exception) {
+                // Ignore nếu có lỗi
+            }
+        }
 
         setupWindowInsets()
 
@@ -540,6 +560,13 @@ abstract class EditActivity(private val type: Type) :
                         params.bottomMargin = fabSize + fabSpacing + navBars.bottom
                         fab.layoutParams = params
                     }
+            }
+
+            // Xử lý window insets cho DrawToolPickerView để không bị che bởi navigation bar
+            binding.DrawToolPickerView.updateLayoutParams<
+                androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+            > {
+                bottomMargin = navBars.bottom
             }
 
             insets
@@ -1191,7 +1218,7 @@ abstract class EditActivity(private val type: Type) :
                 val ivUndo = binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView
                 val ivRedo = binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView
                 if (ivUndo != null && ivRedo != null) {
-                    updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+                updateDrawingUndoRedoButtons(ivUndo, ivRedo)
                 }
             }
         }
@@ -1211,10 +1238,17 @@ abstract class EditActivity(private val type: Type) :
         val ivBack = toolbar.findViewById<View>(R.id.ivBack)
         val ivUndo = toolbar.findViewById<View>(R.id.ivUndo)
         val ivRedo = toolbar.findViewById<View>(R.id.ivRedo)
+        val ivAI = toolbar.findViewById<View>(R.id.ivAI)
         val ivPin = toolbar.findViewById<View>(R.id.ivPin)
         val ivMore = toolbar.findViewById<View>(R.id.ivMore)
 
         ivBack.setOnClickListener { finish() }
+        
+        // Hiển thị nút AI cho cả NOTE và LIST (checklist)
+        ivAI?.visibility = View.VISIBLE
+        ivAI?.setOnClickListener { 
+            openAIActionsMenu()
+        }
 
         ivUndo.setOnClickListener {
             if (isDrawingModeActive) {
@@ -1783,7 +1817,7 @@ abstract class EditActivity(private val type: Type) :
         )
     }
 
-    private fun delete() {
+    protected fun delete() {
         moveNote(Folder.DELETED)
     }
 
@@ -1791,7 +1825,7 @@ abstract class EditActivity(private val type: Type) :
         moveNote(Folder.NOTES)
     }
 
-    private fun archive() {
+    protected fun archive() {
         moveNote(Folder.ARCHIVED)
     }
 
@@ -1975,15 +2009,15 @@ abstract class EditActivity(private val type: Type) :
     protected open fun setColor() {
         colorInt = extractColor(notallyModel.color)
         
-        // Nếu là màu mặc định, sử dụng gradient thay vì màu trắng
+        // Nếu là màu mặc định, dùng nền gradient cam/kem
         val isDefaultColor = notallyModel.color == com.philkes.notallyx.data.model.BaseNote.COLOR_DEFAULT
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (isDefaultColor) {
-                // Dùng màu từ gradient cho status bar và navigation bar
-                val gradientColor = ContextCompat.getColor(this, R.color.md_theme_background)
-                window.statusBarColor = gradientColor
-                window.navigationBarColor = gradientColor
+                // Thanh system dùng màu kem nhạt gần với nền home today
+                val bgColor = Color.parseColor("#FFE6C0")
+                window.statusBarColor = bgColor
+                window.navigationBarColor = bgColor
                 window.setLightStatusAndNavBar(true)
             } else {
             window.statusBarColor = colorInt
@@ -1994,11 +2028,13 @@ abstract class EditActivity(private val type: Type) :
         
         binding.apply {
             if (isDefaultColor) {
-                // Sử dụng gradient cho background mặc định
-                ScrollView.setBackgroundResource(R.drawable.bg_edit_default_gradient)
-                root.setBackgroundResource(R.drawable.bg_edit_default_gradient)
-                RecyclerView.setBackgroundResource(R.drawable.bg_edit_default_gradient)
-                // Toolbar trong suốt để hiển thị gradient
+                // Màn Edit dùng nền bg_background_layer full trên–dưới (giống Home Today)
+                val bg =
+                    ContextCompat.getDrawable(this@EditActivity, R.drawable.bg_background_layer)
+                ScrollView.background = bg
+                root.background = bg
+                RecyclerView.background = bg
+                // Toolbar trong suốt để lộ nền
                 Toolbar.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
                 Toolbar.setBackgroundColor(Color.TRANSPARENT)
             } else {

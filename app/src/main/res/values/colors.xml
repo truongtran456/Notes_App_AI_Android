@@ -15,9 +15,9 @@
     <color name="md_theme_onError">#FFFFFF</color>
     <color name="md_theme_errorContainer">#FFDAD6</color>
     <color name="md_theme_onErrorContainer">#410002</color>
-    <color name="md_theme_background">#FAF8FF</color>
+    <color name="md_theme_background">#FFF3DE</color>
     <color name="md_theme_onBackground">#1A1B21</color>
-    <color name="md_theme_surface">#FAF8FF</color>
+    <color name="md_theme_surface">#FFF3DE</color>
     <color name="md_theme_surface_dark">#121318</color>
     <color name="md_theme_onSurface">#1A1B21</color>
     <color name="md_theme_surfaceVariant">#E2E1EC</color>
@@ -63,9 +63,9 @@
     <color name="md_theme_onError_mediumContrast">#FFFFFF</color>
     <color name="md_theme_errorContainer_mediumContrast">#DA342E</color>
     <color name="md_theme_onErrorContainer_mediumContrast">#FFFFFF</color>
-    <color name="md_theme_background_mediumContrast">#FAF8FF</color>
+    <color name="md_theme_background_mediumContrast">#F9F4EC</color>
     <color name="md_theme_onBackground_mediumContrast">#1A1B21</color>
-    <color name="md_theme_surface_mediumContrast">#FAF8FF</color>
+    <color name="md_theme_surface_mediumContrast">#F9F4EC</color>
     <color name="md_theme_onSurface_mediumContrast">#1A1B21</color>
     <color name="md_theme_surfaceVariant_mediumContrast">#E2E1EC</color>
     <color name="md_theme_onSurfaceVariant_mediumContrast">#41424B</color>
@@ -110,9 +110,9 @@
     <color name="md_theme_onError_highContrast">#FFFFFF</color>
     <color name="md_theme_errorContainer_highContrast">#8C0009</color>
     <color name="md_theme_onErrorContainer_highContrast">#FFFFFF</color>
-    <color name="md_theme_background_highContrast">#FAF8FF</color>
+    <color name="md_theme_background_highContrast">#F2F2F2</color>
     <color name="md_theme_onBackground_highContrast">#1A1B21</color>
-    <color name="md_theme_surface_highContrast">#FAF8FF</color>
+    <color name="md_theme_surface_highContrast">#F2F2F2</color>
     <color name="md_theme_onSurface_highContrast">#000000</color>
     <color name="md_theme_surfaceVariant_highContrast">#E2E1EC</color>
     <color name="md_theme_onSurfaceVariant_highContrast">#22232B</color>
@@ -224,5 +224,19 @@
     <color name="colorFF6EB4">#FF6EB4</color>
     <color name="colorFFDCAA">#FFDCAA</color>
     <color name="color3D2A00">#3D2A00</color>
+
+    <!-- Lavender Glass Background Palette -->
+    <!-- Base -->
+    <color name="white_90">#E6FFFFFF</color>
+    <color name="gray_10">#1A000000</color>
+
+    <!-- Purple palette -->
+    <color name="purple_deep">#E0D8F0</color>
+    <color name="purple_main">#D8D0E8</color>
+    <color name="purple_soft">#E8E0F5</color>
+    <color name="purple_light">#F0E8F8</color>
+
+    <!-- Glass overlay -->
+    <color name="glass_overlay">#40FFFFFF</color>
 
 </resources>

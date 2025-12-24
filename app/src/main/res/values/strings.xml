@@ -10,7 +10,21 @@
     <string name="adding_images">Adding images</string>
     <string name="all">All</string>
     <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="days_ago">%d days ago</string>
     <string name="task_list">Task List</string>
+    <string name="study_sets_title">Study Sets</string>
+    <string name="study_sets_subtitle">Continue learning, one topic at a time</string>
+    <string name="topic">Topic</string>
+    <string name="words">Words</string>
+    <string name="streak">Streak</string>
+    <string name="section_studied">Learned</string>
+    <string name="section_not_studied">Not Started</string>
+    <string name="not_started_yet">Not started yet</string>
+    <string name="start_learning">Start learning</string>
+    <string name="continue_learning">Continue learning</string>
+    <string name="last_studied">Last studied: %s</string>
+    <string name="progress_completed">%1$d%% completed</string>
     <string name="app_name" translatable="false">NotallyX</string>
     <string name="appearance">Appearance</string>
     <string name="archive">Archive</string>
@@ -170,6 +184,7 @@
     <string name="google_keep">Google Keep</string>
     <string name="google_keep_help">In order to import your Notes from Google Keep you must download your Google Takeout ZIP file. Only select the \"Keep\" data. Click Help to get more information.\n\nIf you already have a Takeout ZIP file, click Import and choose the ZIP file.</string>
     <string name="grid">Grid</string>
+    <string name="home">Home</string>
     <string name="help">Help</string>
     <string name="hours">Hours</string>
     <string name="image_format_not_supported">Image format not supported</string>
@@ -369,20 +384,21 @@
     <string name="ai_hide_answer">Hide Answer</string>
     <string name="ai_correct">Correct!</string>
     <string name="ai_incorrect">Incorrect</string>
-    <string name="ai_vocab_story">AI Story</string>
-    <string name="ai_vocab_quiz">AI Vocabulary Quizzes</string>
-    <string name="ai_vocab_flashcards">AI Flashcards</string>
+    <string name="ai_vocab_story">Story</string>
+    <string name="ai_vocab_quiz">Quizzs</string>
+    <string name="ai_vocab_flashcards">Flashcards</string>
     <string name="ai_vocab_mindmap">AI Mindmap</string>
     <string name="ai_vocab_summary_table">Vocabulary Summary Table</string>
-    <string name="ai_vocab_cloze">Cloze Test</string>
-    <string name="ai_vocab_match_pairs">Match Pairs</string>
+    <string name="ai_vocab_cloze">Cloze</string>
+    <string name="ai_vocab_match_pairs">Match</string>
     <string name="ai_fill_answer">Fill in the answer</string>
     <string name="ai_check_answer">Check Answer</string>
     <string name="ai_action_cloze_desc">Điền từ vào chỗ trống (4-8 blank)</string>
     <string name="ai_action_match_desc">Ghép 8 cặp từ - nghĩa (4x4)</string>
     <string name="ai_vocab_overall_stats">Overall Stats</string>
-    <string name="ai_action_overall_desc">Xem % từng từ và % tổng ghi chú</string>
+    <string name="ai_action_overall_desc" formatted="false">Xem % từng từ và % tổng ghi chú</string>
     <string name="ai_overall_not_ready">Bạn chưa hoàn thành đủ 3 bài (MCQ, Cloze, Match Pairs)</string>
+    <string name="statistics">Statistics</string>
     <string name="ai_prev">Prev</string>
     <string name="ai_next">Next</string>
     <string name="ai_flip">Flip</string>
@@ -414,13 +430,13 @@
     <string name="ai_retry">Retry</string>
     <string name="ai_close">Close</string>
     <string name="ai_choose_action">Choose an AI assistant action</string>
-    <string name="ai_action_summary">Quick summary</string>
+    <string name="ai_action_summary">Summary</string>
     <string name="ai_action_summary_desc">Tóm tắt 1 câu + đoạn chi tiết</string>
-    <string name="ai_action_bullet">Key bullet points</string>
+    <string name="ai_action_bullet">Key</string>
     <string name="ai_action_bullet_desc">Xem những ý chính quan trọng</string>
-    <string name="ai_action_questions">Review questions</string>
+    <string name="ai_action_questions">Question</string>
     <string name="ai_action_questions_desc">5-10 câu hỏi tự luận kèm đáp án</string>
-    <string name="ai_action_mcq">MCQ practice</string>
+    <string name="ai_action_mcq">MCQ</string>
     <string name="ai_action_mcq_desc">Các câu hỏi trắc nghiệm nhiều độ khó</string>
     <string name="ai_action_file">AI from file</string>
     <string name="ai_action_file_desc">Ảnh, audio, PDF, DOCX, …</string>
@@ -460,4 +476,6 @@
     <string name="nav_theme_system">System</string>
     <string name="nav_menu">Menu</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="transition_note_card" translatable="false">transition_note_card</string>
+    <string name="logout">Logout</string>
 </resources>

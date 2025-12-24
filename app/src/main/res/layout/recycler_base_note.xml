@@ -7,6 +7,7 @@
     android:layout_marginEnd="4dp"
     android:layout_marginBottom="8dp"
     android:checkable="true"
+    android:transitionName="@string/transition_note_card"
     app:cardCornerRadius="16dp"
     app:cardElevation="4dp"
     app:strokeWidth="0dp"

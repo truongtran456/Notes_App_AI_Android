@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Layer 1: nền kem trắng chủ đạo -->
+    <item>
+        <shape>
+            <solid android:color="#FFF3DE" />
+        </shape>
+    </item>
+
+    <!-- Layer 2: dải cam nhạt loang chéo -->
+    <item>
+        <shape>
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#33FFDCAA"
+                android:centerColor="#00FFDCAA"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+
+    <!-- Layer 3: trắng sữa tạo chiều sâu -->
+    <item>
+        <shape>
+            <gradient
+                android:type="radial"
+                android:gradientRadius="600dp"
+                android:centerX="0.8"
+                android:centerY="0.2"
+                android:startColor="#55FFFFFF"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+
+    <!-- Layer 4: xám nhạt ở đáy -->
+    <item>
+        <shape>
+            <gradient
+                android:type="linear"
+                android:angle="90"
+                android:startColor="#00FFFFFF"
+                android:endColor="#33ECECEC" />
+        </shape>
+    </item>
+
+</layer-list>

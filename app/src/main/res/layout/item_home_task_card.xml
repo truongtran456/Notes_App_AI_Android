@@ -93,7 +93,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@null"
-            android:src="@drawable/ic_arrow_diagonal"
+            android:src="@android:drawable/ic_lock_idle_alarm"
             android:scaleType="centerInside"
             android:padding="12dp"
             android:tint="#000000"

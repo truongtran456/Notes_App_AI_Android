@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/InlineSummaryToolbar"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical|end"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:visibility="gone">
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/BtnCancel"
+        style="@style/Widget.Material3.Button.IconButton"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:minWidth="0dp"
+        android:insetLeft="0dp"
+        android:insetRight="0dp"
+        android:padding="10dp"
+        app:icon="@drawable/arrow_back"
+        app:iconGravity="textStart"
+        app:iconPadding="0dp"
+        app:iconTint="@color/md_theme_primary"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="Back" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/BtnReplace"
+        style="@style/Widget.Material3.Button.IconButton"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:minWidth="0dp"
+        android:insetLeft="0dp"
+        android:insetRight="0dp"
+        android:padding="10dp"
+        app:icon="@drawable/bg_tick"
+        app:iconGravity="textStart"
+        app:iconPadding="0dp"
+        app:iconTint="@color/md_theme_onPrimary"
+        android:backgroundTint="@color/md_theme_primary"
+        android:contentDescription="Done" />
+
+</LinearLayout>
+

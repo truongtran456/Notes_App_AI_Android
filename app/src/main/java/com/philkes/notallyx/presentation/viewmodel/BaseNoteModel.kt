@@ -127,11 +127,46 @@ class BaseNoteModel(private val app: Application) : AndroidViewModel(app) {
 
     internal var showRefreshBackupsFolderAfterThemeChange = false
 
+    private var databaseObserver: androidx.lifecycle.Observer<NotallyDatabase>? = null
+    private var folderObserver: androidx.lifecycle.Observer<Folder>? = null
+
     init {
-        NotallyDatabase.getDatabase(app).observeForever(::init)
-        folder.observeForever { newFolder ->
-            searchResults!!.fetch(keyword, newFolder, currentLabel)
+        databaseObserver = androidx.lifecycle.Observer { database -> init(database) }
+        NotallyDatabase.getDatabase(app).observeForever(databaseObserver!!)
+        folderObserver = androidx.lifecycle.Observer { newFolder ->
+            searchResults?.fetch(keyword, newFolder, currentLabel)
         }
+        folder.observeForever(folderObserver!!)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Remove observers to prevent memory leaks
+        databaseObserver?.let { observer ->
+            try {
+                NotallyDatabase.getDatabase(app).removeObserver(observer)
+            } catch (e: Exception) {
+                // Ignore if already removed
+            }
+        }
+        folderObserver?.let { observer ->
+            try {
+                folder.removeObserver(observer)
+            } catch (e: Exception) {
+                // Ignore if already removed
+            }
+        }
+        allNotes?.let { notes ->
+            allNotesObserver?.let { observer ->
+                try {
+                    notes.removeObserver(observer)
+                } catch (e: Exception) {
+                    // Ignore if already removed
+                }
+            }
+        }
+        // Clear cache to free memory
+        labelCache.clear()
     }
 
     private fun init(database: NotallyDatabase) {

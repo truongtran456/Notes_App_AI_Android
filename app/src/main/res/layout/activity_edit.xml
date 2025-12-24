@@ -4,7 +4,9 @@
   xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:app="http://schemas.android.com/apk/res-auto"
   android:layout_height="match_parent"
-  android:layout_width="match_parent">
+  android:layout_width="match_parent"
+  android:background="@drawable/bg_background_layer"
+  android:transitionName="@string/transition_note_card">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -62,6 +64,7 @@
             android:fillViewport="true"
             android:visibility="gone"
             android:clipToPadding="false"
+            android:background="@drawable/bg_background_layer"
           >
 
             <LinearLayout
@@ -104,19 +107,45 @@
                         />
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <com.philkes.notallyx.presentation.view.misc.StylableEditTextWithHistory
-                    android:id="@+id/EnterTitle"
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@null"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="8dp">
+
+                    <com.philkes.notallyx.presentation.view.misc.StylableEditTextWithHistory
+                        android:id="@+id/EnterTitle"
+                        android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                        android:background="@android:color/transparent"
                     android:hint="@string/title"
                     android:imeOptions="actionNext"
                     android:inputType="textMultiLine|textCapSentences"
                     android:paddingStart="24dp"
-                    android:paddingTop="16dp"
-                    android:paddingEnd="24dp"
-                    android:paddingBottom="8dp"
-                    android:textAppearance="?attr/textAppearanceHeadline6" />
+                        android:paddingEnd="8dp"
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/StatsIcon"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
+
+                    <!-- Icon thống kê - chỉ hiển thị cho checklist -->
+                    <ImageButton
+                        android:id="@+id/StatsIcon"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_circular_button_ripple"
+                        android:src="@drawable/ic_bar_chart"
+                        android:contentDescription="@string/statistics"
+                        android:visibility="gone"
+                        android:padding="8dp"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        android:layout_marginEnd="16dp" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -134,9 +163,11 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/date"
-                        android:textAppearance="?attr/textAppearanceBodyMedium"
-                        android:textColor="?android:textColorHint" />
+                        android:textSize="12sp"
+                        android:textColor="?android:textColorHint"
+                        android:alpha="0.7" />
 
+                    <!-- InlineAiButton đã được di chuyển lên toolbar -->
                     <androidx.appcompat.widget.AppCompatImageView
                         android:id="@+id/InlineAiButton"
                         android:layout_width="40dp"
@@ -147,7 +178,8 @@
                         android:src="@drawable/ai_sparkle"
                         android:scaleType="centerInside"
                         android:backgroundTint="@null"
-                        android:tint="@android:color/white" />
+                        android:tint="@android:color/white"
+                        android:visibility="gone" />
                 </LinearLayout>
 
 
@@ -168,7 +200,7 @@
                     android:id="@+id/EnterBody"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@null"
+            android:background="@android:color/transparent"
                     android:minHeight="48dp"
                     android:hint="@string/note"
                     android:inputType="textMultiLine|textCapSentences"
@@ -176,6 +208,16 @@
                     android:paddingTop="16dp"
                     android:paddingEnd="24dp"
                     android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+                <!-- Inline summary toolbar (preview/replace) -->
+                <include
+                    android:id="@+id/InlineSummaryToolbarContainer"
+                    layout="@layout/inline_summary_toolbar"
+                    android:visibility="gone"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:layout_gravity="end" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/RecyclerView"

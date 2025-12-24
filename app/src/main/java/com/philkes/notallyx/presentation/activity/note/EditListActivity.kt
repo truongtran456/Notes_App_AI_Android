@@ -1,9 +1,20 @@
 package com.philkes.notallyx.presentation.activity.note
 
+import android.content.Context
+import android.graphics.Typeface
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
+import android.widget.LinearLayout
+import android.widget.PopupMenu
+import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.gson.Gson
+import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.api.models.AIResult
 import com.philkes.notallyx.data.api.models.SummaryResponse
@@ -11,6 +22,7 @@ import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
+import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.setOnNextAction
 import com.philkes.notallyx.presentation.showToast
 import com.philkes.notallyx.presentation.view.note.action.AddBottomSheet
@@ -24,11 +36,13 @@ import com.philkes.notallyx.presentation.view.note.listitem.sorting.ListItemSort
 import com.philkes.notallyx.presentation.view.note.listitem.sorting.indices
 import com.philkes.notallyx.presentation.view.note.listitem.sorting.mapIndexed
 import com.philkes.notallyx.presentation.view.note.listitem.sorting.toMutableList
+import com.philkes.notallyx.presentation.viewmodel.ExportMimeType
 import com.philkes.notallyx.presentation.viewmodel.preference.ListItemSort
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences
 import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,6 +57,24 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     // Cache for AI results
     private var cachedVocabResult: SummaryResponse? = null
     private var aiRepository: AIRepository? = null
+    private var tts: android.speech.tts.TextToSpeech? = null
+    private var ttsReady: Boolean = false
+    private val vocabCachePrefs by lazy { getSharedPreferences("ai_vocab_cache", MODE_PRIVATE) }
+    private val wordStatusPrefs by lazy { getSharedPreferences("word_status_store", MODE_PRIVATE) }
+
+    private val wordStatusStore =
+        object : ListItemAdapter.WordStatusStore {
+            override fun get(key: String): ListItemAdapter.WordStatus {
+                val raw = wordStatusPrefs.getString(key, null)
+                return raw?.let {
+                    runCatching { ListItemAdapter.WordStatus.valueOf(it) }.getOrNull()
+                } ?: ListItemAdapter.WordStatus.NEW
+            }
+
+            override fun set(key: String, status: ListItemAdapter.WordStatus) {
+                wordStatusPrefs.edit().putString(key, status.name).apply()
+            }
+        }
 
     override fun finish() {
         notallyModel.setItems(items.toMutableList())
@@ -69,6 +101,26 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        initTextToSpeech()
+        loadCachedVocabResult()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Nếu đã có cache và chưa render inline (sau khi quay lại), hiển thị luôn
+        if (cachedVocabResult != null && (adapter?.getInlineSummaries()?.isEmpty() != false)) {
+            showInlineVocabSummary(cachedVocabResult!!)
+        }
+    }
+
+    override fun onDestroy() {
+        tts?.stop()
+        tts?.shutdown()
+        super.onDestroy()
+    }
+
     override fun deleteChecked() {
         listManager.deleteCheckedItems()
     }
@@ -91,7 +143,419 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
     override fun openTextFormattingMenu() {}
 
+    override fun openMoreMenu() {
+        val anchor = binding.Toolbar.findViewById<View>(R.id.ivMore) ?: return
+        var popup: android.widget.PopupWindow? = null
+        val content =
+            layoutInflater.inflate(R.layout.popup_more_note, null).apply {
+                findViewById<View>(R.id.itemShare).setOnClickListener {
+                    share()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemExport).setOnClickListener {
+                    val exportMenu = PopupMenu(this@EditListActivity, anchor, Gravity.END)
+                    ExportMimeType.entries.forEach { mime: ExportMimeType ->
+                        exportMenu.menu.add(mime.name).setOnMenuItemClickListener {
+                            export(mime)
+                            true
+                        }
+                    }
+                    exportMenu.show()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemChangeColor).setOnClickListener {
+                    changeColor()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemReminders).setOnClickListener {
+                    changeReminders()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemLabels).setOnClickListener {
+                    changeLabels()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemArchive).setOnClickListener {
+                    archive()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemDelete).setOnClickListener {
+                    delete()
+                    popup?.dismiss()
+                }
+            }
+
+        popup =
+            android.widget.PopupWindow(
+                content,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                true,
+            ).apply {
+                isOutsideTouchable = true
+                elevation = 8f
+            }
+
+        val location = IntArray(2)
+        binding.Toolbar.getLocationOnScreen(location)
+        val toolbarBottom = location[1] + binding.Toolbar.height
+
+        popup.showAtLocation(binding.root, Gravity.TOP or Gravity.END, 0, toolbarBottom)
+    }
+
+    /**
+     * Data class để lưu thống kê từng từ
+     */
+    private data class VocabStat(
+        val vocab: String,
+        var earnedPoints: Int = 0,
+        var maxPoints: Int = 0,
+    ) {
+        val percentage: Int
+            get() = if (maxPoints > 0) (earnedPoints * 100 / maxPoints) else 0
+    }
+
+    /**
+     * Data class cho Match Pairs progress
+     */
+    private data class MatchPairVocabProgress(
+        val vocab: String,
+        val status: String, // "pending" | "completed"
+    )
+
+    /**
+     * Hiển thị thống kê vocabulary quizzes trong bottom sheet
+     * Tương tự như showOverallStatistics trong AISummaryActivity
+     */
+    private fun showStats() {
+        val localNoteId = notallyModel.id
+        val prefs = getSharedPreferences("quiz_results", MODE_PRIVATE)
+        val mcqDone = prefs.getBoolean("note_${localNoteId}_vocab_mcq_completed", false)
+        val clozeDone = prefs.getBoolean("note_${localNoteId}_cloze_completed", false)
+        val matchDone = prefs.getBoolean("note_${localNoteId}_match_pairs_completed", false)
+
+        if (mcqDone && clozeDone && matchDone) {
+            // Cần có cachedResult để hiển thị thống kê
+            // Nếu chưa có, cần process AI trước
+            if (cachedVocabResult != null) {
+                showStatsBottomSheet(cachedVocabResult!!)
+            } else {
+                // Chưa có cached result, cần process AI trước
+                showToast(getString(R.string.ai_processing))
+                // Trigger AI processing để có cached result
+                val checkedItems = items.toMutableList()
+                    .filter { it.checked }
+                    .map { it.body.toString().trim() }
+                    .filter { it.isNotBlank() }
+                val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
+                val checkedVocabItems = checkedItems.joinToString("\n")
+                val attachmentUris = getAttachedFileUris()
+                
+                // Process AI và sau đó hiển thị stats
+                processVocabAIForStats(checkedVocabItems, attachmentUris, allItemsText)
+            }
+        } else {
+            showToast(getString(R.string.ai_overall_not_ready))
+        }
+    }
+
+    /**
+     * Hiển thị bottom sheet với thống kê vocabulary
+     * Tính toán giống như AISummaryActivity.showOverallStatistics()
+     */
+    private fun showStatsBottomSheet(cachedResult: SummaryResponse) {
+        val dialog = BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_vocab_stats, null)
+
+        val localNoteId = notallyModel.id
+        val prefs = getSharedPreferences("quiz_results", MODE_PRIVATE)
+        val gson = Gson()
+
+        // Data class để lưu thống kê từng từ
+        val vocabStats = mutableMapOf<String, VocabStat>()
+
+        // ---- MCQ từ prefs ----
+        val mcqs = (cachedResult.vocabMcqs ?: cachedResult.review?.vocabMcqs).orEmpty()
+        if (mcqs.isNotEmpty()) {
+            val answersJson = prefs.getString("note_${localNoteId}_vocab_mcq_answers", null)
+            val answersById: Map<Int, String> =
+                try {
+                    answersJson?.let {
+                        gson.fromJson(
+                            it,
+                            object : com.google.gson.reflect.TypeToken<Map<Int, String>>() {}.type,
+                        )
+                    } ?: emptyMap()
+                } catch (_: Exception) {
+                    emptyMap()
+                }
+
+            mcqs.forEach { quiz ->
+                val vocab = quiz.vocabTarget?.lowercase()?.trim() ?: return@forEach
+                val weight = 1
+                val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                stat.maxPoints += weight
+                val qid = quiz.id
+                if (qid != null && answersById[qid] == quiz.answer) {
+                    stat.earnedPoints += weight
+                }
+            }
+        }
+
+        // ---- Cloze từ prefs ----
+        val clozeTests = (cachedResult.clozeTests ?: cachedResult.review?.clozeTests).orEmpty()
+        if (clozeTests.isNotEmpty()) {
+            val answersJson = prefs.getString("note_${localNoteId}_cloze_answers", null)
+            val answersById: Map<Int, String> =
+                try {
+                    answersJson?.let {
+                        gson.fromJson(
+                            it,
+                            object : com.google.gson.reflect.TypeToken<Map<Int, String>>() {}.type,
+                        )
+                    } ?: emptyMap()
+                } catch (_: Exception) {
+                    emptyMap()
+                }
+
+            clozeTests.forEach { cloze ->
+                cloze.blanks?.forEach { blank ->
+                    val bid = blank.id ?: return@forEach
+                    val ans = blank.answer ?: return@forEach
+                    val vocab = (cloze.vocab?.lowercase()?.trim() ?: ans.lowercase().trim())
+                    val weight = 2
+                    val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                    stat.maxPoints += weight
+                    if (answersById[bid]?.equals(ans, ignoreCase = true) == true) {
+                        stat.earnedPoints += weight
+                    }
+                }
+            }
+        }
+
+        // ---- Match Pairs từ prefs ----
+        val progressJson = prefs.getString("note_${localNoteId}_match_pairs_vocab_progress", null)
+        if (!progressJson.isNullOrBlank()) {
+            try {
+                // MatchPairVocabProgress là private class trong AISummaryActivity, nên parse thủ công
+                val jsonArray = JsonParser.parseString(progressJson).asJsonArray
+                jsonArray.forEach { element ->
+                    val obj = element.asJsonObject
+                    val vocab = obj.get("vocab")?.asString?.lowercase()?.trim() ?: return@forEach
+                    val status = obj.get("status")?.asString ?: ""
+                    if (vocab.isNotBlank()) {
+                        val stat = vocabStats.getOrPut(vocab) { VocabStat(vocab) }
+                        stat.maxPoints += 1
+                        if (status == "completed") {
+                            stat.earnedPoints += 1
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // ignore parse errors
+            }
+        }
+
+        // Tính tổng điểm
+        var totalEarned = 0
+        var totalMax = 0
+        vocabStats.values.forEach { s ->
+            totalEarned += s.earnedPoints
+            totalMax += s.maxPoints
+        }
+        val overallPercentage = if (totalMax > 0) (totalEarned * 100 / totalMax) else 0
+
+        // Lưu overallPercentage vào SharedPreferences để sử dụng trong StudySetsFragment
+        // Lưu cả totalEarned và totalMax để có thể tính lại nếu cần
+        prefs.edit()
+            .putInt("note_${localNoteId}_overall_percentage", overallPercentage)
+            .putInt("note_${localNoteId}_total_earned", totalEarned)
+            .putInt("note_${localNoteId}_total_max", totalMax)
+            .apply()
+
+        // Hiển thị tổng mastery score
+        val totalMasteryText = "$totalEarned / $totalMax ($overallPercentage%)"
+        val totalMasteryView = sheetView.findViewById<TextView>(R.id.TotalMasteryScore)
+        totalMasteryView.text = totalMasteryText
+
+        // Tính số từ đã hoàn thành (100%)
+        val completedCount = vocabStats.values.count { it.percentage >= 100 }
+        val totalCount = vocabStats.size
+        val completedCountView = sheetView.findViewById<TextView>(R.id.CompletedCount)
+        completedCountView.text = "$completedCount/$totalCount completed"
+
+        // Hiển thị thống kê từng từ với card design
+        val statsContainer = sheetView.findViewById<LinearLayout>(R.id.VocabStatsContainer)
+        statsContainer.removeAllViews()
+
+        vocabStats.values
+            .sortedByDescending { it.percentage }
+            .forEach { stat ->
+                val itemView = layoutInflater.inflate(R.layout.item_vocab_stat, statsContainer, false)
+                
+                // Title
+                val vocabTitle = itemView.findViewById<TextView>(R.id.VocabTitle)
+                vocabTitle.text = stat.vocab.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+
+                // Progress text (giống format "8 / 8 hours" -> "2 / 7")
+                val progressText = itemView.findViewById<TextView>(R.id.ProgressText)
+                progressText.text = "${stat.earnedPoints} / ${stat.maxPoints}"
+
+                // Percentage
+                val percentageText = itemView.findViewById<TextView>(R.id.PercentageText)
+                percentageText.text = "${stat.percentage}%"
+                
+                // Màu sắc theo phần trăm (xanh cho >= 80%, cam cho >= 60%, đỏ cho < 60%)
+                val colorRes = when {
+                    stat.percentage >= 80 -> android.R.color.holo_green_dark
+                    stat.percentage >= 60 -> android.R.color.holo_orange_dark
+                    else -> android.R.color.holo_red_dark
+                }
+                val color = ContextCompat.getColor(this, colorRes)
+                percentageText.setTextColor(color)
+
+                // Progress bar - set max = 100 và progress = percentage
+                val progressBar = itemView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.ProgressBar)
+                progressBar.max = 100
+                progressBar.setProgressCompat(stat.percentage, true) // animated
+                progressBar.setIndicatorColor(color)
+                progressBar.trackColor = ContextCompat.getColor(this, android.R.color.darker_gray)
+                
+                // Icon color - màu xanh lá cho tất cả (giống hình)
+                val icon = itemView.findViewById<android.widget.ImageView>(R.id.Icon)
+                val iconColor = ContextCompat.getColor(this, android.R.color.holo_green_dark)
+                icon.setColorFilter(iconColor)
+
+                statsContainer.addView(itemView)
+            }
+
+        dialog.setContentView(sheetView)
+        dialog.show()
+    }
+
+    /**
+     * Process AI và tự động hiển thị stats sau khi có kết quả
+     */
+    private fun processVocabAIForStats(
+        checkedVocabItems: String,
+        attachmentUris: List<android.net.Uri>,
+        allItemsText: String,
+    ) {
+        if (checkedVocabItems.isBlank() && attachmentUris.isEmpty()) {
+            showToast(R.string.ai_error_empty_note)
+            return
+        }
+
+        val userId = getAiUserId()
+        val localNoteId = notallyModel.id
+        val currentHash = computeVocabContentHash(checkedVocabItems, attachmentUris, allItemsText)
+        val noteIdToUse = ensureBackendNoteIdForVocab(localNoteId, currentHash)
+
+        // Show loading dialog
+        val loadingDialog = android.app.ProgressDialog(this).apply {
+            setMessage(getString(R.string.ai_processing))
+            setCancelable(false)
+            show()
+        }
+
+        if (aiRepository == null) {
+            aiRepository = AIRepository(this)
+        }
+
+        lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    aiRepository!!.processCombinedInputs(
+                        noteText = checkedVocabItems.ifBlank { null },
+                        attachments = attachmentUris,
+                        userId = userId,
+                        noteId = noteIdToUse,
+                        contentType = "checklist",
+                        checkedVocabItems = checkedVocabItems,
+                        useCache = true,
+                    )
+                }
+
+                loadingDialog.dismiss()
+
+                when (result) {
+                    is AIResult.Success -> {
+                        cachedVocabResult = result.data
+
+                        // Save content hash và backend_note_id
+                        if (localNoteId != -1L && currentHash != null) {
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setNoteContentHash(this@EditListActivity, localNoteId, "vocab", currentHash)
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setBackendNoteId(this@EditListActivity, localNoteId, noteIdToUse)
+                        }
+
+                        // Tự động hiển thị stats bottom sheet sau khi có kết quả
+                        showStatsBottomSheet(result.data)
+                    }
+                    is AIResult.Error -> {
+                        showToast(result.message ?: getString(R.string.ai_error_generic))
+                    }
+                    is AIResult.Loading -> {
+                        // Should not happen in sync call
+                    }
+                }
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                showToast("Error: ${e.message ?: "Unknown error"}")
+            }
+        }
+    }
+
     override fun openAIActionsMenu() {
+        // Hiển thị popup menu thay vì bottom sheet
+        // Lấy toolbar từ binding như trong initDrawToolbar()
+        val toolbar = binding.Toolbar
+        val ivAI = toolbar.findViewById<View>(R.id.ivAI)
+        if (ivAI != null && ivAI.visibility == View.VISIBLE) {
+            try {
+                val options = com.philkes.notallyx.presentation.view.note.ai.AIOption.getDefaultForVocab()
+                com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.show(
+                    context = this,
+                    anchor = ivAI,
+                    options = options,
+                    listener = object : com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.OnItemClickListener {
+                        override fun onClick(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
+                            // Xử lý khi click vào option
+                            processVocabAIForOption(option)
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("EditListActivity", "Error showing AI popup, fallback to bottom sheet", e)
+                // Fallback: dùng cách cũ nếu popup lỗi
+                val checkedItems =
+                    items
+                        .toMutableList()
+                        .filter { it.checked }
+                        .map { it.body.toString().trim() }
+                        .filter { it.isNotBlank() }
+                val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
+                val checkedVocabItems = checkedItems.joinToString("\n")
+                val attachmentUris = getAttachedFileUris()
+                processVocabAI(checkedVocabItems, attachmentUris, allItemsText)
+            }
+        } else {
+            // Fallback: dùng cách cũ
+            val checkedItems =
+                items
+                    .toMutableList()
+                    .filter { it.checked }
+                    .map { it.body.toString().trim() }
+                    .filter { it.isNotBlank() }
+            val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
+            val checkedVocabItems = checkedItems.joinToString("\n")
+            val attachmentUris = getAttachedFileUris()
+            processVocabAI(checkedVocabItems, attachmentUris, allItemsText)
+        }
+    }
+    
+    private fun processVocabAIForOption(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
         // Collect checked items (vocabulary words)
         val checkedItems =
             items
@@ -106,10 +570,199 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
         val attachmentUris = getAttachedFileUris()
 
-        // Always process AI (backend will check cache and return cached result if content
-        // unchanged)
-        // This ensures we always have the latest result and backend cache is checked
-        processVocabAI(checkedVocabItems, attachmentUris, allItemsText)
+        if (checkedVocabItems.isBlank() && attachmentUris.isEmpty()) {
+            showToast(R.string.ai_error_empty_note)
+            return
+        }
+
+        val userId = getAiUserId()
+        val localNoteId = notallyModel.id
+        val currentHash = computeVocabContentHash(checkedVocabItems, attachmentUris, allItemsText)
+        val noteIdToUse = ensureBackendNoteIdForVocab(localNoteId, currentHash)
+
+        // Nếu đã có cached result và hash khớp, dùng lại luôn
+        if (cachedVocabResult != null && localNoteId != -1L && currentHash != null) {
+            val storedHash =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                    this,
+                    localNoteId,
+                    "vocab",
+                )
+            if (currentHash == storedHash) {
+                // Map option type; SUMMARY hiển thị inline, các mục khác mở activity như cũ
+                when (option.type) {
+                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> {
+                        showInlineVocabSummary(cachedVocabResult!!)
+                    }
+                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> {
+                AISummaryActivity.startWithResult(
+                    context = this,
+                    summaryResponse = cachedVocabResult!!,
+                    noteId = notallyModel.id,
+                    showAllSections = false,
+                            initialSection = AISummaryActivity.AISection.VOCAB_STORY,
+                    isVocabMode = true,
+                )
+                    }
+                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> {
+                        AISummaryActivity.startWithResult(
+                            context = this,
+                            summaryResponse = cachedVocabResult!!,
+                            noteId = notallyModel.id,
+                            showAllSections = false,
+                            initialSection = AISummaryActivity.AISection.VOCAB_FLASHCARDS,
+                            isVocabMode = true,
+                        )
+                    }
+                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> {
+                        AISummaryActivity.startWithResult(
+                            context = this,
+                            summaryResponse = cachedVocabResult!!,
+                            noteId = notallyModel.id,
+                            showAllSections = false,
+                            initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
+                            isVocabMode = true,
+                        )
+                    }
+                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE -> {
+                        AISummaryActivity.startWithResult(
+                            context = this,
+                            summaryResponse = cachedVocabResult!!,
+                            noteId = notallyModel.id,
+                            showAllSections = false,
+                            initialSection = AISummaryActivity.AISection.VOCAB_CLOZE,
+                            isVocabMode = true,
+                        )
+                    }
+                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
+                        AISummaryActivity.startWithResult(
+                            context = this,
+                            summaryResponse = cachedVocabResult!!,
+                            noteId = notallyModel.id,
+                            showAllSections = false,
+                            initialSection = AISummaryActivity.AISection.VOCAB_MATCH,
+                            isVocabMode = true,
+                        )
+                    }
+                }
+                return
+            }
+        }
+
+        // Show loading dialog
+        val loadingDialog =
+            android.app.ProgressDialog(this).apply {
+                setMessage(getString(R.string.ai_processing))
+                setCancelable(false)
+                show()
+            }
+
+        if (aiRepository == null) {
+            aiRepository = AIRepository(this)
+        }
+
+        lifecycleScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    aiRepository!!.processCombinedInputs(
+                        noteText = checkedVocabItems.ifBlank { null },
+                        attachments = attachmentUris,
+                        userId = userId,
+                        noteId = noteIdToUse,
+                        contentType = "checklist",
+                        checkedVocabItems = checkedVocabItems,
+                        useCache = true,
+                    )
+                }
+
+                loadingDialog.dismiss()
+
+                when (result) {
+                    is AIResult.Success -> {
+                        cachedVocabResult = result.data
+                        saveVocabCache(notallyModel.id, result.data)
+                        saveVocabCache(notallyModel.id, result.data)
+                        if (localNoteId != -1L && currentHash != null) {
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setNoteContentHash(this@EditListActivity, localNoteId, "vocab", currentHash)
+                            val existingBackendNoteId =
+                                com.philkes.notallyx.data.preferences.AIUserPreferences
+                                    .getBackendNoteId(this@EditListActivity, localNoteId)
+                            if (existingBackendNoteId == null || existingBackendNoteId != noteIdToUse) {
+                                com.philkes.notallyx.data.preferences.AIUserPreferences
+                                    .setBackendNoteId(this@EditListActivity, localNoteId, noteIdToUse)
+                            }
+                        }
+                        
+                        // SUMMARY hiển thị inline; các mục khác mở activity như cũ
+                        when (option.type) {
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> {
+                                showInlineVocabSummary(result.data)
+                            }
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> {
+                        AISummaryActivity.startWithResult(
+                            context = this@EditListActivity,
+                            summaryResponse = result.data,
+                            noteId = notallyModel.id,
+                            showAllSections = false,
+                                    initialSection = AISummaryActivity.AISection.VOCAB_STORY,
+                            isVocabMode = true,
+                        )
+                            }
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> {
+                                AISummaryActivity.startWithResult(
+                                    context = this@EditListActivity,
+                                    summaryResponse = result.data,
+                                    noteId = notallyModel.id,
+                                    showAllSections = false,
+                                    initialSection = AISummaryActivity.AISection.VOCAB_FLASHCARDS,
+                                    isVocabMode = true,
+                                )
+                            }
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> {
+                                AISummaryActivity.startWithResult(
+                                    context = this@EditListActivity,
+                                    summaryResponse = result.data,
+                                    noteId = notallyModel.id,
+                                    showAllSections = false,
+                                    initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
+                                    isVocabMode = true,
+                                )
+                            }
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE -> {
+                                AISummaryActivity.startWithResult(
+                                    context = this@EditListActivity,
+                                    summaryResponse = result.data,
+                                    noteId = notallyModel.id,
+                                    showAllSections = false,
+                                    initialSection = AISummaryActivity.AISection.VOCAB_CLOZE,
+                                    isVocabMode = true,
+                                )
+                            }
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
+                                AISummaryActivity.startWithResult(
+                                    context = this@EditListActivity,
+                                    summaryResponse = result.data,
+                                    noteId = notallyModel.id,
+                                    showAllSections = false,
+                                    initialSection = AISummaryActivity.AISection.VOCAB_MATCH,
+                                    isVocabMode = true,
+                                )
+                            }
+                        }
+                    }
+                    is AIResult.Error -> {
+                        showToast(result.message ?: getString(R.string.ai_error_generic))
+                    }
+                    is AIResult.Loading -> {
+                        // Should not happen in sync call
+                    }
+                }
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                showToast("Error: ${e.message ?: "Unknown error"}")
+            }
+        }
     }
 
     /**
@@ -118,6 +771,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
      */
     private fun invalidateVocabCache() {
         cachedVocabResult = null
+        adapter?.clearInlineSummary()
     }
 
     private fun processVocabAI(
@@ -139,7 +793,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         val currentHash = computeVocabContentHash(checkedVocabItems, attachmentUris, allItemsText)
         val noteIdToUse = ensureBackendNoteIdForVocab(localNoteId, currentHash)
 
-        // N?u ?� c� cached result v� hash kh?p, d�ng l?i lu�n kh�ng c?n g?i API
+        // N?u ?� c� cached result v� hash kh?p, d�ng l?i lu�n kh�ng c?n g?i API
         if (cachedVocabResult != null && localNoteId != -1L && currentHash != null) {
             val storedHash =
                 com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
@@ -171,7 +825,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
         lifecycleScope.launch {
             try {
-                // Lu�n d�ng /process/combined ?? ??ng b? v?i note Text v� h? tr? file trong t??ng
+                // Lu�n d�ng /process/combined ?? ??ng b? v?i note Text v� h? tr? file trong t??ng
                 // lai
                 val result =
                     withContext(Dispatchers.IO) {
@@ -192,7 +846,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                     is AIResult.Success -> {
                         cachedVocabResult = result.data
 
-                        // Save content hash v� backend_note_id n?u c� local noteId
+                        // Save content hash v� backend_note_id n?u c� local noteId
                         if (localNoteId != -1L && currentHash != null) {
                             com.philkes.notallyx.data.preferences.AIUserPreferences
                                 .setNoteContentHash(
@@ -246,20 +900,6 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         val dialog = BottomSheetDialog(this)
         val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_ai_vocab_actions, null)
 
-        // Summary Table
-        sheetView.findViewById<View>(R.id.ActionSummaryTable).setOnClickListener {
-            dialog.dismiss()
-            // Use cached result to display immediately
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = cachedResult,
-                noteId = notallyModel.id,
-                showAllSections = false,
-                initialSection = AISummaryActivity.AISection.VOCAB_SUMMARY_TABLE,
-                isVocabMode = true,
-            )
-        }
-
         // Vocab Story
         sheetView.findViewById<View>(R.id.ActionVocabStory).setOnClickListener {
             dialog.dismiss()
@@ -299,9 +939,6 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             )
         }
 
-        // Mindmap - ?n ch?c n?ng n�y (ch? c� 6 ch?c n?ng)
-        sheetView.findViewById<View>(R.id.ActionMindmap).visibility = View.GONE
-
         // Cloze
         sheetView.findViewById<View>(R.id.ActionCloze).setOnClickListener {
             dialog.dismiss()
@@ -328,32 +965,206 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             )
         }
 
-        // Overall Stats
-        sheetView.findViewById<View>(R.id.ActionOverallStats).setOnClickListener {
-            val localNoteId = notallyModel.id
-            val prefs = getSharedPreferences("quiz_results", MODE_PRIVATE)
-            val mcqDone = prefs.getBoolean("note_${localNoteId}_vocab_mcq_completed", false)
-            val clozeDone = prefs.getBoolean("note_${localNoteId}_cloze_completed", false)
-            val matchDone = prefs.getBoolean("note_${localNoteId}_match_pairs_completed", false)
+        dialog.setContentView(sheetView)
+        dialog.show()
+    }
 
-            if (mcqDone && clozeDone && matchDone) {
-                dialog.dismiss()
-                AISummaryActivity.startWithResult(
-                    context = this,
-                    summaryResponse = cachedResult,
-                    noteId = notallyModel.id,
-                    showAllSections = true,
-                    initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
-                    isVocabMode = true,
-                    statsOnly = true, // hi?n th? b?ng th?ng k�, ?n n?i dung kh�c
-                )
-            } else {
-                showToast(getString(R.string.ai_overall_not_ready))
+    private fun showInlineVocabSummary(cachedResult: SummaryResponse) {
+        val rows = cachedResult.summaryTable ?: cachedResult.review?.summaryTable
+        if (rows.isNullOrEmpty()) {
+            showToast(getString(R.string.ai_error_generic))
+            return
+        }
+
+        val existingStates = adapter?.getInlineSummaries().orEmpty()
+        val list = items.toMutableList()
+        val newStates = mutableMapOf<Int, ListItemAdapter.InlineSummaryState>()
+
+        rows.forEach { row ->
+            val word = row.word?.trim()
+            if (!word.isNullOrBlank()) {
+                val pos = findItemPositionByWord(word)
+                if (pos != -1) {
+                    val keepExpanded =
+                        existingStates[pos]?.let { it.word.equals(word, true) && it.expanded } ?: true
+                    newStates[pos] =
+                        ListItemAdapter.InlineSummaryState(
+                            word = word,
+                            row = row,
+                            expanded = keepExpanded,
+                        )
+                }
             }
         }
 
-        dialog.setContentView(sheetView)
-        dialog.show()
+        if (newStates.isEmpty()) {
+            showToast(getString(R.string.ai_error_empty_note))
+            return
+        }
+
+        adapter?.setInlineSummaries(newStates)
+
+        // Scroll đến mục đầu tiên có summary
+        val firstPos = newStates.keys.minOrNull()
+        if (firstPos != null && firstPos != RecyclerView.NO_POSITION) {
+            binding.RecyclerView.smoothScrollToPosition(firstPos)
+        }
+    }
+
+    private fun saveVocabCache(noteId: Long, data: SummaryResponse) {
+        if (noteId == -1L) return
+        runCatching {
+            val json = Gson().toJson(data)
+            vocabCachePrefs.edit().putString("note_${noteId}_vocab_summary", json).apply()
+        }
+    }
+
+    private fun loadCachedVocabResult() {
+        val noteId = notallyModel.id
+        if (noteId == -1L) return
+        val json = vocabCachePrefs.getString("note_${noteId}_vocab_summary", null) ?: return
+        runCatching {
+            val type = object : TypeToken<SummaryResponse>() {}.type
+            val cached = Gson().fromJson<SummaryResponse>(json, type)
+            cachedVocabResult = cached
+        }
+    }
+
+    private fun initTextToSpeech() {
+        tts =
+            android.speech.tts.TextToSpeech(this) { status ->
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    val result = tts?.setLanguage(Locale.US)
+                    ttsReady =
+                        result != android.speech.tts.TextToSpeech.LANG_MISSING_DATA &&
+                            result != android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED
+                    if (!ttsReady) {
+                        showToast(getString(R.string.ai_tts_not_ready))
+                    }
+            } else {
+                    ttsReady = false
+                    showToast(getString(R.string.ai_tts_not_ready))
+                }
+            }
+    }
+
+    private fun onSpeakWord(word: String) {
+        if (word.isBlank()) return
+        if (!ttsReady) {
+            showToast(getString(R.string.ai_tts_not_ready))
+            return
+        }
+        try {
+            tts?.stop()
+            tts?.speak(word, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "tts-$word")
+        } catch (e: Exception) {
+            showToast("TTS error: ${e.message ?: "unknown"}")
+        }
+    }
+
+    private fun onInlineVocabClick(word: String) {
+        if (word.isBlank()) {
+            showToast(R.string.ai_error_empty_note)
+            return
+        }
+
+        // Dùng cached nếu có
+        cachedVocabResult?.let { cached ->
+            val rows = cached.summaryTable ?: cached.review?.summaryTable
+            val hasWord = rows?.any { it.word.equals(word, true) } == true
+            if (hasWord) {
+                showInlineSummaryForWord(word, cached)
+                return
+            }
+        }
+
+        // Fetch mới cho từ này
+        val attachments = getAttachedFileUris()
+        val loadingDialog =
+            android.app.ProgressDialog(this).apply {
+                setMessage(getString(R.string.ai_processing))
+                setCancelable(false)
+                show()
+            }
+
+        if (aiRepository == null) {
+            aiRepository = AIRepository(this)
+        }
+
+        lifecycleScope.launch {
+            try {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        aiRepository!!.processCombinedInputs(
+                            noteText = word,
+                            attachments = attachments,
+                            userId = getAiUserId(),
+                            noteId = ensureBackendNoteIdForVocab(notallyModel.id, null),
+                            contentType = "checklist",
+                            checkedVocabItems = word,
+                            useCache = true,
+                        )
+                    }
+
+                loadingDialog.dismiss()
+
+                when (result) {
+                    is AIResult.Success -> {
+                        cachedVocabResult = result.data
+                        showInlineSummaryForWord(word, result.data)
+                    }
+                    is AIResult.Error -> showToast(result.message ?: getString(R.string.ai_error_generic))
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                showToast("Error: ${e.message ?: "Unknown error"}")
+            }
+        }
+    }
+
+    private fun showInlineSummaryForWord(word: String, response: SummaryResponse) {
+        val rows = response.summaryTable ?: response.review?.summaryTable
+        if (rows.isNullOrEmpty()) {
+            showToast(getString(R.string.ai_error_generic))
+            return
+        }
+        val matchedRow =
+            rows.firstOrNull { it.word?.equals(word, true) == true }
+                ?: rows.firstOrNull()
+        if (matchedRow == null) {
+            showToast(getString(R.string.ai_error_empty_note))
+            return
+        }
+
+        val pos = findItemPositionByWord(matchedRow.word ?: word)
+        if (pos == -1) {
+            showToast(getString(R.string.ai_error_empty_note))
+            return
+        }
+
+        val state =
+            ListItemAdapter.InlineSummaryState(
+                word = matchedRow.word ?: word,
+                row = matchedRow,
+                expanded = true,
+            )
+        adapter?.setInlineSummaries(mapOf(pos to state))
+        binding.RecyclerView.smoothScrollToPosition(pos)
+    }
+
+    private fun resolveSelectedVocabItem(
+        rows: List<com.philkes.notallyx.data.api.models.VocabSummaryRow>,
+    ): Pair<String, Int>? {
+        // Không còn dùng, giữ để tránh lỗi reference nếu nơi khác gọi
+        return null
+    }
+
+    private fun findItemPositionByWord(word: String): Int {
+        if (word.isBlank()) return -1
+        val normalized = word.trim().lowercase()
+        val list = items.toMutableList()
+        return list.indexOfFirst { it.body.toString().trim().lowercase() == normalized }
     }
 
     private fun launchAIVocabSummary(
@@ -461,6 +1272,13 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         if (notallyModel.isNewNote || notallyModel.items.isEmpty()) {
             listManager.add(pushChange = false)
         }
+
+        // Hiển thị icon thống kê cho checklist
+        val statsIcon = findViewById<View>(R.id.StatsIcon)
+        statsIcon?.visibility = View.VISIBLE
+        statsIcon?.setOnClickListener {
+            showStats()
+        }
     }
 
     override fun setupListeners() {
@@ -502,6 +1320,10 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                 elevation,
                 NotallyXPreferences.getInstance(application),
                 listManager,
+                ::onInlineVocabClick,
+                ::onSpeakWord,
+                notallyModel.id,
+                wordStatusStore,
             )
         val sortCallback =
             when (preferences.listItemSorting.value) {
@@ -517,6 +1339,10 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         binding.RecyclerView.adapter = adapter
         listManager.adapter = adapter!!
         listManager.initList(items)
+        // Nếu đã có cache summary, hiển thị ngay khi vào màn
+        binding.RecyclerView.post {
+            cachedVocabResult?.let { showInlineVocabSummary(it) }
+        }
         savedInstanceState?.let {
             val itemPos = it.getInt(EXTRA_ITEM_POS, -1)
             if (itemPos > -1) {
@@ -593,9 +1419,9 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     }
 
     /**
-     * ??m b?o d�ng c�ng backend_note_id cho checklist n?u n?i dung kh�ng ??i.
-     * - N?u hash kh?p v� c� backend_note_id ?� l?u ? d�ng l?i.
-     * - N?u ch?a c� ho?c hash kh�c ? sinh UUID m?i, l?u mapping v� clear hash c?.
+     * ??m b?o d�ng c�ng backend_note_id cho checklist n?u n?i dung kh�ng ??i.
+     * - N?u hash kh?p v� c� backend_note_id ?� l?u ? d�ng l?i.
+     * - N?u ch?a c� ho?c hash kh�c ? sinh UUID m?i, l?u mapping v� clear hash c?.
      */
     private fun ensureBackendNoteIdForVocab(localNoteId: Long, currentHash: String?): String {
         if (localNoteId != -1L && currentHash != null) {
@@ -624,7 +1450,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                 return storedBackend
             }
 
-            // Hash ??i ho?c ch?a c� mapping: clear c?, sinh m?i
+            // Hash ??i ho?c ch?a c� mapping: clear c?, sinh m?i
             android.util.Log.d(
                 "EditListActivity",
                 "ensureBackendNoteIdForVocab: Hash mismatch or no mapping, generating new UUID. currentHash=${currentHash.take(16)}..., storedHash=${storedHash?.take(16)}...",
@@ -657,7 +1483,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             return generated
         }
 
-        // localNoteId = -1 ho?c kh�ng c� hash ? sinh UUID nh?ng kh�ng l?u mapping
+        // localNoteId = -1 ho?c kh�ng c� hash ? sinh UUID nh?ng kh�ng l?u mapping
         android.util.Log.d(
             "EditListActivity",
             "ensureBackendNoteIdForVocab: localNoteId=$localNoteId or no hash, generating temporary UUID",

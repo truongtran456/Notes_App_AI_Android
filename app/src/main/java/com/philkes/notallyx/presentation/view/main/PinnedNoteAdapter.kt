@@ -35,6 +35,12 @@ class PinnedNoteAdapter(
         holder.bind(note, imageRoot, selectedIds.contains(note.id), NotesSortBy.CREATION_DATE)
     }
 
+    override fun onViewRecycled(holder: PinnedNoteViewHolder) {
+        super.onViewRecycled(holder)
+        // Cleanup Glide requests when view is recycled to prevent memory leaks
+        holder.clearGlideRequests()
+    }
+
     inner class PinnedNoteViewHolder(
         private val binding: RecyclerPinnedNoteBinding,
         private val dateFormat: DateFormat,
@@ -93,6 +99,10 @@ class PinnedNoteAdapter(
                 true
             }
             viewHolder.bind(baseNote, imageRoot, checked, sortBy)
+        }
+        
+        fun clearGlideRequests() {
+            viewHolder.clearGlideRequests()
         }
     }
 

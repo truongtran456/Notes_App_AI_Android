@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="100dp"
+    android:viewportWidth="200"
+    android:viewportHeight="100">
+    
+    <!-- Arrow (mũi nhọn chỉ lên) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M90,8 L100,0 L110,8 Z" />
+    
+    <!-- Arrow border -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M90,8 L100,0 L110,8 Z"
+        android:strokeWidth="1"
+        android:strokeColor="#E0E0E0" />
+    
+    <!-- Bubble (hình chữ nhật bo góc) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,8 L8,92 Q8,100 16,100 L184,100 Q192,100 192,92 L192,8 Q192,0 184,0 L16,0 Q8,0 8,8 Z" />
+    
+    <!-- Bubble border -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M8,8 L8,92 Q8,100 16,100 L184,100 Q192,100 192,92 L192,8 Q192,0 184,0 L16,0 Q8,0 8,8 Z"
+        android:strokeWidth="1"
+        android:strokeColor="#E0E0E0" />
+        
+</vector>
+

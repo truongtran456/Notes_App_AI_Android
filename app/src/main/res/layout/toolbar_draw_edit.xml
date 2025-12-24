@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:paddingStart="12dp"
     android:paddingEnd="16dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="12dp">
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
 
-    <!-- Back giống nút menu ở NotesToolbar nhưng là quay lại -->
+    <!-- Back -->
     <ImageButton
         android:id="@+id/ivBack"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:background="@drawable/bg_circular_button"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_circular_button_ripple"
         android:src="@drawable/ic_back"
-        android:contentDescription="@string/navigation_drawer_open"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />
 
-    <!-- Card bo góc ở giữa, giống hệt NotesSearchCard -->
+    <!-- Card -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/EditActionsCard"
         android:layout_width="0dp"
-        android:layout_height="52dp"
+        android:layout_height="44dp"
         android:layout_marginStart="12dp"
-        app:cardCornerRadius="26dp"
+        app:cardCornerRadius="22dp"
         app:cardElevation="0dp"
         app:strokeColor="@android:color/transparent"
         app:strokeWidth="0dp"
@@ -39,16 +39,16 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp"
             android:background="@drawable/bg_search_pill">
 
-            <!-- Undo (trái trong card) -->
+    <!-- Undo -->
             <ImageButton
                 android:id="@+id/ivUndo"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/bg_circular_button"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_circular_button_ripple"
                 android:src="@drawable/undo"
                 android:tint="#000000"
                 android:contentDescription="@string/undo"
@@ -56,13 +56,13 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent" />
 
-            <!-- Redo, sát bên Undo -->
+    <!-- Redo -->
             <ImageButton
                 android:id="@+id/ivRedo"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
                 android:layout_marginStart="8dp"
-                android:background="@drawable/bg_circular_button"
+        android:background="@drawable/bg_circular_button_ripple"
                 android:src="@drawable/redo"
                 android:tint="#000000"
                 android:contentDescription="@string/redo"
@@ -70,26 +70,12 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent" />
 
-            <!-- Pin: ở bên phải card, giống vị trí search button -->
-            <ImageButton
-                android:id="@+id/ivPin"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/bg_circular_button"
-                android:src="@drawable/pin"
-                android:tint="#000000"
-                android:contentDescription="@string/pin"
-                app:layout_constraintEnd_toStartOf="@id/ivMore"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toBottomOf="parent" />
-
-            <!-- More: ở mép phải card, giống NotesMoreButton -->
+    <!-- More (mép phải nhất) -->
             <ImageButton
                 android:id="@+id/ivMore"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/bg_circular_button"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_circular_button_ripple"
                 android:src="@drawable/more_vert"
                 android:tint="#000000"
                 android:contentDescription="@string/tap_for_more_options"
@@ -97,7 +83,38 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent" />
 
+    <!-- AI -->
+    <ImageButton
+        android:id="@+id/ivAI"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/bg_ai_gradient_ripple"
+        android:src="@drawable/ai_sparkle"
+        android:tint="@android:color/white"
+        android:contentDescription="@string/ai_assistant"
+        android:padding="6dp"
+        android:scaleType="centerInside"
+        app:layout_constraintEnd_toStartOf="@id/ivPin"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <!-- Pin -->
+    <ImageButton
+        android:id="@+id/ivPin"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/bg_circular_button_ripple"
+        android:src="@drawable/pin"
+        android:tint="#000000"
+        android:contentDescription="@string/pin"
+        app:layout_constraintEnd_toStartOf="@id/ivMore"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
         </androidx.constraintlayout.widget.ConstraintLayout>
+
 
     </com.google.android.material.card.MaterialCardView>
 

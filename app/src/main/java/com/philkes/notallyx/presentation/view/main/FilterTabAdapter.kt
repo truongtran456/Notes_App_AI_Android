@@ -57,28 +57,25 @@ class FilterTabAdapter(
 
             binding.FilterTabText.text = text
 
-            // Style cho selected/unselected
+            // Style giống filter pills của Home Today
+            val selectedDrawable =
+                ContextCompat.getDrawable(context, R.drawable.bg_filter_pill_selected)
+            val unselectedDrawable =
+                ContextCompat.getDrawable(context, R.drawable.bg_filter_pill_unselected)
+
             if (isSelected) {
-                // Selected: background primary, text white
-                binding.root.setCardBackgroundColor(
-                    ContextCompat.getColor(context, R.color.md_theme_primary)
-                )
+                binding.FilterTabText.background = selectedDrawable
                 binding.FilterTabText.setTextColor(
-                    ContextCompat.getColor(context, R.color.md_theme_onPrimary)
+                    ContextCompat.getColor(context, android.R.color.white)
                 )
-                binding.root.cardElevation = 4f
             } else {
-                // Unselected: background surface container, text on surface
-                binding.root.setCardBackgroundColor(
-                    context.getColorFromAttr(com.google.android.material.R.attr.colorSurfaceContainerHighest)
-                )
+                binding.FilterTabText.background = unselectedDrawable
                 binding.FilterTabText.setTextColor(
-                    context.getColorFromAttr(com.google.android.material.R.attr.colorOnSurface)
+                    ContextCompat.getColor(context, android.R.color.black)
                 )
-                binding.root.cardElevation = 2f
             }
 
-            binding.root.setOnClickListener {
+            binding.FilterTabText.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     val item = getItem(position)

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="0dp"
+    android:layout_height="96dp"
+    android:layout_weight="1"
+    android:layout_marginEnd="8dp"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp"
+    app:cardBackgroundColor="@android:color/transparent">
+
+    <LinearLayout
+        android:id="@+id/CardContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="16dp"
+        android:background="@drawable/bg_overview_learned">
+
+        <!-- Icon trên cùng -->
+        <ImageView
+            android:id="@+id/Icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/notebook"
+            android:contentDescription="@string/app_name"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Text số -->
+        <TextView
+            android:id="@+id/Value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0"
+            android:textStyle="bold"
+            android:textColor="#2D2D2D"
+            android:textSize="24sp" />
+
+        <!-- Label -->
+        <TextView
+            android:id="@+id/Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Learned"
+            android:textColor="#6A6A6A"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
+

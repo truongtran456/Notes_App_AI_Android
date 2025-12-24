@@ -43,13 +43,16 @@ class HomeTaskAdapter(
     override fun onBindViewHolder(holder: HomeTaskViewHolder, position: Int) {
         val note = getItem(position)
         val gradientIndex = position % gradientDrawables.size
-        // Icon type: arrow diagonal cho card đầu, pause cho card thứ 2, arrow cho các card khác
-        val iconType = when (position % 3) {
-            0 -> IconType.ARROW_DIAGONAL
-            1 -> IconType.PAUSE
-            else -> IconType.ARROW_DIAGONAL
+        holder.bind(note, gradientDrawables[gradientIndex])
+    }
+    
+    // Public method to get item by position (for transition)
+    fun getItemAt(position: Int): BaseNote? {
+        return if (position >= 0 && position < itemCount) {
+            getItem(position)
+        } else {
+            null
         }
-        holder.bind(note, gradientDrawables[gradientIndex], iconType)
     }
 }
 
@@ -70,8 +73,11 @@ class HomeTaskViewHolder(
         timeFormat.applyPattern("hh:mm a")
     }
 
-    fun bind(note: BaseNote, gradientDrawable: Int, iconType: IconType = IconType.ARROW_DIAGONAL) {
+    fun bind(note: BaseNote, gradientDrawable: Int) {
         binding.apply {
+            // Set transition name cho Material Container Transform
+            CardRoot.transitionName = "note_card_${note.id}"
+            
             // Set gradient background cho MaterialCardView
             CardRoot.setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
             // Cache drawable to avoid repeated getDrawable() calls
@@ -110,27 +116,12 @@ class HomeTaskViewHolder(
                 else -> ""
             }
             
-            // Show status if note has reminders
-            if (note.reminders.isNotEmpty()) {
-                StatusText.visibility = android.view.View.VISIBLE
-                StatusText.text = "Reminder"
-            } else {
-                StatusText.visibility = android.view.View.GONE
-            }
+            // Ẩn status \"Reminder\" và icon ghim để card sạch hơn
+            StatusText.visibility = android.view.View.GONE
             
-            // Set icon based on type
-            when (iconType) {
-                IconType.ARROW_DIAGONAL -> {
-                    ActionButton.setImageResource(com.philkes.notallyx.R.drawable.ic_arrow_diagonal)
-                }
-                IconType.PAUSE -> {
-                    ActionButton.setImageResource(com.philkes.notallyx.R.drawable.ic_pause)
-                }
-                IconType.PLAY -> {
-                    // TODO: Add play icon if needed
-                    ActionButton.setImageResource(com.philkes.notallyx.R.drawable.ic_arrow_diagonal)
-                }
-            }
+            // Icon cố định: đồng hồ báo thức
+            ActionButton.setImageResource(android.R.drawable.ic_lock_idle_alarm)
+            ActionButton.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.BLACK)
             
             // Set click listener
             root.setOnClickListener {

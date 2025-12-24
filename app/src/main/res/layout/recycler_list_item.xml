@@ -1,86 +1,116 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    >
+    android:orientation="vertical">
 
     <cn.leaqi.drawer.SwipeDrawer
-      android:id="@+id/SwipeLayout"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      app:leftMode="drawer"
-      app:leftType="view"
-      app:leftLayout="@+id/IndentSpace"
-      >
+        android:id="@+id/SwipeLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:leftLayout="@+id/IndentSpace"
+        app:leftMode="drawer"
+        app:leftType="view"
+        app:rightLayout="@+id/DeleteContainer"
+        app:rightMode="drawer"
+        app:rightType="view">
 
         <Space
             android:id="@+id/IndentSpace"
             android:layout_width="20dp"
             android:layout_height="match_parent"
+            android:gravity="center"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:minHeight="0dp"
-            android:gravity="center"/>
+            android:minHeight="0dp" />
 
         <RelativeLayout
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:paddingStart="0dp"
-          android:paddingEnd="0dp"
-          android:id="@+id/Content"
-          android:gravity="center_vertical"
-          >
+            android:id="@+id/Content"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:paddingStart="0dp"
+            android:paddingEnd="0dp">
 
             <ImageButton
-              android:id="@+id/DragHandle"
-              android:layout_width="wrap_content"
-              android:layout_height="wrap_content"
-              android:layout_centerVertical="true"
-              android:layout_alignParentStart="true"
-              android:background="?attr/selectableItemBackground"
-              android:contentDescription="@string/drag_handle"
-              android:padding="8dp"
-              app:srcCompat="@drawable/drag_handle"
-              app:tint="?attr/colorControlNormal" />
+                android:id="@+id/DragHandle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackground"
+                android:contentDescription="@string/drag_handle"
+                android:padding="8dp"
+                app:srcCompat="@drawable/drag_handle"
+                app:tint="?attr/colorControlNormal" />
 
             <com.google.android.material.checkbox.MaterialCheckBox
-              android:id="@+id/CheckBox"
-              android:layout_width="wrap_content"
-              android:layout_height="wrap_content"
-              android:layout_centerVertical="true"
-              android:layout_toEndOf="@id/DragHandle" />
+                android:id="@+id/CheckBox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toEndOf="@id/DragHandle" />
 
             <com.philkes.notallyx.presentation.view.misc.EditTextAutoClearFocus
-              android:id="@+id/EditText"
-              android:layout_width="match_parent"
-              android:layout_height="wrap_content"
-              android:minHeight="48dp"
-              android:layout_centerVertical="true"
-              android:layout_toEndOf="@id/CheckBox"
-              android:layout_alignParentEnd="true"
-              android:background="@null"
-              android:hint="@string/item"
-              android:imeOptions="actionNext"
-              android:inputType="textMultiLine"
-              android:layout_marginEnd="48dp"
-              android:textAppearance="?attr/textAppearanceBodyLarge" />
+                android:id="@+id/EditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="72dp"
+                android:layout_toEndOf="@id/CheckBox"
+                android:background="@null"
+                android:hint="@string/item"
+                android:imeOptions="actionNext"
+                android:inputType="textMultiLine"
+                android:minHeight="48dp"
+                android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+            <TextView
+                android:id="@+id/StatusIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="●"
+                android:textSize="16sp"
+                android:textColor="?attr/colorControlNormal" />
         </RelativeLayout>
+
+        <FrameLayout
+            android:id="@+id/DeleteContainer"
+            android:layout_width="72dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:background="#FFE6E6E6">
+
+            <ImageButton
+                android:id="@+id/Delete"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/delete"
+                android:padding="12dp"
+                app:srcCompat="@drawable/delete"
+                app:tint="@android:color/holo_red_dark" />
+        </FrameLayout>
     </cn.leaqi.drawer.SwipeDrawer>
 
-    <ImageButton
-        android:id="@+id/Delete"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/AiSummaryContainer"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentEnd="true"
-        android:layout_centerVertical="true"
-        android:background="?attr/selectableItemBackground"
-        android:contentDescription="@string/delete"
-        android:visibility="invisible"
-        android:minWidth="48dp"
-        android:minHeight="48dp"
-        app:srcCompat="@drawable/delete"
-        app:tint="?attr/colorControlNormal" />
+        android:layout_marginStart="48dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/bg_inline_ai_card"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone" />
 
-</RelativeLayout>
+</LinearLayout>

@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base gradient mới: cam/kem ấm, bỏ tím -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#FFF7EC"
+                android:centerColor="#FFF3DE"
+                android:endColor="#FFD5B0" />
+        </shape>
+    </item>
+    
+    <!-- Overlay loang 1 - góc trên trái (cam nhạt) -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.0"
+                android:centerY="0.0"
+                android:gradientRadius="700dp"
+                android:startColor="#40FFD5B0"
+                android:centerColor="#20FFCFA0"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+    
+    <!-- Overlay loang 2 - góc dưới phải (cam nhạt) -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="1.0"
+                android:centerY="1.0"
+                android:gradientRadius="900dp"
+                android:startColor="#40FFF3DE"
+                android:centerColor="#20FFE3C5"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+    
+    <!-- Overlay loang 3 - giữa trái -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.15"
+                android:centerY="0.5"
+                android:gradientRadius="600dp"
+                android:startColor="#30FFD5B0"
+                android:centerColor="#15FFE3C5"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+    
+    <!-- Overlay loang 4 - giữa phải -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.85"
+                android:centerY="0.5"
+                android:gradientRadius="650dp"
+                android:startColor="#30FFF3DE"
+                android:centerColor="#15FFE3C5"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+    
+    <!-- Overlay loang 5 - giữa trên -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.5"
+                android:centerY="0.2"
+                android:gradientRadius="1000dp"
+                android:startColor="#30FFFFFF"
+                android:centerColor="#10FFFFFF"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+    
+    <!-- Overlay loang 6 - giữa dưới -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:centerX="0.5"
+                android:centerY="0.8"
+                android:gradientRadius="800dp"
+                android:startColor="#20FFFFFF"
+                android:centerColor="#10FFFFFF"
+                android:endColor="#00FFFFFF" />
+        </shape>
+    </item>
+    
+    <!-- Dải loang chéo 1 - từ trên trái xuống dưới phải (cam) -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="135"
+                android:startColor="#20FFD5B0"
+                android:centerColor="#00FFFFFF"
+                android:endColor="#10FFE3C5" />
+        </shape>
+    </item>
+    
+    <!-- Dải loang chéo 2 - từ trên phải xuống dưới trái (cam) -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="45"
+                android:startColor="#15FFF3DE"
+                android:centerColor="#00FFFFFF"
+                android:endColor="#10FFD5B0" />
+        </shape>
+    </item>
+    
+    <!-- Dải loang ngang - từ trái sang phải -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="0"
+                android:startColor="#10FFD5B0"
+                android:centerColor="#00FFFFFF"
+                android:endColor="#10FFE3C5" />
+        </shape>
+    </item>
+    
+    <!-- Dải loang dọc - từ trên xuống dưới -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="90"
+                android:startColor="#10FFF3DE"
+                android:centerColor="#00FFFFFF"
+                android:endColor="#10FFD5B0" />
+        </shape>
+    </item>
+    
+    <!-- Dải loang dọc 2 - tạo độ sâu -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="linear"
+                android:angle="180"
+                android:startColor="#10FFFFFF"
+                android:centerColor="#00FFFFFF"
+                android:endColor="#10FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

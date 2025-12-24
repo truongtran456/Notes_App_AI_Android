@@ -31,8 +31,10 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.gson.Gson
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.api.models.AIResult
+import com.philkes.notallyx.data.api.models.MCQs
 import com.philkes.notallyx.data.api.models.SummaryResponse
 import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.model.createNoteUrl
@@ -62,7 +64,7 @@ import com.philkes.notallyx.presentation.view.note.TextFormattingListsAdapter
 import com.philkes.notallyx.presentation.view.note.TextFormattingStyleAdapter
 import com.philkes.notallyx.presentation.view.note.action.AddNoteActions
 import com.philkes.notallyx.presentation.view.note.action.AddNoteBottomSheet
-import com.philkes.notallyx.presentation.view.note.action.MoreNoteBottomSheet
+import com.philkes.notallyx.presentation.viewmodel.ExportMimeType
 import com.philkes.notallyx.utils.LinkMovementMethod
 import com.philkes.notallyx.utils.copyToClipBoard
 import com.philkes.notallyx.utils.findAllOccurrences
@@ -82,6 +84,9 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     private var textFormattingAdapter: TextFormattingAdapter? = null
     private var textFormatSheet: BottomSheetDialog? = null
     private var cachedTextResult: SummaryResponse? = null
+    private var inlineSummaryOriginalText: String? = null
+    private var inlineSummaryCurrentText: String? = null
+    private var inlineSummaryVisible: Boolean = false
     private var aiRepository: AIRepository? = null
     private var searchResultIndices: List<Pair<Int, Int>>? = null
 
@@ -93,12 +98,71 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         if (notallyModel.isNewNote) {
             binding.EnterBody.requestFocus()
         }
+
+        // Ẩn icon thống kê cho note thường (chỉ hiển thị cho checklist)
+        findViewById<View>(R.id.StatsIcon)?.visibility = View.GONE
+    }
+
+    private fun setupInlineSummaryToolbar() {
+        val toolbar = findViewById<View>(R.id.InlineSummaryToolbarContainer) ?: return
+        val btnReplace =
+            toolbar.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnReplace)
+        val btnCancel =
+            toolbar.findViewById<com.google.android.material.button.MaterialButton>(R.id.BtnCancel)
+
+        btnCancel?.setOnClickListener { restoreOriginalFromInlineSummary() } // Back
+        btnReplace?.setOnClickListener { applyInlineSummaryReplace() } // Done
+    }
+
+    private fun showInlineSummaryPreview(summaryResponse: SummaryResponse) {
+        val toolbar = findViewById<View>(R.id.InlineSummaryToolbarContainer) ?: return
+
+        // Ưu tiên các trường summary khác nhau
+        val text =
+            summaryResponse.summary
+                ?: summaryResponse.summaries?.shortParagraph
+                ?: summaryResponse.summaries?.oneSentence
+                ?: summaryResponse.summaries?.bulletPoints?.joinToString(separator = "\n") { "• $it" }
+                ?: summaryResponse.processedText
+                ?: summaryResponse.rawText
+
+        if (text.isNullOrBlank()) {
+            showToast(R.string.ai_error_generic)
+            return
+        }
+
+        inlineSummaryOriginalText = binding.EnterBody.text?.toString().orEmpty()
+        inlineSummaryCurrentText = text
+        inlineSummaryVisible = true
+
+        // Hiển thị preview: thay nội dung bằng bản tóm tắt, vẫn cho phép chỉnh sửa
+        binding.EnterBody.setText(text)
+        toolbar.visibility = View.VISIBLE
+    }
+
+    private fun restoreOriginalFromInlineSummary() {
+        val toolbar = findViewById<View>(R.id.InlineSummaryToolbarContainer) ?: return
+        if (inlineSummaryVisible && inlineSummaryOriginalText != null) {
+            binding.EnterBody.setText(inlineSummaryOriginalText)
+        }
+        toolbar.visibility = View.GONE
+        inlineSummaryVisible = false
+        inlineSummaryCurrentText = null
+    }
+
+    private fun applyInlineSummaryReplace() {
+        val toolbar = findViewById<View>(R.id.InlineSummaryToolbarContainer) ?: return
+        // Giữ nội dung tóm tắt trong EnterBody, mở khóa edit cho user chỉnh sửa tiếp
+        toolbar.visibility = View.GONE
+        inlineSummaryVisible = false
+        inlineSummaryOriginalText = null
+        // inlineSummaryCurrentText đã nằm trong EnterBody
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setupActivityResultLaunchers()
+        setupInlineSummaryToolbar()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -386,8 +450,66 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
     }
 
     override fun openMoreMenu() {
-        MoreNoteBottomSheet(this, createFolderActions(), colorInt)
-            .show(supportFragmentManager, MoreNoteBottomSheet.TAG)
+        val toolbar = binding.Toolbar
+        val ivMore = toolbar.findViewById<View>(R.id.ivMore) ?: return
+
+        var popup: android.widget.PopupWindow? = null
+        val content =
+            layoutInflater.inflate(R.layout.popup_more_note, null).apply {
+                findViewById<View>(R.id.itemShare).setOnClickListener {
+                    share()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemExport).setOnClickListener {
+                    val exportMenu =
+                        android.widget.PopupMenu(this@EditNoteActivity, ivMore, Gravity.END)
+                    ExportMimeType.entries.forEach { mime: ExportMimeType ->
+                        exportMenu.menu.add(mime.name).setOnMenuItemClickListener {
+                            export(mime)
+                            true
+                        }
+                    }
+                    exportMenu.show()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemChangeColor).setOnClickListener {
+                    changeColor()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemReminders).setOnClickListener {
+                    changeReminders()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemLabels).setOnClickListener {
+                    changeLabels()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemArchive).setOnClickListener {
+                    archive()
+                    popup?.dismiss()
+                }
+                findViewById<View>(R.id.itemDelete).setOnClickListener {
+                    delete()
+                    popup?.dismiss()
+                }
+            }
+
+        popup =
+            android.widget.PopupWindow(
+                content,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                true,
+            ).apply {
+                isOutsideTouchable = true
+                elevation = 8f
+            }
+
+        val location = IntArray(2)
+        binding.Toolbar.getLocationOnScreen(location)
+        val toolbarBottom = location[1] + binding.Toolbar.height
+
+        popup.showAtLocation(binding.root, Gravity.TOP or Gravity.END, 0, toolbarBottom)
     }
 
     private fun ensureAICenterButton() {
@@ -446,7 +568,245 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
             showToast(R.string.ai_error_empty_note)
             return
         }
-        runTextAIAndShowActions(noteText)
+        
+        // Hiển thị popup menu thay vì bottom sheet
+        // Lấy toolbar từ binding như trong initDrawToolbar()
+        val toolbar = binding.Toolbar
+        val ivAI = toolbar.findViewById<View>(R.id.ivAI)
+        if (ivAI != null && ivAI.visibility == View.VISIBLE) {
+            try {
+                val options = com.philkes.notallyx.presentation.view.note.ai.AIOption.getDefaultForText()
+                com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.show(
+                    context = this,
+                    anchor = ivAI,
+                    options = options,
+                    listener = object : com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.OnItemClickListener {
+                        override fun onClick(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
+                            // Xử lý khi click vào option - sử dụng logic hiện có
+                            runTextAIAndShowActionForOption(option)
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("EditNoteActivity", "Error showing AI popup, fallback to bottom sheet", e)
+                // Fallback: dùng cách cũ nếu popup lỗi
+                runTextAIAndShowActions(noteText)
+            }
+        } else {
+            // Fallback: dùng cách cũ nếu không tìm thấy nút AI
+            runTextAIAndShowActions(noteText)
+        }
+    }
+    
+    private fun runTextAIAndShowActionForOption(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
+        val noteText = binding.EnterBody.text?.toString().orEmpty()
+        if (noteText.isBlank()) {
+            showToast(R.string.ai_error_empty_note)
+            return
+        }
+        
+        val userId = getAiUserId()
+        val attachmentUris = getAttachedFileUris()
+        val mode = "text"
+        val currentHash = computeContentHash(noteText, attachmentUris)
+        val localNoteId = notallyModel.id
+        
+        // Nếu có cachedResult và hash khớp -> dùng ngay
+        if (cachedTextResult != null && localNoteId != -1L && currentHash != null) {
+            val storedHash =
+                com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                    this,
+                    localNoteId,
+                    mode,
+                )
+            if (currentHash == storedHash) {
+                if (option.type == com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY) {
+                    showInlineSummaryPreview(cachedTextResult!!)
+                    return
+                } else {
+                    if (option.type == com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ) {
+                        startTextMcqFlow(cachedTextResult!!.mcqs)
+                    } else {
+                        // Map option type to AISection và hiển thị Activity
+                        val section = when (option.type) {
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> 
+                                AISummaryActivity.AISection.SUMMARY
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> 
+                                AISummaryActivity.AISection.BULLET_POINTS
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> 
+                                AISummaryActivity.AISection.QUESTIONS
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> 
+                                AISummaryActivity.AISection.MCQ
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE,
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
+                                // CLOZE và MATCH chỉ dành cho vocab/checklist, không áp dụng cho text notes
+                                showToast(R.string.ai_error_generic)
+                                return
+                            }
+                        }
+                        
+                        AISummaryActivity.startWithResult(
+                            context = this,
+                            summaryResponse = cachedTextResult!!,
+                            noteId = notallyModel.id,
+                            showAllSections = false,
+                            initialSection = section,
+                            isVocabMode = false,
+                        )
+                    }
+                    return
+                }
+            }
+        }
+        
+        // Nếu không có cache, process AI
+        val backendNoteId = ensureBackendNoteIdForCurrentNote(noteText, attachmentUris)
+        
+        if (aiRepository == null) {
+            aiRepository = AIRepository(this)
+        }
+        
+        lifecycleScope.launch {
+            try {
+                val serverCached =
+                    aiRepository!!.getCachedNote(userId, backendNoteId, checkVocabData = false)
+                if (serverCached != null) {
+                    cachedTextResult = serverCached
+                    if (localNoteId != -1L && currentHash != null) {
+                        com.philkes.notallyx.data.preferences.AIUserPreferences.setNoteContentHash(
+                            this@EditNoteActivity,
+                            localNoteId,
+                            mode,
+                            currentHash,
+                        )
+                        com.philkes.notallyx.data.preferences.AIUserPreferences.setBackendNoteId(
+                            this@EditNoteActivity,
+                            localNoteId,
+                            backendNoteId,
+                        )
+                    }
+                    
+                    if (option.type == com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY) {
+                        showInlineSummaryPreview(serverCached)
+                        return@launch
+                    } else {
+                        if (option.type == com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ) {
+                            startTextMcqFlow(serverCached.mcqs)
+                        } else {
+                            // Map option type to AISection và hiển thị Activity
+                            val section = when (option.type) {
+                                com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> 
+                                    AISummaryActivity.AISection.SUMMARY
+                                com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> 
+                                    AISummaryActivity.AISection.BULLET_POINTS
+                                com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> 
+                                    AISummaryActivity.AISection.QUESTIONS
+                                com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> 
+                                    AISummaryActivity.AISection.MCQ
+                                com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE,
+                                com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
+                                    // CLOZE và MATCH chỉ dành cho vocab/checklist, không áp dụng cho text notes
+                                    showToast(R.string.ai_error_generic)
+                                    return@launch
+                                }
+                            }
+                            
+                            AISummaryActivity.startWithResult(
+                                context = this@EditNoteActivity,
+                                summaryResponse = serverCached,
+                                noteId = notallyModel.id,
+                                showAllSections = false,
+                                initialSection = section,
+                                isVocabMode = false,
+                            )
+                        }
+                        return@launch
+                    }
+                }
+            } catch (_: Exception) {}
+            
+            val loadingDialog =
+                android.app.ProgressDialog(this@EditNoteActivity).apply {
+                    setMessage(getString(R.string.ai_processing))
+                    setCancelable(false)
+                    show()
+                }
+            try {
+                val result =
+                    aiRepository!!.processCombinedInputs(
+                        noteText = noteText,
+                        attachments = attachmentUris,
+                        userId = userId,
+                        noteId = backendNoteId,
+                        contentType = null,
+                        checkedVocabItems = null,
+                        useCache = true,
+                    )
+                loadingDialog.dismiss()
+                when (result) {
+                    is AIResult.Success -> {
+                        cachedTextResult = result.data
+                        if (localNoteId != -1L && currentHash != null) {
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setNoteContentHash(
+                                    this@EditNoteActivity,
+                                    localNoteId,
+                                    mode,
+                                    currentHash,
+                                )
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setBackendNoteId(this@EditNoteActivity, localNoteId, backendNoteId)
+                        }
+                        
+                        when (option.type) {
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> {
+                                showInlineSummaryPreview(result.data)
+                            }
+                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> {
+                                startTextMcqFlow(result.data.mcqs)
+                            }
+                            else -> {
+                                // Map option type to AISection và hiển thị Activity
+                                val section = when (option.type) {
+                                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> 
+                                        AISummaryActivity.AISection.SUMMARY
+                                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> 
+                                        AISummaryActivity.AISection.BULLET_POINTS
+                                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> 
+                                        AISummaryActivity.AISection.QUESTIONS
+                                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> 
+                                        AISummaryActivity.AISection.MCQ
+                                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE,
+                                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
+                                        // CLOZE và MATCH chỉ dành cho vocab/checklist, không áp dụng cho text notes
+                                        showToast(R.string.ai_error_generic)
+                                        return@launch
+                                    }
+                                }
+                                
+                                AISummaryActivity.startWithResult(
+                                    context = this@EditNoteActivity,
+                                    summaryResponse = result.data,
+                                    noteId = notallyModel.id,
+                                    showAllSections = false,
+                                    initialSection = section,
+                                    isVocabMode = false,
+                                )
+                            }
+                        }
+                    }
+                    is AIResult.Error -> {
+                        showToast(result.message ?: getString(R.string.ai_error_generic))
+                    }
+                    is AIResult.Loading -> {
+                        // ignore
+                    }
+                }
+            } catch (e: Exception) {
+                loadingDialog.dismiss()
+                showToast("Error: ${e.message ?: "Unknown error"}")
+            }
+        }
     }
 
     private fun showTextActionsBottomSheet(cachedResult: SummaryResponse, backendNoteId: String) {
@@ -491,14 +851,7 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
 
         sheetView.findViewById<View>(R.id.ActionMCQ).setOnClickListener {
             dialog.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = cachedResult,
-                noteId = notallyModel.id,
-                showAllSections = false,
-                initialSection = AISummaryActivity.AISection.MCQ,
-                isVocabMode = false,
-            )
+            startTextMcqFlow(cachedResult.mcqs)
         }
 
         sheetView.findViewById<View>(R.id.ActionFile).visibility = View.GONE
@@ -871,6 +1224,59 @@ class EditNoteActivity : EditActivity(Type.NOTE), AddNoteActions {
         val intent = Intent(this, activity)
         intent.putExtra(EXTRA_SELECTED_BASE_NOTE, noteId)
         startActivity(intent)
+    }
+
+    // MCQ quiz flow for text notes: show difficulty directly from Notes
+    private fun startTextMcqFlow(mcqs: MCQs?) {
+        if (mcqs == null || (
+                mcqs.easy.isNullOrEmpty() &&
+                    mcqs.medium.isNullOrEmpty() &&
+                    mcqs.hard.isNullOrEmpty()
+            )
+        ) {
+            showToast(R.string.ai_error_generic)
+            return
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("AI MCQ Practice")
+            .setItems(arrayOf("Easy", "Medium", "Hard")) { dialog, which ->
+                val difficulty =
+                    when (which) {
+                        0 -> "easy"
+                        1 -> "medium"
+                        else -> "hard"
+                    }
+                val list =
+                    when (difficulty) {
+                        "easy" -> mcqs.easy
+                        "medium" -> mcqs.medium
+                        "hard" -> mcqs.hard
+                        else -> mcqs.easy
+                    } ?: emptyList()
+
+                if (list.isEmpty()) {
+                    showToast(getString(R.string.ai_error_generic))
+                } else {
+                    val json = Gson().toJson(list)
+                    val intent =
+                        Intent(this, com.philkes.notallyx.presentation.activity.ai.TextMcqQuizActivity::class.java)
+                            .apply {
+                                putExtra(
+                                    com.philkes.notallyx.presentation.activity.ai.TextMcqQuizActivity.EXTRA_MCQS_JSON,
+                                    json,
+                                )
+                                putExtra(
+                                    com.philkes.notallyx.presentation.activity.ai.TextMcqQuizActivity.EXTRA_DIFFICULTY,
+                                    difficulty,
+                                )
+                            }
+                    startActivity(intent)
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun Intent?.getPickedNoteData(): Triple<String, String, Boolean> {

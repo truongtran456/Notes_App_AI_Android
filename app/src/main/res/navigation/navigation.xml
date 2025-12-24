@@ -94,7 +94,7 @@
 
     <fragment
         android:id="@+id/Checklist"
-        android:name="com.philkes.notallyx.presentation.activity.main.fragment.ChecklistFragment"
-        android:label="List" />
+        android:name="com.philkes.notallyx.presentation.activity.main.fragment.StudySetsFragment"
+        android:label="Study Sets" />
 
 </navigation>

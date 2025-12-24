@@ -93,7 +93,7 @@
                 style="@style/Theme.Main.ClickableView"
                 android:layout_width="@dimen/dp_30"
                 android:layout_height="@dimen/dp_30"
-                android:layout_marginEnd="@dimen/dp_16"
+                android:layout_marginEnd="@dimen/dp_4"
                 android:background="@drawable/bg_more"
                 android:padding="@dimen/dp_6"
                 android:src="@drawable/ic_more_1" />

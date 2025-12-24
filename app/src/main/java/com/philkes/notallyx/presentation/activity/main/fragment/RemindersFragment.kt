@@ -30,6 +30,8 @@ class RemindersFragment : Fragment(), NoteReminderListener {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // Clear adapter to prevent memory leaks
+        binding?.RecyclerView?.adapter = null
         binding = null
         reminderAdapter = null
     }
@@ -57,12 +59,10 @@ class RemindersFragment : Fragment(), NoteReminderListener {
     ): View? {
         setHasOptionsMenu(true)
         binding = FragmentRemindersBinding.inflate(inflater)
-        
-        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ fragment
-        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
-            binding?.root?.setBackgroundResource(R.drawable.bg_background)
-        }
-        
+
+        // Luôn dùng nền gradient Home Today cho Reminders
+        binding?.root?.setBackgroundResource(R.drawable.bg_background_layer)
+
         return binding?.root
     }
 

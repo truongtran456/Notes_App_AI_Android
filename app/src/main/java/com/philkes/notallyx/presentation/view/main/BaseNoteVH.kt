@@ -57,6 +57,9 @@ class BaseNoteVH(
 
     // Cache drawables để tránh lag
     private val drawableCache = mutableMapOf<Int, Drawable?>()
+    
+    // Track Glide request to cleanup when view is recycled
+    private var currentGlideRequest: com.bumptech.glide.RequestManager? = null
 
     init {
         val title = preferences.textSize.displayTitleSize
@@ -91,6 +94,8 @@ class BaseNoteVH(
     }
 
     fun bind(baseNote: BaseNote, imageRoot: File?, checked: Boolean, sortBy: NotesSortBy) {
+        // Set transition name cho Material Container Transform
+        binding.root.transitionName = "note_card_${baseNote.id}"
         updateCheck(checked, baseNote.color)
 
         when (baseNote.type) {
@@ -223,6 +228,8 @@ class BaseNoteVH(
     }
 
     private fun setImages(images: List<FileAttachment>, mediaRoot: File?) {
+        // Clear previous Glide request to prevent memory leaks
+        clearGlideRequests()
 
         binding.apply {
             if (images.isNotEmpty()) {
@@ -232,36 +239,48 @@ class BaseNoteVH(
                 val image = images[0]
                 val file = if (mediaRoot != null) File(mediaRoot, image.localName) else null
 
-                Glide.with(ImageView)
-                    .load(file)
-                    .centerCrop()
-                    .transition(DrawableTransitionOptions.withCrossFade())
-                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                    .listener(
-                        object : RequestListener<Drawable> {
+                try {
+                    currentGlideRequest = Glide.with(ImageView)
+                    currentGlideRequest!!
+                        .load(file)
+                        .centerCrop()
+                        .transition(DrawableTransitionOptions.withCrossFade())
+                        .diskCacheStrategy(DiskCacheStrategy.NONE)
+                        .listener(
+                            object : RequestListener<Drawable> {
 
-                            override fun onLoadFailed(
-                                e: GlideException?,
-                                model: Any?,
-                                target: Target<Drawable>?,
-                                isFirstResource: Boolean,
-                            ): Boolean {
-                                Message.visibility = VISIBLE
-                                return false
-                            }
+                                override fun onLoadFailed(
+                                    e: GlideException?,
+                                    model: Any?,
+                                    target: Target<Drawable>?,
+                                    isFirstResource: Boolean,
+                                ): Boolean {
+                                    // Don't crash on error, just show message
+                                    try {
+                                        Message.visibility = VISIBLE
+                                    } catch (e: Exception) {
+                                        // Ignore if view is recycled
+                                    }
+                                    return false
+                                }
 
-                            override fun onResourceReady(
-                                resource: Drawable?,
-                                model: Any?,
-                                target: Target<Drawable>?,
-                                dataSource: DataSource?,
-                                isFirstResource: Boolean,
-                            ): Boolean {
-                                return false
+                                override fun onResourceReady(
+                                    resource: Drawable?,
+                                    model: Any?,
+                                    target: Target<Drawable>?,
+                                    dataSource: DataSource?,
+                                    isFirstResource: Boolean,
+                                ): Boolean {
+                                    return false
+                                }
                             }
-                        }
-                    )
-                    .into(ImageView)
+                        )
+                        .into(ImageView)
+                } catch (e: Exception) {
+                    // Handle Glide errors gracefully to prevent crashes
+                    Message.visibility = VISIBLE
+                }
+                
                 if (images.size > 1) {
                     ImageViewMore.apply {
                         text = images.size.toString()
@@ -274,9 +293,19 @@ class BaseNoteVH(
                 ImageView.visibility = GONE
                 Message.visibility = GONE
                 ImageViewMore.visibility = GONE
-                Glide.with(ImageView).clear(ImageView)
+                clearGlideRequests()
             }
         }
+    }
+    
+    fun clearGlideRequests() {
+        try {
+            currentGlideRequest?.clear(binding.ImageView)
+            Glide.with(binding.ImageView).clear(binding.ImageView)
+        } catch (e: Exception) {
+            // Ignore errors if view is already recycled
+        }
+        currentGlideRequest = null
     }
 
     private fun setFiles(files: List<FileAttachment>) {
@@ -331,3 +360,4 @@ class BaseNoteVH(
             )
     }
 }
+

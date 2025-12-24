@@ -94,6 +94,15 @@ class BaseNoteAdapter(
         list.replaceAll(items)
     }
 
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        super.onViewRecycled(holder)
+        // Cleanup Glide requests when view is recycled to prevent memory leaks
+        if (holder is BaseNoteVH) {
+            // Clear Glide requests in ViewHolder
+            holder.clearGlideRequests()
+        }
+    }
+
     private fun NotesSort.createCallback() =
         when (sortedBy) {
             NotesSortBy.TITLE -> BaseNoteTitleSort(this@BaseNoteAdapter, sortDirection)

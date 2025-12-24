@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Base gradient - đậm hơn bg_app_gradient một chút -->
+    <!-- Base gradient cam/kem ấm -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="270"
-                android:startColor="#D8D0E8"
-                android:centerColor="#E0D4C8"
-                android:endColor="#FFD8C0" />
+                android:startColor="#FFF7EC"
+                android:centerColor="#FFF3DE"
+                android:endColor="#FFD5B0" />
         </shape>
     </item>
     <!-- Radial gradient overlay for soft depth -->

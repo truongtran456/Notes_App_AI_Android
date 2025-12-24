@@ -82,10 +82,8 @@ class SettingsFragment : Fragment() {
     ): View {
         val binding = FragmentSettingsBinding.inflate(inflater)
 
-        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ màn Settings
-        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
-            binding.root.setBackgroundResource(R.drawable.bg_background)
-        }
+        // Luôn dùng nền gradient Home Today cho Settings
+        binding.root.setBackgroundResource(R.drawable.bg_background_layer)
 
         model.preferences.apply {
             setupAppearance(binding)

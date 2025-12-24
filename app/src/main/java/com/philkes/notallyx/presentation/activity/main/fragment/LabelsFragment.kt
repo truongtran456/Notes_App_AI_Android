@@ -38,6 +38,8 @@ class LabelsFragment : Fragment(), LabelListener {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // Clear adapter to prevent memory leaks
+        binding?.RecyclerView?.adapter = null
         binding = null
         labelAdapter = null
     }
@@ -61,12 +63,10 @@ class LabelsFragment : Fragment(), LabelListener {
     ): View? {
         setHasOptionsMenu(true)
         binding = FragmentNotesBinding.inflate(inflater)
-        
-        // Nếu Theme = FOLLOW_SYSTEM thì dùng bg_background cho toàn bộ fragment
-        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
-            binding?.root?.setBackgroundResource(R.drawable.bg_background)
-        }
-        
+
+        // Luôn dùng nền gradient Home Today cho Labels
+        binding?.root?.setBackgroundResource(R.drawable.bg_background_layer)
+
         return binding?.root
     }
 

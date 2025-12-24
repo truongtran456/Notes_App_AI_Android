@@ -14,6 +14,7 @@ import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.text.style.StyleSpan
 import android.view.View
+import android.view.LayoutInflater
 import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -25,7 +26,6 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.tabs.TabLayout
-import com.google.gson.Gson
 import com.philkes.notallyx.R
 import com.philkes.notallyx.data.api.models.AIResult
 import com.philkes.notallyx.data.api.models.ClozeBlank
@@ -47,6 +47,9 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.launch
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.gson.Gson
 
 class AISummaryActivity : AppCompatActivity() {
 
@@ -82,7 +85,7 @@ class AISummaryActivity : AppCompatActivity() {
     private var mindmapTranslated: String? = null
     private var mindmapIsTranslated = false
     private var summaryTableTranslated: String? = null
-    // TTS cho ph·t ‚m
+    // TTS cho phÔøΩt ÔøΩm
     private var tts: TextToSpeech? = null
     private var ttsReady: Boolean = false
     // State for flashcards
@@ -117,18 +120,18 @@ class AISummaryActivity : AppCompatActivity() {
     private var clozeIsQuizMode: Boolean = false
 
     // State for match pairs quiz mode (theo t? v?ng)
-    private var matchPairsScore: Int = 0 // S? t? ?„ ho‡n th‡nh (?„ match ?˙ng Ìt nh?t 1 l?n)
+    private var matchPairsScore: Int = 0 // S? t? ?ÔøΩ hoÔøΩn thÔøΩnh (?ÔøΩ match ?ÔøΩng ÔøΩt nh?t 1 l?n)
     private var matchPairsTotal: Int = 0 // T?ng s? t? unique trong note
     private var matchPairsCompleted: Boolean = false
     private var matchPairsWordsMatched: MutableSet<String> =
-        mutableSetOf() // C·c vocab ?„ ho‡n th‡nh
+        mutableSetOf() // CÔøΩc vocab ?ÔøΩ hoÔøΩn thÔøΩnh
     private var matchPairsUniqueWords: Set<String> = emptySet() // T?t c? vocab unique
 
-    // Progress chi ti?t cho t?ng vocab c?a Match Pairs (l?u v‡o SharedPreferences)
+    // Progress chi ti?t cho t?ng vocab c?a Match Pairs (l?u vÔøΩo SharedPreferences)
     private data class MatchPairVocabProgress(
         val vocab: String,
         var status: String = "pending", // "pending" | "completed"
-        var attempts: Int = 0, // s? l?n th? (match sai + ?˙ng)
+        var attempts: Int = 0, // s? l?n th? (match sai + ?ÔøΩng)
         var completedAt: Long? = null, // timestamp khi completed
     )
 
@@ -142,6 +145,8 @@ class AISummaryActivity : AppCompatActivity() {
     // State for summary table (to get Vietnamese translations for match pairs)
     private var summaryTableState: List<VocabSummaryRow>? = null
     private var summaryTableIsTranslated = false
+
+    // MCQ quiz flow (text notes) - moved to dedicated activity
 
     companion object {
         const val EXTRA_NOTE_CONTENT = "note_content"
@@ -217,7 +222,7 @@ class AISummaryActivity : AppCompatActivity() {
             showLoading()
 
             aiRepository = AIRepository(this)
-            // Init TTS (English) cho ph·t ‚m t? v?ng
+            // Init TTS (English) cho phÔøΩt ÔøΩm t? v?ng
             tts =
                 TextToSpeech(this) { status ->
                     if (status == TextToSpeech.SUCCESS) {
@@ -282,7 +287,7 @@ class AISummaryActivity : AppCompatActivity() {
 
     private fun setupToolbar() {
         binding.Toolbar.setNavigationOnClickListener { finish() }
-        // Set title d?a trÍn initialSection
+        // Set title d?a trÔøΩn initialSection
         val title =
             when (initialSection) {
                 // Text-mode sections
@@ -461,7 +466,7 @@ class AISummaryActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // ??m b?o note_id g?i lÍn backend luÙn l‡ UUID duy nh?t (tr·nh tr˘ng sau khi wipe
+                // ??m b?o note_id g?i lÔøΩn backend luÔøΩn lÔøΩ UUID duy nh?t (trÔøΩnh trÔøΩng sau khi wipe
                 // app)
                 val noteIdToUse = ensureBackendNoteId()
 
@@ -483,7 +488,7 @@ class AISummaryActivity : AppCompatActivity() {
                     "summarizeNote: shouldUseCache=$shouldUseCache",
                 )
 
-                // N?u nÍn d˘ng cache v‡ ?„ cÛ noteId, th? GET tr??c ?? tr·nh g?i POST
+                // N?u nÔøΩn dÔøΩng cache vÔøΩ ?ÔøΩ cÔøΩ noteId, th? GET tr??c ?? trÔøΩnh g?i POST
                 if (shouldUseCache && !noteIdToUse.isNullOrBlank()) {
                     val cached = aiRepository.getCachedNote(userId, noteIdToUse)
                     if (cached != null) {
@@ -499,7 +504,7 @@ class AISummaryActivity : AppCompatActivity() {
                     }
                 }
 
-                // LuÙn d˘ng /process/combined cho note text (text + future files) ?? ??ng b? cache
+                // LuÔøΩn dÔøΩng /process/combined cho note text (text + future files) ?? ??ng b? cache
                 val result =
                     aiRepository.processCombinedInputs(
                         noteText = noteContent,
@@ -533,8 +538,8 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     /**
-     * ??m b?o note_id g?i lÍn backend luÙn l‡ UUID duy nh?t ?? tr·nh tr˘ng v?i c·c l?n c‡i app
-     * tr??c ?Û (khi local noteId cÛ th? l?p l?i sau khi wipe).
+     * ??m b?o note_id g?i lÔøΩn backend luÔøΩn lÔøΩ UUID duy nh?t ?? trÔøΩnh trÔøΩng v?i cÔøΩc l?n cÔøΩi app
+     * tr??c ?ÔøΩ (khi local noteId cÔøΩ th? l?p l?i sau khi wipe).
      */
     private fun ensureBackendNoteId(): String {
         backendNoteId?.let {
@@ -544,7 +549,7 @@ class AISummaryActivity : AppCompatActivity() {
         val generated = UUID.randomUUID().toString()
         backendNoteId = generated
 
-        // N?u cÛ local noteId, l?u mapping ?? l?n sau v?n d˘ng c˘ng backendNoteId (khi hash kh?p)
+        // N?u cÔøΩ local noteId, l?u mapping ?? l?n sau v?n dÔøΩng cÔøΩng backendNoteId (khi hash kh?p)
         if (noteId != -1L) {
             AIUserPreferences.setBackendNoteId(this, noteId, generated)
         }
@@ -640,39 +645,50 @@ class AISummaryActivity : AppCompatActivity() {
 
         // ----- TEXT NOTE UI (non-vocab mode) -----
         if (!isVocabMode) {
-            if (showAll) {
-                // Display all sections when showAll = true
-                updateOneSentenceCard(summaries?.oneSentence)
-                updateParagraphCard(summaries?.shortParagraph)
-                updateBulletPointsCard(summaries?.bulletPoints)
-            } else if (initialSection == AISection.SUMMARY) {
-                // Quick Summary: only display one sentence and paragraph, DO NOT display bullet
-                // points
-                updateOneSentenceCard(summaries?.oneSentence)
-                updateParagraphCard(summaries?.shortParagraph)
-                updateBulletPointsCard(null) // Hide bullet points to avoid duplication
-            } else if (initialSection == AISection.BULLET_POINTS) {
-                // Bullet Points section: only display bullet points
-                updateOneSentenceCard(null)
-                updateParagraphCard(null)
-                updateBulletPointsCard(summaries?.bulletPoints)
-            } else {
-                // Other sections (QUESTIONS, MCQ)
+            if (initialSection == AISection.MCQ) {
+                // Text MCQ: chuy·ªÉn sang flow quiz m·ªõi (full-screen activity)
+                binding.MCQCard.isVisible = false
+                startTextMcqFlow(response.mcqs)
+                // ·∫®n c√°c card kh√°c ƒë·ªÉ t·∫≠p trung v√†o quiz
                 updateOneSentenceCard(null)
                 updateParagraphCard(null)
                 updateBulletPointsCard(null)
-            }
-
-            if (showAll || initialSection == AISection.QUESTIONS) {
-                updateQuestionsCard(response.questions)
-            } else {
                 binding.QuestionsCard.isVisible = false
-            }
-
-            if (showAll || initialSection == AISection.MCQ) {
-                updateMCQCard(response.mcqs)
             } else {
-                binding.MCQCard.isVisible = false
+                if (showAll) {
+                    // Display all sections when showAll = true
+                    updateOneSentenceCard(summaries?.oneSentence)
+                    updateParagraphCard(summaries?.shortParagraph)
+                    updateBulletPointsCard(summaries?.bulletPoints)
+                } else if (initialSection == AISection.SUMMARY) {
+                    // Quick Summary: only display one sentence and paragraph, DO NOT display bullet
+                    // points
+                    updateOneSentenceCard(summaries?.oneSentence)
+                    updateParagraphCard(summaries?.shortParagraph)
+                    updateBulletPointsCard(null) // Hide bullet points to avoid duplication
+                } else if (initialSection == AISection.BULLET_POINTS) {
+                    // Bullet Points section: only display bullet points
+                    updateOneSentenceCard(null)
+                    updateParagraphCard(null)
+                    updateBulletPointsCard(summaries?.bulletPoints)
+                } else {
+                    // Other sections (QUESTIONS, MCQ)
+                    updateOneSentenceCard(null)
+                    updateParagraphCard(null)
+                    updateBulletPointsCard(null)
+                }
+
+                if (showAll || initialSection == AISection.QUESTIONS) {
+                    updateQuestionsCard(response.questions)
+                } else {
+                    binding.QuestionsCard.isVisible = false
+                }
+
+                if (showAll || initialSection == AISection.MCQ) {
+                    updateMCQCard(response.mcqs)
+                } else {
+                    binding.MCQCard.isVisible = false
+                }
             }
         } else {
             // Vocab mode (checklist): ?n to?n b? ph?n summary/text m?c ??nh
@@ -683,7 +699,7 @@ class AISummaryActivity : AppCompatActivity() {
             binding.MCQCard.isVisible = false
         }
 
-        // Stats-only mode: ?n c·c n?i dung kh·c, ch? hi?n th? ti?n ?? v‡ b?ng th?ng kÍ
+        // Stats-only mode: ?n cÔøΩc n?i dung khÔøΩc, ch? hi?n th? ti?n ?? vÔøΩ b?ng th?ng kÔøΩ
         if (statsOnly) {
             hideAllCardsExceptStats()
             renderStatsOnly()
@@ -698,8 +714,8 @@ class AISummaryActivity : AppCompatActivity() {
         val clozeTests = response.clozeTests ?: response.review?.clozeTests
         val matchPairs = response.matchPairs ?: response.review?.matchPairs
 
-        // LU‘N set summaryTableState ?? Match Pairs cÛ th? l?y ngh?a ti?ng Vi?t
-        // (ngay c? khi khÙng hi?n th? Summary Table card)
+        // LUÔøΩN set summaryTableState ?? Match Pairs cÔøΩ th? l?y ngh?a ti?ng Vi?t
+        // (ngay c? khi khÔøΩng hi?n th? Summary Table card)
         summaryTableState = summaryTable?.ifEmpty { null }
 
         // Debug logging for vocab data
@@ -789,7 +805,7 @@ class AISummaryActivity : AppCompatActivity() {
             }
         }
 
-        // C?p nh?t Overall Progress Card (n?u cÛ d? li?u quiz)
+        // C?p nh?t Overall Progress Card (n?u cÔøΩ d? li?u quiz)
         updateOverallProgressCardSummary()
 
         maybeScrollToInitialSection(forceShowAll = showAll)
@@ -1270,7 +1286,7 @@ class AISummaryActivity : AppCompatActivity() {
             return
         }
 
-        // L?u d? li?u g?c ?? d˘ng cho translate
+        // L?u d? li?u g?c ?? dÔøΩng cho translate
         vocabStoryOriginal = story
 
         // Hi?n th? title
@@ -1282,7 +1298,7 @@ class AISummaryActivity : AppCompatActivity() {
         val paragraphs = story.paragraphs?.filter { it.isNotBlank() } ?: emptyList()
 
         if (paragraphs.isEmpty()) {
-            // N?u khÙng cÛ paragraphs, hi?n th? thÙng b·o
+            // N?u khÔøΩng cÔøΩ paragraphs, hi?n th? thÔøΩng bÔøΩo
             binding.VocabStoryParagraphs.addView(
                 TextView(this).apply {
                     text = "No story content available"
@@ -1326,13 +1342,13 @@ class AISummaryActivity : AppCompatActivity() {
         binding.VocabMCQContainer.removeAllViews()
         if (items.isEmpty()) return
 
-        // L?y set_id t? b? c‚u h?i (t?t c? c˘ng set_id)
+        // L?y set_id t? b? cÔøΩu h?i (t?t c? cÔøΩng set_id)
         val currentSetId = items.firstOrNull()?.setId
         if (noteId != -1L && currentSetId != null) {
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
             val savedSetId = prefs.getInt("note_${noteId}_vocab_mcq_set_id", -1)
             if (savedSetId != -1 && savedSetId != currentSetId) {
-                // set_id thay ??i -> reset ti?n trÏnh MCQ
+                // set_id thay ??i -> reset ti?n trÔøΩnh MCQ
                 android.util.Log.d(
                     "AISummaryActivity",
                     "updateVocabMCQCard: set_id changed ($savedSetId -> $currentSetId), resetting progress",
@@ -1350,24 +1366,24 @@ class AISummaryActivity : AppCompatActivity() {
                 vocabMCQScore = 0
                 vocabQuizCompleted = false
             }
-            // L?u set_id hi?n t?i ?? l?n sau so s·nh
+            // L?u set_id hi?n t?i ?? l?n sau so sÔøΩnh
             prefs.edit().putInt("note_${noteId}_vocab_mcq_set_id", currentSetId).apply()
         }
 
-        // Ki?m tra xem quiz ?„ ho‡n th‡nh ch?a
+        // Ki?m tra xem quiz ?ÔøΩ hoÔøΩn thÔøΩnh ch?a
         val isCompleted = checkQuizCompleted("vocab_mcq")
         if (isCompleted) {
-            // Load k?t qu? ?„ l?u v‡ hi?n th?
+            // Load k?t qu? ?ÔøΩ l?u vÔøΩ hi?n th?
             vocabQuizCompleted = true
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
             vocabMCQScore = prefs.getInt("note_${noteId}_vocab_mcq_score", 0)
 
-            // KhÙi ph?c th? t? c‚u h?i v‡ ?·p ·n ?„ ch?n t? prefs
+            // KhÔøΩi ph?c th? t? cÔøΩu h?i vÔøΩ ?ÔøΩp ÔøΩn ?ÔøΩ ch?n t? prefs
             val gson = Gson()
             val savedOrderJson = prefs.getString("note_${noteId}_vocab_mcq_order", null)
             val savedAnswersJson = prefs.getString("note_${noteId}_vocab_mcq_answers", null)
 
-            // Th? t? c‚u h?i (danh s·ch id)
+            // Th? t? cÔøΩu h?i (danh sÔøΩch id)
             val idOrder: List<Int>? =
                 try {
                     savedOrderJson?.let { gson.fromJson(it, Array<Int>::class.java)?.toList() }
@@ -1388,7 +1404,7 @@ class AISummaryActivity : AppCompatActivity() {
                     null
                 }
 
-            // S?p x?p l?i theo order ?„ l?u n?u cÛ, ?? map ?·p ·n v? ?˙ng c‚u
+            // S?p x?p l?i theo order ?ÔøΩ l?u n?u cÔøΩ, ?? map ?ÔøΩp ÔøΩn v? ?ÔøΩng cÔøΩu
             val orderedItems =
                 if (!idOrder.isNullOrEmpty()) {
                     items.sortedBy { quiz -> idOrder.indexOf(quiz.id ?: -1) }
@@ -1399,7 +1415,7 @@ class AISummaryActivity : AppCompatActivity() {
             vocabMCQAllQuestions = orderedItems
             vocabMCQShuffledQuestions = orderedItems.toMutableList()
 
-            // KhÙi ph?c ?·p ·n ng??i d˘ng theo id
+            // KhÔøΩi ph?c ?ÔøΩp ÔøΩn ng??i dÔøΩng theo id
             vocabMCQUserAnswers.clear()
             if (!answersById.isNullOrEmpty()) {
                 vocabMCQShuffledQuestions.forEachIndexed { idx, quiz ->
@@ -1413,10 +1429,10 @@ class AISummaryActivity : AppCompatActivity() {
             return
         }
 
-        // L?u d? li?u g?c ?? d˘ng cho translate
+        // L?u d? li?u g?c ?? dÔøΩng cho translate
         vocabMCQsOriginal = items
 
-        // Checklist mode: hi?n th? t?ng c‚u h?i ng?u nhiÍn, tÌnh ?i?m
+        // Checklist mode: hi?n th? t?ng cÔøΩu h?i ng?u nhiÔøΩn, tÔøΩnh ?i?m
         vocabMCQAllQuestions = items
         vocabMCQShuffledQuestions = items.shuffled().toMutableList()
         vocabMCQCurrentIndex = 0
@@ -1438,7 +1454,7 @@ class AISummaryActivity : AppCompatActivity() {
         binding.VocabMCQContainer.removeAllViews()
 
         if (vocabMCQCurrentIndex >= vocabMCQShuffledQuestions.size) {
-            // H?t c‚u h?i, hi?n th? k?t qu?
+            // H?t cÔøΩu h?i, hi?n th? k?t qu?
             showVocabMCQResult()
             return
         }
@@ -1616,7 +1632,7 @@ class AISummaryActivity : AppCompatActivity() {
         vocabQuizCompleted = true
         val totalQuestions = vocabMCQShuffledQuestions.size
 
-        // Load k?t qu? ?„ l?u n?u cÛ (khi m? l?i)
+        // Load k?t qu? ?ÔøΩ l?u n?u cÔøΩ (khi m? l?i)
         if (noteId != -1L) {
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
             val savedScore = prefs.getInt("note_${noteId}_vocab_mcq_score", -1)
@@ -1628,7 +1644,7 @@ class AISummaryActivity : AppCompatActivity() {
 
         val percentage = if (totalQuestions > 0) (vocabMCQScore * 100 / totalQuestions) else 0
 
-        // L?u k?t qu? v‡o preferences
+        // L?u k?t qu? vÔøΩo preferences
         saveQuizResults()
 
         val resultView =
@@ -1772,7 +1788,7 @@ class AISummaryActivity : AppCompatActivity() {
                 setPadding(0, 12.dpToPx(), 0, 16.dpToPx())
             }
 
-        // Question text (khÙng hi?n th? Target ?? khÙng l? ?·p ·n)
+        // Question text (khÔøΩng hi?n th? Target ?? khÔøΩng l? ?ÔøΩp ÔøΩn)
         val questionText =
             TextView(this).apply {
                 val questionStr = quiz.question ?: ""
@@ -1920,7 +1936,7 @@ class AISummaryActivity : AppCompatActivity() {
             return
         }
 
-        // L?u d? li?u g?c ?? d˘ng cho translate
+        // L?u d? li?u g?c ?? dÔøΩng cho translate
         flashcardsOriginal = items
 
         flashcardIndex = flashcardIndex.coerceIn(0, items.size - 1)
@@ -2071,7 +2087,7 @@ class AISummaryActivity : AppCompatActivity() {
                         )
 
                         // Make each word bold
-                        val pattern = Regex("ï\\s+([^:]+):")
+                        val pattern = Regex("ÔøΩ\\s+([^:]+):")
                         pattern.findAll(meaningText).forEach { match ->
                             val wordStart = labelLength + 1 + match.range.first
                             val wordEnd = labelLength + 1 + match.range.last - 1
@@ -2281,15 +2297,15 @@ class AISummaryActivity : AppCompatActivity() {
         binding.ClozeContainer.removeAllViews()
         clozeTests ?: return
 
-        // L?y set_id t? cloze_tests ??u tiÍn (t?t c? ??u cÛ c˘ng set_id)
+        // L?y set_id t? cloze_tests ??u tiÔøΩn (t?t c? ??u cÔøΩ cÔøΩng set_id)
         val currentSetId = clozeTests.firstOrNull()?.setId
 
-        // Check xem set_id cÛ thay ??i khÙng (n?u cÛ thÏ reset progress)
+        // Check xem set_id cÔøΩ thay ??i khÔøΩng (n?u cÔøΩ thÔøΩ reset progress)
         if (noteId != -1L) {
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
             val savedSetId = prefs.getInt("note_${noteId}_cloze_set_id", -1)
             if (currentSetId != null && savedSetId != -1 && currentSetId != savedSetId) {
-                // set_id ?„ thay ??i ? reset progress
+                // set_id ?ÔøΩ thay ??i ? reset progress
                 android.util.Log.d(
                     "AISummaryActivity",
                     "updateClozeCard: set_id changed ($savedSetId -> $currentSetId), resetting progress",
@@ -2313,15 +2329,15 @@ class AISummaryActivity : AppCompatActivity() {
             }
         }
 
-        // Ki?m tra xem quiz ?„ ho‡n th‡nh ch?a (sau khi ?„ reset n?u c?n)
+        // Ki?m tra xem quiz ?ÔøΩ hoÔøΩn thÔøΩnh ch?a (sau khi ?ÔøΩ reset n?u c?n)
         val isCompleted = checkQuizCompleted("cloze")
         if (isCompleted) {
-            // Load k?t qu? ?„ l?u v‡ hi?n th?
+            // Load k?t qu? ?ÔøΩ l?u vÔøΩ hi?n th?
             clozeQuizCompleted = true
             if (noteId != -1L) {
                 val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
                 clozeScore = prefs.getInt("note_${noteId}_cloze_score", 0)
-                // KhÙi ph?c th? t? c‚u h?i v‡ ?·p ·n ?„ ch?n
+                // KhÔøΩi ph?c th? t? cÔøΩu h?i vÔøΩ ?ÔøΩp ÔøΩn ?ÔøΩ ch?n
                 val gson = Gson()
                 val savedOrderJson = prefs.getString("note_${noteId}_cloze_order", null)
                 val savedAnswersJson = prefs.getString("note_${noteId}_cloze_answers", null)
@@ -2367,7 +2383,7 @@ class AISummaryActivity : AppCompatActivity() {
                 clozeAllQuestions = ordered.toMutableList()
                 clozeShuffledQuestions = ordered.toMutableList()
 
-                // KhÙi ph?c c‚u tr? l?i ng??i d˘ng theo id
+                // KhÔøΩi ph?c cÔøΩu tr? l?i ng??i dÔøΩng theo id
                 clozeUserAnswersQuiz.clear()
                 if (!answersById.isNullOrEmpty()) {
                     clozeShuffledQuestions.forEachIndexed { idx, (_, blank) ->
@@ -2388,8 +2404,8 @@ class AISummaryActivity : AppCompatActivity() {
             prefs.edit().putInt("note_${noteId}_cloze_set_id", currentSetId).apply()
         }
 
-        // Checklist mode: hi?n th? t?ng c‚u h?i ng?u nhiÍn, tÌnh ?i?m
-        // T·ch m?i blank th‡nh m?t c‚u h?i riÍng
+        // Checklist mode: hi?n th? t?ng cÔøΩu h?i ng?u nhiÔøΩn, tÔøΩnh ?i?m
+        // TÔøΩch m?i blank thÔøΩnh m?t cÔøΩu h?i riÔøΩng
         clozeAllQuestions.clear()
         clozeTests.forEachIndexed { clozeIdx, cloze ->
             cloze.blanks?.forEach { blank ->
@@ -2413,7 +2429,7 @@ class AISummaryActivity : AppCompatActivity() {
         binding.ClozeContainer.removeAllViews()
 
         if (clozeCurrentIndex >= clozeShuffledQuestions.size) {
-            // H?t c‚u h?i, hi?n th? k?t qu?
+            // H?t cÔøΩu h?i, hi?n th? k?t qu?
             showClozeResult()
             return
         }
@@ -2434,7 +2450,7 @@ class AISummaryActivity : AppCompatActivity() {
             }
         binding.ClozeContainer.addView(header)
 
-        // Paragraph (c‚u h?i v?i blank)
+        // Paragraph (cÔøΩu h?i v?i blank)
         cloze.paragraph
             ?.takeIf { it.isNotBlank() }
             ?.let { paragraph ->
@@ -2588,7 +2604,7 @@ class AISummaryActivity : AppCompatActivity() {
         val totalQuestions = clozeShuffledQuestions.size
         val percentage = if (totalQuestions > 0) (clozeScore * 100 / totalQuestions) else 0
 
-        // Load k?t qu? ?„ l?u n?u cÛ (khi m? l?i)
+        // Load k?t qu? ?ÔøΩ l?u n?u cÔøΩ (khi m? l?i)
         if (noteId != -1L) {
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
             val savedScore = prefs.getInt("note_${noteId}_cloze_score", -1)
@@ -2598,7 +2614,7 @@ class AISummaryActivity : AppCompatActivity() {
             }
         }
 
-        // L?u k?t qu? v‡o preferences
+        // L?u k?t qu? vÔøΩo preferences
         saveQuizResults()
 
         val resultView =
@@ -2737,7 +2753,7 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun saveQuizResults() {
-        // L?u k?t qu? v‡o preferences ?? tracking
+        // L?u k?t qu? vÔøΩo preferences ?? tracking
         if (noteId != -1L) {
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
             val editor = prefs.edit()
@@ -2746,7 +2762,7 @@ class AISummaryActivity : AppCompatActivity() {
                 editor.putBoolean("note_${noteId}_vocab_mcq_completed", true)
                 editor.putInt("note_${noteId}_vocab_mcq_score", vocabMCQScore)
                 editor.putInt("note_${noteId}_vocab_mcq_total", vocabMCQShuffledQuestions.size)
-                // L?u th? t? c‚u h?i v‡ ?·p ·n (?? xem l?i v?n ?˙ng m‡u)
+                // L?u th? t? cÔøΩu h?i vÔøΩ ?ÔøΩp ÔøΩn (?? xem l?i v?n ?ÔøΩng mÔøΩu)
                 val idOrder = vocabMCQShuffledQuestions.map { it.id ?: -1 }
                 val answersById = mutableMapOf<Int, String>()
                 vocabMCQUserAnswers.forEach { (idx, ans) ->
@@ -2761,8 +2777,8 @@ class AISummaryActivity : AppCompatActivity() {
                 editor.putBoolean("note_${noteId}_cloze_completed", true)
                 editor.putInt("note_${noteId}_cloze_score", clozeScore)
                 editor.putInt("note_${noteId}_cloze_total", clozeShuffledQuestions.size)
-                // set_id ?„ ???c l?u khi updateClozeCard
-                // L?u th? t? blank id v‡ ?·p ·n ng??i d˘ng
+                // set_id ?ÔøΩ ???c l?u khi updateClozeCard
+                // L?u th? t? blank id vÔøΩ ?ÔøΩp ÔøΩn ng??i dÔøΩng
                 val idOrder = clozeShuffledQuestions.map { it.second.id ?: -1 }
                 val answersById = mutableMapOf<Int, String>()
                 clozeShuffledQuestions.forEachIndexed { idx, (_, blank) ->
@@ -2778,7 +2794,7 @@ class AISummaryActivity : AppCompatActivity() {
                 editor.putBoolean("note_${noteId}_match_pairs_completed", true)
                 editor.putInt("note_${noteId}_match_pairs_score", matchPairsScore)
                 editor.putInt("note_${noteId}_match_pairs_total", matchPairsTotal)
-                // set_id ?„ ???c l?u khi updateMatchPairsCard
+                // set_id ?ÔøΩ ???c l?u khi updateMatchPairsCard
             }
 
             // L?u progress chi ti?t per-vocab cho Match Pairs
@@ -2798,7 +2814,7 @@ class AISummaryActivity : AppCompatActivity() {
 
             editor.apply()
 
-            // Sau khi l?u, c?p nh?t l?i Overall Progress Card ?? ph?n ·nh ?i?m m?i
+            // Sau khi l?u, c?p nh?t l?i Overall Progress Card ?? ph?n ÔøΩnh ?i?m m?i
             updateOverallProgressCardSummary()
         }
     }
@@ -2830,7 +2846,7 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun showOverallStatistics(container: LinearLayout) {
-        // N?u ?ang ? ch? ?? statsOnly: tÌnh to·n tr?c ti?p t? SummaryResponse + SharedPreferences
+        // N?u ?ang ? ch? ?? statsOnly: tÔøΩnh toÔøΩn tr?c ti?p t? SummaryResponse + SharedPreferences
         if (statsOnly && noteId != -1L && summaryResponse != null) {
             val vocabStats = mutableMapOf<String, VocabStat>()
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
@@ -2931,7 +2947,7 @@ class AISummaryActivity : AppCompatActivity() {
                 }
             }
 
-            // T?ng ?i?m cho c? ghi ch˙
+            // T?ng ?i?m cho c? ghi chÔøΩ
             var totalEarned = 0
             var totalMax = 0
             vocabStats.values.forEach { s ->
@@ -2958,7 +2974,7 @@ class AISummaryActivity : AppCompatActivity() {
                 }
             )
 
-            // Th?ng kÍ theo t? v?ng
+            // Th?ng kÔøΩ theo t? v?ng
             container.addView(
                 TextView(this).apply {
                     text = "\nVocabulary Statistics:"
@@ -2992,7 +3008,7 @@ class AISummaryActivity : AppCompatActivity() {
             return
         }
 
-        // M?c ??nh: d˘ng state hi?n t?i (khi ?ang ? m‡n quiz)
+        // M?c ??nh: dÔøΩng state hi?n t?i (khi ?ang ? mÔøΩn quiz)
         val vocabStats = mutableMapOf<String, VocabStat>()
 
         // Vocab MCQ stats (weighted)
@@ -3114,13 +3130,13 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     /**
-     * C?p nh?t Overall Progress Card ? ??u ghi ch˙ (summary ng?n g?n) S? d?ng c˘ng tr?ng s? nh?
+     * C?p nh?t Overall Progress Card ? ??u ghi chÔøΩ (summary ng?n g?n) S? d?ng cÔøΩng tr?ng s? nh?
      * showOverallStatistics nh?ng ch? hi?n th?:
      * - Note Progress (%)
-     * - S? vocab ?„ master / t?ng vocab
+     * - S? vocab ?ÔøΩ master / t?ng vocab
      */
     private fun updateOverallProgressCardSummary() {
-        // N?u ch?a cÛ d? li?u vocab/quizzes thÏ ?n card
+        // N?u ch?a cÔøΩ d? li?u vocab/quizzes thÔøΩ ?n card
         if (
             vocabMCQShuffledQuestions.isEmpty() &&
                 clozeShuffledQuestions.isEmpty() &&
@@ -3226,15 +3242,15 @@ class AISummaryActivity : AppCompatActivity() {
 
         android.util.Log.d("AISummaryActivity", "updateMatchPairsCard: pairs count=${pairs.size}")
 
-        // L?y set_id t? match_pairs ??u tiÍn (t?t c? ??u cÛ c˘ng set_id)
+        // L?y set_id t? match_pairs ??u tiÔøΩn (t?t c? ??u cÔøΩ cÔøΩng set_id)
         val currentSetId = pairs.firstOrNull()?.setId
 
-        // Check xem set_id cÛ thay ??i khÙng (n?u cÛ thÏ reset progress)
+        // Check xem set_id cÔøΩ thay ??i khÔøΩng (n?u cÔøΩ thÔøΩ reset progress)
         if (noteId != -1L) {
             val prefs = getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
             val savedSetId = prefs.getInt("note_${noteId}_match_pairs_set_id", -1)
             if (currentSetId != null && savedSetId != -1 && currentSetId != savedSetId) {
-                // set_id ?„ thay ??i ? reset progress
+                // set_id ?ÔøΩ thay ??i ? reset progress
                 android.util.Log.d(
                     "AISummaryActivity",
                     "updateMatchPairsCard: set_id changed ($savedSetId -> $currentSetId), resetting progress",
@@ -3259,10 +3275,10 @@ class AISummaryActivity : AppCompatActivity() {
             }
         }
 
-        // L?u to‡n b? pairs
+        // L?u toÔøΩn b? pairs
         matchPairsAll = pairs.toMutableList()
 
-        // L?y t?t c? c·c t? unique ?? tÌnh ?i?m theo t?
+        // L?y t?t c? cÔøΩc t? unique ?? tÔøΩnh ?i?m theo t?
         matchPairsUniqueWords =
             pairs.mapNotNull { it.word?.lowercase()?.trim() }.filter { it.isNotBlank() }.toSet()
 
@@ -3275,12 +3291,12 @@ class AISummaryActivity : AppCompatActivity() {
             prefs.edit().putInt("note_${noteId}_match_pairs_set_id", currentSetId).apply()
         }
 
-        // Load progress ?„ l?u (n?u cÛ)
+        // Load progress ?ÔøΩ l?u (n?u cÔøΩ)
         matchPairsWordsMatched.clear()
         matchPairsVocabProgress.clear()
         loadMatchPairsVocabProgress()
 
-        // ??m b?o t?t c? vocab ??u cÛ entry trong progress
+        // ??m b?o t?t c? vocab ??u cÔøΩ entry trong progress
         matchPairsUniqueWords.forEach { vocab ->
             val key = vocab.lowercase().trim()
             if (key.isNotBlank() && !matchPairsVocabProgress.containsKey(key)) {
@@ -3288,7 +3304,7 @@ class AISummaryActivity : AppCompatActivity() {
             }
         }
 
-        // C?p nh?t score t? progress (s? vocab ?„ completed)
+        // C?p nh?t score t? progress (s? vocab ?ÔøΩ completed)
         matchPairsWordsMatched =
             matchPairsVocabProgress.values
                 .filter { it.status == "completed" }
@@ -3296,7 +3312,7 @@ class AISummaryActivity : AppCompatActivity() {
                 .toMutableSet()
         matchPairsScore = matchPairsWordsMatched.size
 
-        // N?u t?t c? vocab ??u completed -> quiz ho‡n th‡nh
+        // N?u t?t c? vocab ??u completed -> quiz hoÔøΩn thÔøΩnh
         if (matchPairsWordsMatched.size >= matchPairsUniqueWords.size && matchPairsTotal > 0) {
             matchPairsQuizCompleted = true
             saveQuizResults()
@@ -3306,48 +3322,48 @@ class AISummaryActivity : AppCompatActivity() {
             matchPairsQuizCompleted = false
         }
 
-        // L?y ngh?a ti?ng Vi?t t? summaryTable d?a trÍn word
+        // L?y ngh?a ti?ng Vi?t t? summaryTable d?a trÔøΩn word
         fun getVietnameseTranslation(word: String?): String? {
             if (word.isNullOrBlank()) return null
-            // TÏm translation t? summaryTable
+            // TÔøΩm translation t? summaryTable
             return summaryTableState
                 ?.firstOrNull { it.word?.equals(word, ignoreCase = true) == true }
                 ?.translation
         }
 
-        // R˙t g?n ngh?a ?? hi?n th? ng?n g?n (t?i ?a 25 k˝ t? ?? ?? hi?n th? trong Ù)
+        // RÔøΩt g?n ngh?a ?? hi?n th? ng?n g?n (t?i ?a 25 kÔøΩ t? ?? ?? hi?n th? trong ÔøΩ)
         fun shortenMeaning(meaning: String?): String {
             if (meaning.isNullOrBlank()) return ""
             val text = meaning.trim()
-            // Lo?i b? c·c prefix nh? "Ngh?a c?a", "› ngh?a", v.v.
+            // Lo?i b? cÔøΩc prefix nh? "Ngh?a c?a", "ÔøΩ ngh?a", v.v.
             val cleaned =
                 text.replace(
                     Regex(
-                        "^(Ngh?a c?a|› ngh?a|Ngh?a|Meaning of|Meaning|con|Con)\\s*:?\\s*",
+                        "^(Ngh?a c?a|ÔøΩ ngh?a|Ngh?a|Meaning of|Meaning|con|Con)\\s*:?\\s*",
                         RegexOption.IGNORE_CASE,
                     ),
                     "",
                 )
-            // L?y ph?n ??u tiÍn, lo?i b? d?u c‚u
-            val firstPart = cleaned.split(Regex("[,?.?()??\\-ñó]")).firstOrNull()?.trim() ?: cleaned
-            // Gi?i h?n 25 k˝ t? ?? v?a v?i Ù
+            // L?y ph?n ??u tiÔøΩn, lo?i b? d?u cÔøΩu
+            val firstPart = cleaned.split(Regex("[,?.?()??\\-ÔøΩÔøΩ]")).firstOrNull()?.trim() ?: cleaned
+            // Gi?i h?n 25 kÔøΩ t? ?? v?a v?i ÔøΩ
             return if (firstPart.length > 25) firstPart.take(25).trim() + "..." else firstPart
         }
 
         /**
-         * Render m?t l??t (round) 4x4 v?i t?i ?a 8 t? v?ng, ?u tiÍn c·c t? CH?A completed, ch?m
+         * Render m?t l??t (round) 4x4 v?i t?i ?a 8 t? v?ng, ?u tiÔøΩn cÔøΩc t? CH?A completed, ch?m
          * ?i?m theo t?.
          *
-         * Sau khi ho‡n th‡nh h?t c·c t? trong round hi?n t?i:
-         * - N?u v?n cÚn t? ch?a ho‡n th‡nh trong note ? t? ??ng render round m?i.
-         * - N?u ?„ ho‡n th‡nh h?t t?t c? t? ? hi?n th? k?t qu? cu?i c˘ng.
+         * Sau khi hoÔøΩn thÔøΩnh h?t cÔøΩc t? trong round hi?n t?i:
+         * - N?u v?n cÔøΩn t? ch?a hoÔøΩn thÔøΩnh trong note ? t? ??ng render round m?i.
+         * - N?u ?ÔøΩ hoÔøΩn thÔøΩnh h?t t?t c? t? ? hi?n th? k?t qu? cu?i cÔøΩng.
          */
         var currentRoundWords: MutableSet<String> = mutableSetOf()
 
         fun renderRound() {
             val allPairs = matchPairsAll ?: return
 
-            // N?u ?„ ho‡n th‡nh h?t thÏ hi?n th? k?t qu?
+            // N?u ?ÔøΩ hoÔøΩn thÔøΩnh h?t thÔøΩ hi?n th? k?t qu?
             if (
                 matchPairsQuizCompleted || matchPairsWordsMatched.size >= matchPairsUniqueWords.size
             ) {
@@ -3357,7 +3373,7 @@ class AISummaryActivity : AppCompatActivity() {
                 return
             }
 
-            // Danh s·ch vocab ch?a ho‡n th‡nh
+            // Danh sÔøΩch vocab ch?a hoÔøΩn thÔøΩnh
             val unfinishedVocab =
                 matchPairsUniqueWords.filter { vocab ->
                     val prog = matchPairsVocabProgress[vocab]
@@ -3371,18 +3387,18 @@ class AISummaryActivity : AppCompatActivity() {
                 return
             }
 
-            // ?u tiÍn vocab cÛ attempts cao h?n (b? sai nhi?u) r?i shuffle v‡ l?y t?i ?a 8
+            // ?u tiÔøΩn vocab cÔøΩ attempts cao h?n (b? sai nhi?u) r?i shuffle vÔøΩ l?y t?i ?a 8
             val sortedByAttempts =
                 unfinishedVocab.sortedByDescending { matchPairsVocabProgress[it]?.attempts ?: 0 }
             val vocabForRound =
                 if (sortedByAttempts.size <= 8) sortedByAttempts.shuffled()
                 else sortedByAttempts.shuffled().take(8)
 
-            // L?u l?i danh s·ch vocab c?a round hi?n t?i (?? bi?t khi n‡o ho‡n th‡nh round n‡y)
+            // L?u l?i danh sÔøΩch vocab c?a round hi?n t?i (?? bi?t khi nÔøΩo hoÔøΩn thÔøΩnh round nÔøΩy)
             currentRoundWords.clear()
             currentRoundWords.addAll(vocabForRound.map { it.lowercase().trim() })
 
-            // Ch?n 1 pair cho m?i vocab (n?u cÛ nhi?u pair cho c˘ng 1 t? thÏ l?y c?p ??u tiÍn)
+            // Ch?n 1 pair cho m?i vocab (n?u cÔøΩ nhi?u pair cho cÔøΩng 1 t? thÔøΩ l?y c?p ??u tiÔøΩn)
             val selected = mutableListOf<MatchPair>()
             vocabForRound.forEach { vocab ->
                 val p = allPairs.firstOrNull { it.word?.equals(vocab, ignoreCase = true) == true }
@@ -3437,10 +3453,10 @@ class AISummaryActivity : AppCompatActivity() {
 
             tiles.shuffle()
 
-            // TÌnh s? c?t v‡ h‡ng d?a trÍn s? l??ng tiles (4x4 ho?c Ìt h?n nh?ng v?n 4 c?t)
+            // TÔøΩnh s? c?t vÔøΩ hÔøΩng d?a trÔøΩn s? l??ng tiles (4x4 ho?c ÔøΩt h?n nh?ng v?n 4 c?t)
             val totalTiles = tiles.size
             val columnCount = 4
-            val rowCount = (totalTiles + columnCount - 1) / columnCount // L‡m trÚn lÍn
+            val rowCount = (totalTiles + columnCount - 1) / columnCount // LÔøΩm trÔøΩn lÔøΩn
 
             val grid =
                 GridLayout(this).apply {
@@ -3463,7 +3479,7 @@ class AISummaryActivity : AppCompatActivity() {
                     MaterialButton(this).apply {
                         this.text = tile.text
                         isAllCaps = false
-                        tag = tile // L?u to‡n b? TileInfo v‡o tag
+                        tag = tile // L?u toÔøΩn b? TileInfo vÔøΩo tag
                         maxLines = 2
                         ellipsize = android.text.TextUtils.TruncateAt.END
                         textSize = 11f
@@ -3501,25 +3517,25 @@ class AISummaryActivity : AppCompatActivity() {
                                 val secondKey = key
 
                                 if (first == secondKey) {
-                                    // Match ?˙ng
+                                    // Match ?ÔøΩng
                                     matchPairsRevealed.add(key)
 
                                     // L?y word t? tileInfo
                                     val vocabKey = tileInfo.wordKey.lowercase().trim()
                                     val prog = matchPairsVocabProgress[vocabKey]
 
-                                    // N?u t? n‡y ch?a ???c match ?˙ng tr??c ?Û, ?·nh d?u completed
+                                    // N?u t? nÔøΩy ch?a ???c match ?ÔøΩng tr??c ?ÔøΩ, ?ÔøΩnh d?u completed
                                     // + t?ng ?i?m
                                     if (!matchPairsWordsMatched.contains(vocabKey)) {
                                         matchPairsWordsMatched.add(vocabKey)
                                         matchPairsScore =
                                             matchPairsWordsMatched
-                                                .size // ?i?m tÌnh theo s? vocab ?„ ho‡n th‡nh
+                                                .size // ?i?m tÔøΩnh theo s? vocab ?ÔøΩ hoÔøΩn thÔøΩnh
 
                                         if (prog != null) {
                                             prog.status = "completed"
                                             prog.completedAt = System.currentTimeMillis()
-                                            // C?ng thÍm 1 attempt cho l?n match ?˙ng n‡y
+                                            // C?ng thÔøΩm 1 attempt cho l?n match ?ÔøΩng nÔøΩy
                                             prog.attempts = (prog.attempts + 1).coerceAtMost(999)
                                             matchPairsVocabProgress[vocabKey] = prog
                                         }
@@ -3540,15 +3556,15 @@ class AISummaryActivity : AppCompatActivity() {
                                         }
                                     }
 
-                                    // N?u ?„ ho‡n th‡nh T?T C? vocab trong note ? k?t th˙c quiz
+                                    // N?u ?ÔøΩ hoÔøΩn thÔøΩnh T?T C? vocab trong note ? k?t thÔøΩc quiz
                                     if (matchPairsWordsMatched.size >= matchPairsUniqueWords.size) {
                                         matchPairsQuizCompleted = true
                                         saveQuizResults()
                                         showMatchPairsResult()
                                     } else {
-                                        // N?u ch? ho‡n th‡nh xong ROUND hi?n t?i (t?t c? t? trong
+                                        // N?u ch? hoÔøΩn thÔøΩnh xong ROUND hi?n t?i (t?t c? t? trong
                                         // currentRoundWords),
-                                        // nh?ng v?n cÚn t? ch?a ho‡n th‡nh trong note ? render
+                                        // nh?ng v?n cÔøΩn t? ch?a hoÔøΩn thÔøΩnh trong note ? render
                                         // round m?i.
                                         val roundCompleted =
                                             currentRoundWords.all { wordKey ->
@@ -3559,7 +3575,7 @@ class AISummaryActivity : AppCompatActivity() {
                                         }
                                     }
                                 } else {
-                                    // Match sai -> t?ng attempts cho vocab ?Û
+                                    // Match sai -> t?ng attempts cho vocab ?ÔøΩ
                                     val vocabKey = tileInfo.wordKey.lowercase().trim()
                                     val prog = matchPairsVocabProgress[vocabKey]
                                     if (prog != null) {
@@ -3619,8 +3635,8 @@ class AISummaryActivity : AppCompatActivity() {
             binding.MatchPairsContainer.removeAllViews()
             binding.MatchPairsContainer.addView(grid)
 
-            // B? n˙t reset vÏ ?„ hi?n th? t?t c? c·c c?p, khÙng c?n reset n?a
-            // (User ph?i match h?t t?t c? c·c t? m?i ho‡n th‡nh)
+            // B? nÔøΩt reset vÔøΩ ?ÔøΩ hi?n th? t?t c? cÔøΩc c?p, khÔøΩng c?n reset n?a
+            // (User ph?i match h?t t?t c? cÔøΩc t? m?i hoÔøΩn thÔøΩnh)
         }
 
         // Render l?n ??u
@@ -3628,7 +3644,7 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     /**
-     * ?n to‡n b? card n?i dung, ch? gi? Overall Progress v‡ b?ng th?ng kÍ per vocab. D˘ng cho ch?
+     * ?n toÔøΩn b? card n?i dung, ch? gi? Overall Progress vÔøΩ b?ng th?ng kÔøΩ per vocab. DÔøΩng cho ch?
      * ?? statsOnly.
      */
     private fun hideAllCardsExceptStats() {
@@ -3650,15 +3666,15 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     /**
-     * Render b?ng th?ng kÍ per-vocab v‡ % t?ng, ch? d˘ng cho statsOnly. T?n d?ng h‡m
-     * showOverallStatistics ?? tÌnh to·n l?i.
+     * Render b?ng th?ng kÔøΩ per-vocab vÔøΩ % t?ng, ch? dÔøΩng cho statsOnly. T?n d?ng hÔøΩm
+     * showOverallStatistics ?? tÔøΩnh toÔøΩn l?i.
      */
     private fun renderStatsOnly() {
         // ??m b?o Overall Progress card hi?n
         binding.OverallProgressCard.isVisible = true
         updateOverallProgressCardSummary()
 
-        // T?o container m?i cho b?ng th?ng kÍ
+        // T?o container m?i cho b?ng th?ng kÔøΩ
         val statsContainer =
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -3676,7 +3692,7 @@ class AISummaryActivity : AppCompatActivity() {
 
         showOverallStatistics(statsContainer)
 
-        // ThÍm v‡o cu?i n?i dung ScrollView
+        // ThÔøΩm vÔøΩo cu?i n?i dung ScrollView
         val root = (binding.ContentScrollView.getChildAt(0) as? LinearLayout)
         root?.addView(statsContainer)
     }
@@ -3736,7 +3752,7 @@ class AISummaryActivity : AppCompatActivity() {
 
     private fun updateSummaryTableCard(rows: List<VocabSummaryRow>?) {
         val items = rows.orEmpty()
-        // L?u summaryTable v‡o state ?? d˘ng cho match pairs
+        // L?u summaryTable vÔøΩo state ?? dÔøΩng cho match pairs
         summaryTableState = items.ifEmpty { null }
         binding.SummaryTableCard.isVisible = items.isNotEmpty()
         binding.SummaryTableContainer.removeAllViews()
@@ -3763,7 +3779,7 @@ class AISummaryActivity : AppCompatActivity() {
                     }
                 val wordView =
                     TextView(this).apply {
-                        text = "ï $word"
+                        text = "ÔøΩ $word"
                         textSize = 16f
                         setTypeface(null, Typeface.BOLD)
                         setTextColor(
@@ -3781,9 +3797,9 @@ class AISummaryActivity : AppCompatActivity() {
                         background = null
                         contentDescription = "Speak $word"
                         setOnClickListener {
-                            // LuÙn d˘ng t? g?c (word) ?? TTS ??c, khÙng d˘ng phonetic vÏ TTS khÙng
+                            // LuÔøΩn dÔøΩng t? g?c (word) ?? TTS ??c, khÔøΩng dÔøΩng phonetic vÔøΩ TTS khÔøΩng
                             // hi?u IPA notation
-                            // TTS s? t? ??ng ph·t ‚m ?˙ng t? ti?ng Anh n?u setLanguage(Locale.US)
+                            // TTS s? t? ??ng phÔøΩt ÔøΩm ?ÔøΩng t? ti?ng Anh n?u setLanguage(Locale.US)
                             val toSpeak = word.trim()
                             if (ttsReady && toSpeak.isNotBlank()) {
                                 // Stop any ongoing speech tr??c khi ??c t? m?i
@@ -3824,26 +3840,26 @@ class AISummaryActivity : AppCompatActivity() {
             }
 
             // Translation
-            row.translation?.let { addField("D?ch", it) }
+            row.translation?.let { addField("D·ªãch", it) }
 
             // Part of Speech
-            row.partOfSpeech?.let { addField("Lo?i t?", it) }
+            row.partOfSpeech?.let { addField("Lo·∫°i t·ª´", it) }
 
             // Definition
-            row.definition?.let { addField("??nh ngh?a", it) }
+            row.definition?.let { addField("ƒê·ªãnh nghƒ©a", it) }
 
             // Usage Note
-            row.usageNote?.let { addField("C·ch d˘ng", it) }
+            row.usageNote?.let { addField("C√°ch d√πng", it) }
 
             // Common Structures
             row.commonStructures
                 ?.takeIf { it.isNotEmpty() }
-                ?.let { addField("C?u tr˙c", it.joinToString(", ")) }
+                ?.let { addField("C·∫•u tr√∫c", it.joinToString(", ")) }
 
             // Collocations
             row.collocations
                 ?.takeIf { it.isNotEmpty() }
-                ?.let { addField("C?m t?", it.joinToString(", ")) }
+                ?.let { addField("C·ª•m t·ª´", it.joinToString(", ")) }
 
             // Add divider between words (except last)
             if (index < items.size - 1) {
@@ -4043,7 +4059,7 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun translateVocabStory() {
-        // ?u tiÍn l?y t? bi?n instance (?„ hi?n th?), n?u khÙng cÛ thÏ l?y t? summaryResponse
+        // ?u tiÔøΩn l?y t? bi?n instance (?ÔøΩ hi?n th?), n?u khÔøΩng cÔøΩ thÔøΩ l?y t? summaryResponse
         val story =
             vocabStoryOriginal
                 ?: summaryResponse?.vocabStory
@@ -4116,7 +4132,7 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun translateVocabMCQ() {
-        // ?u tiÍn l?y t? bi?n instance (?„ hi?n th?), n?u khÙng cÛ thÏ l?y t? summaryResponse
+        // ?u tiÔøΩn l?y t? bi?n instance (?ÔøΩ hi?n th?), n?u khÔøΩng cÔøΩ thÔøΩ l?y t? summaryResponse
         val quizzes =
             vocabMCQsOriginal
                 ?: summaryResponse?.vocabMcqs
@@ -4147,7 +4163,7 @@ class AISummaryActivity : AppCompatActivity() {
                 if (index > 0) appendLine()
                 appendLine("Question ${index + 1}:")
                 quiz.type?.let { appendLine("Type: $it") }
-                // KhÙng hi?n th? Target ?? khÙng l? ?·p ·n
+                // KhÔøΩng hi?n th? Target ?? khÔøΩng l? ?ÔøΩp ÔøΩn
                 quiz.question?.let { appendLine("Q: $it") }
                 quiz.options?.forEach { (key, value) -> appendLine("$key: $value") }
                 quiz.explanation?.let { appendLine("Explanation: $it") }
@@ -4238,7 +4254,7 @@ class AISummaryActivity : AppCompatActivity() {
                         }
                     }
 
-                    // T?o l?i row v?i c·c field ?„ d?ch
+                    // T?o l?i row v?i cÔøΩc field ?ÔøΩ d?ch
                     val translatedRow =
                         row.copy(
                             word = translatedWord,
@@ -4264,7 +4280,7 @@ class AISummaryActivity : AppCompatActivity() {
                         "AISummaryActivity",
                         "translateSummaryTable row $index: error - $error",
                     )
-                    // N?u l?i, d˘ng row g?c
+                    // N?u l?i, dÔøΩng row g?c
                     translatedRows.add(row)
                     completedCount++
                     if (completedCount == rows.size) {
@@ -4339,7 +4355,7 @@ class AISummaryActivity : AppCompatActivity() {
                         }
                     }
 
-                    // T?o l?i quiz v?i c·c field ?„ d?ch
+                    // T?o l?i quiz v?i cÔøΩc field ?ÔøΩ d?ch
                     val translatedQuiz =
                         quiz.copy(
                             question =
@@ -4368,7 +4384,7 @@ class AISummaryActivity : AppCompatActivity() {
                         "AISummaryActivity",
                         "translateVocabMCQ item $index: error - $error",
                     )
-                    // N?u l?i, d˘ng quiz g?c
+                    // N?u l?i, dÔøΩng quiz g?c
                     translatedQuizzes.add(quiz)
                     completedCount++
                     if (completedCount == quizzes.size) {
@@ -4567,7 +4583,7 @@ class AISummaryActivity : AppCompatActivity() {
                         }
                     }
 
-                    // T?o l?i flashcard v?i c·c field ?„ d?ch
+                    // T?o l?i flashcard v?i cÔøΩc field ?ÔøΩ d?ch
                     val translatedBack =
                         card.back?.copy(
                             meaning =
@@ -4607,7 +4623,7 @@ class AISummaryActivity : AppCompatActivity() {
                         "AISummaryActivity",
                         "translateFlashcards card $index: error - $error",
                     )
-                    // N?u l?i, d˘ng card g?c
+                    // N?u l?i, dÔøΩng card g?c
                     translatedCards.add(card)
                     completedCount++
                     if (completedCount == cards.size) {
@@ -4720,7 +4736,7 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun translateSummaryTable() {
-        // ?u tiÍn l?y t? bi?n instance (?„ hi?n th?), n?u khÙng cÛ thÏ l?y t? summaryResponse
+        // ?u tiÔøΩn l?y t? bi?n instance (?ÔøΩ hi?n th?), n?u khÔøΩng cÔøΩ thÔøΩ l?y t? summaryResponse
         val rows =
             summaryTableState
                 ?: summaryResponse?.summaryTable
@@ -4831,6 +4847,60 @@ class AISummaryActivity : AppCompatActivity() {
                 onError?.invoke(errorMessage)
             }
         }
+    }
+
+    // ===================== TEXT MCQ QUIZ FLOW (TEXT NOTES) =====================
+    private fun startTextMcqFlow(mcqs: com.philkes.notallyx.data.api.models.MCQs?) {
+        if (mcqs == null || (
+                mcqs.easy.isNullOrEmpty() &&
+                    mcqs.medium.isNullOrEmpty() &&
+                    mcqs.hard.isNullOrEmpty()
+            )
+        ) {
+            Toast.makeText(this, R.string.ai_error_generic, Toast.LENGTH_SHORT).show()
+            return
+        }
+        showTextMcqDifficultyDialog(mcqs)
+    }
+
+    private fun showTextMcqDifficultyDialog(mcqs: com.philkes.notallyx.data.api.models.MCQs) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("AI MCQ Practice")
+            .setItems(arrayOf("Easy", "Medium", "Hard")) { dialogInterface, which ->
+                val difficulty =
+                    when (which) {
+                        0 -> "easy"
+                        1 -> "medium"
+                        else -> "hard"
+                    }
+                val list =
+                    when (difficulty) {
+                        "easy" -> mcqs.easy
+                        "medium" -> mcqs.medium
+                        "hard" -> mcqs.hard
+                        else -> mcqs.easy
+                    } ?: emptyList()
+
+                if (list.isEmpty()) {
+                    Toast.makeText(
+                            this,
+                            "No questions for $difficulty",
+                            Toast.LENGTH_SHORT,
+                        )
+                        .show()
+                } else {
+                    val json = Gson().toJson(list)
+                    val intent =
+                        Intent(this, TextMcqQuizActivity::class.java).apply {
+                            putExtra(TextMcqQuizActivity.EXTRA_MCQS_JSON, json)
+                            putExtra(TextMcqQuizActivity.EXTRA_DIFFICULTY, difficulty)
+                        }
+                    startActivity(intent)
+                }
+                dialogInterface.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     enum class AISection {

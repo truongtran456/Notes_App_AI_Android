@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="16dp"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp"
+    app:cardBackgroundColor="#FFFFFF">
+
+    <LinearLayout
+        android:id="@+id/CardContent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Header: Icon + Title + Progress + Action Icon -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            
+            <!-- Action Icon (Edit/Delete) ở góc trên phải -->
+            <ImageView
+                android:id="@+id/ActionIcon"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_arrow_right"
+                android:background="@drawable/bg_circular_button"
+                android:padding="8dp"
+                android:contentDescription="@string/app_name"
+                android:visibility="gone"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <!-- Icon Container -->
+            <ImageView
+                android:id="@+id/SetIcon"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/notebook"
+                app:tint="#2196F3"
+                android:contentDescription="@string/app_name"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <!-- Title -->
+            <TextView
+                android:id="@+id/SetTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="Study Set Title"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#1A1A1A"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="8dp"
+                app:layout_constraintStart_toEndOf="@id/SetIcon"
+                app:layout_constraintEnd_toStartOf="@id/ActionButton"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <!-- Action Button (Continue learning →) -->
+            <TextView
+                android:id="@+id/ActionButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Continue learning →"
+                android:textSize="14sp"
+                android:textColor="#B565FF"
+                android:textStyle="bold"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <!-- Status text (for NOT_STARTED) -->
+            <TextView
+                android:id="@+id/StatusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Not started yet"
+                android:textSize="14sp"
+                android:textColor="#9A9A9A"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="4dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/SetTitle"
+                android:visibility="gone" />
+
+            <!-- Progress Percent (for IN_PROGRESS) -->
+            <TextView
+                android:id="@+id/ProgressPercent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="65% completed"
+                android:textSize="14sp"
+                android:textColor="#B565FF"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="4dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/SetTitle"
+                android:visibility="gone" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Progress Bar Container (for IN_PROGRESS) -->
+        <FrameLayout
+            android:id="@+id/ProgressBarContainer"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <!-- Track -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_progress_track" />
+
+            <!-- Progress -->
+            <View
+                android:id="@+id/ProgressBar"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_progress_bar_gradient" />
+
+        </FrameLayout>
+
+        <!-- Stats Details (for IN_PROGRESS) - Always visible -->
+        <LinearLayout
+            android:id="@+id/ExpandedDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="16dp"
+            android:visibility="gone">
+
+            <!-- Stats Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/bg_stats_row"
+                android:padding="12dp"
+                android:layout_marginTop="12dp">
+
+                <!-- Mastered -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="✔"
+                        android:textSize="16sp"
+                        android:textColor="#4CAF50" />
+
+                    <TextView
+                        android:id="@+id/MasteredCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="#1A1A1A"
+                        android:layout_marginStart="4dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="mastered"
+                        android:textSize="13sp"
+                        android:textColor="#666666"
+                        android:layout_marginStart="4dp" />
+
+                </LinearLayout>
+
+                <!-- Weak -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⚠"
+                        android:textSize="16sp"
+                        android:textColor="#FF9800" />
+
+                    <TextView
+                        android:id="@+id/WeakCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="#1A1A1A"
+                        android:layout_marginStart="4dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="weak"
+                        android:textSize="13sp"
+                        android:textColor="#666666"
+                        android:layout_marginStart="4dp" />
+
+                </LinearLayout>
+
+                <!-- New -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="❓"
+                        android:textSize="16sp"
+                        android:textColor="#B565FF" />
+
+                    <TextView
+                        android:id="@+id/NewCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:textColor="#1A1A1A"
+                        android:layout_marginStart="4dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="new"
+                        android:textSize="13sp"
+                        android:textColor="#666666"
+                        android:layout_marginStart="4dp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Last Studied -->
+            <TextView
+                android:id="@+id/LastStudied"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Last studied: Today"
+                android:textSize="12sp"
+                android:textColor="#9A9A9A"
+                android:layout_marginTop="12dp" />
+
+        </LinearLayout>
+
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
+
+
