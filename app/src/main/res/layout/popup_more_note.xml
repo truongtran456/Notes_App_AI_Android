@@ -19,14 +19,15 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/share"
-            android:tint="?attr/colorOnSurface" />
+            android:tint="#6D3FEF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/share"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textColor="@color/color3D2A00"
+            android:textSize="@dimen/sp_16" />
     </LinearLayout>
 
     <LinearLayout
@@ -43,14 +44,15 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/export"
-            android:tint="?attr/colorOnSurface" />
+            android:tint="#6D3FEF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/export"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textColor="@color/color3D2A00"
+            android:textSize="@dimen/sp_16" />
     </LinearLayout>
 
     <LinearLayout
@@ -67,14 +69,15 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/change_color"
-            android:tint="?attr/colorOnSurface" />
+            android:tint="#6D3FEF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/change_color"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textColor="@color/color3D2A00"
+            android:textSize="@dimen/sp_16" />
     </LinearLayout>
 
     <LinearLayout
@@ -91,14 +94,15 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/notifications"
-            android:tint="?attr/colorOnSurface" />
+            android:tint="#6D3FEF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/reminders"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textColor="@color/color3D2A00"
+            android:textSize="@dimen/sp_16" />
     </LinearLayout>
 
     <LinearLayout
@@ -115,14 +119,15 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/label"
-            android:tint="?attr/colorOnSurface" />
+            android:tint="#6D3FEF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/labels"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textColor="@color/color3D2A00"
+            android:textSize="@dimen/sp_16" />
     </LinearLayout>
 
     <LinearLayout
@@ -139,14 +144,15 @@
             android:layout_width="20dp"
             android:layout_height="20dp"
             android:src="@drawable/archive"
-            android:tint="?attr/colorOnSurface" />
+            android:tint="#6D3FEF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/archive"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textColor="@color/color3D2A00"
+            android:textSize="@dimen/sp_16" />
     </LinearLayout>
 
     <LinearLayout
@@ -170,9 +176,11 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="@string/delete"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textColor="@color/color3D2A00"
+            android:textSize="@dimen/sp_16" />
     </LinearLayout>
 
 </LinearLayout>
+
 
 

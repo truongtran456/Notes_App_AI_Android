@@ -25,6 +25,8 @@ import com.philkes.notallyx.presentation.viewmodel.BaseNoteModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import com.google.gson.JsonParser
 
 class StudySetsFragment : Fragment() {
@@ -35,6 +37,7 @@ class StudySetsFragment : Fragment() {
     
     private val model: BaseNoteModel by activityViewModels()
     private var quizPrefs: SharedPreferences? = null
+    private var processingJob: Job? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -42,7 +45,10 @@ class StudySetsFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View? {
         binding = FragmentStudySetsBinding.inflate(inflater, container, false)
-        quizPrefs = requireContext().getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+        // Safe context access - use context instead of requireContext() to avoid crash
+        context?.let {
+            quizPrefs = it.getSharedPreferences("quiz_results", Context.MODE_PRIVATE)
+        }
         return binding?.root
     }
 
@@ -55,11 +61,24 @@ class StudySetsFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        // Cancel any ongoing coroutines
+        processingJob?.cancel()
+        processingJob = null
+        
+        // Clear RecyclerView adapters to prevent memory leaks
         binding?.StudiedSetsRecyclerView?.adapter = null
         binding?.NotStudiedSetsRecyclerView?.adapter = null
+        
+        // Clear references
         binding = null
         studiedAdapter = null
         notStudiedAdapter = null
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Clear SharedPreferences reference
+        quizPrefs = null
     }
 
     private fun setupAdapters() {
@@ -95,49 +114,71 @@ class StudySetsFragment : Fragment() {
 
     private fun setupObservers() {
         model.baseNotes?.observe(viewLifecycleOwner) { items ->
-            lifecycleScope.launch {
-                val studySets = processStudySets(items)
-                updateUI(studySets)
+            // Cancel previous job if still running
+            processingJob?.cancel()
+            processingJob = lifecycleScope.launch {
+                try {
+                    val studySets = processStudySets(items)
+                    // Only update UI if view is still attached
+                    if (view != null && isAdded) {
+                        updateUI(studySets)
+                    }
+                } catch (e: Exception) {
+                    // Log error but don't crash - handle gracefully
+                    e.printStackTrace()
+                }
             }
         }
     }
 
-    private suspend fun processStudySets(items: List<Item>): List<StudySetUI> = withContext(Dispatchers.IO) {
-        val checklistNotes = items.filterIsInstance<BaseNote>()
-            .filter { it.type == Type.LIST }
+    private suspend fun processStudySets(items: List<Item>): List<StudySetUI> {
+        // Get context and string resource on Main thread first
+        val context = context ?: return emptyList()
+        val emptyListText = context.getString(R.string.empty_list)
         
-        checklistNotes.map { note ->
-            val noteId = note.id
-            // Tính total tất cả từ vựng (kể cả chưa tick)
-            val allItems = note.items ?: emptyList()
-            val total = allItems.size
+        return withContext(Dispatchers.IO) {
+            val checklistNotes = items.filterIsInstance<BaseNote>()
+                .filter { it.type == Type.LIST }
             
-            val hasStats = hasStatistics(noteId)
-            
-            // Tính total từ checkedItems cho TẤT CẢ checklist notes (cả học và chưa học)
-            // Đảm bảo total được tính nhất quán cho cả hai trường hợp
-            if (hasStats) {
-                // Đã hoàn thành cả 3 quiz -> hiển thị ở "Đã học"
-                val stats = calculateStats(noteId, note)
-                StudySetUI(
-                    noteId = noteId,
-                    title = note.title.ifBlank { requireContext().getString(R.string.empty_list) },
-                    state = if (stats.progressPercent >= 100) StudyState.COMPLETED else StudyState.IN_PROGRESS,
-                    total = total, // đếm toàn bộ từ
-                    mastered = stats.mastered,
-                    weak = stats.weak,
-                    unlearned = stats.unlearned,
-                    progressPercent = stats.progressPercent,
-                    lastStudied = getLastStudiedTime(noteId)
-                )
-            } else {
-                // Chưa hoàn thành cả 3 quiz -> hiển thị ở "Chưa học"
-                StudySetUI(
-                    noteId = noteId,
-                    title = note.title.ifBlank { requireContext().getString(R.string.empty_list) },
-                    state = StudyState.NOT_STARTED,
-                    total = total // tổng từ (kể cả chưa tick)
-                )
+            checklistNotes.mapNotNull { note ->
+                try {
+                    val noteId = note.id
+                    // Tính total tất cả từ vựng (kể cả chưa tick)
+                    val allItems = note.items ?: emptyList()
+                    val total = allItems.size
+                    
+                    val hasStats = hasStatistics(noteId)
+                    
+                    // Tính total từ checkedItems cho TẤT CẢ checklist notes (cả học và chưa học)
+                    // Đảm bảo total được tính nhất quán cho cả hai trường hợp
+                    if (hasStats) {
+                        // Đã hoàn thành cả 3 quiz -> hiển thị ở "Đã học"
+                        val stats = calculateStats(noteId, note)
+                        StudySetUI(
+                            noteId = noteId,
+                            title = note.title.ifBlank { emptyListText },
+                            state = if (stats.progressPercent >= 100) StudyState.COMPLETED else StudyState.IN_PROGRESS,
+                            total = total, // đếm toàn bộ từ
+                            mastered = stats.mastered,
+                            weak = stats.weak,
+                            unlearned = stats.unlearned,
+                            progressPercent = stats.progressPercent,
+                            lastStudied = getLastStudiedTime(noteId)
+                        )
+                    } else {
+                        // Chưa hoàn thành cả 3 quiz -> hiển thị ở "Chưa học"
+                        StudySetUI(
+                            noteId = noteId,
+                            title = note.title.ifBlank { emptyListText },
+                            state = StudyState.NOT_STARTED,
+                            total = total // tổng từ (kể cả chưa tick)
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Skip invalid notes instead of crashing
+                    e.printStackTrace()
+                    null
+                }
             }
         }
     }
@@ -173,8 +214,9 @@ class StudySetsFragment : Fragment() {
         }
 
         // Đếm trạng thái từ WordStatus (NEW / LEARNING / MASTERED) trong SharedPreferences
-        val statusPrefs =
-            requireContext().getSharedPreferences("word_status_store", android.content.Context.MODE_PRIVATE)
+        // Safe context access
+        val context = context ?: return StatsResult(total, 0, 0, total, 0)
+        val statusPrefs = context.getSharedPreferences("word_status_store", Context.MODE_PRIVATE)
 
         var mastered = 0
         var weak = 0
@@ -194,6 +236,7 @@ class StudySetsFragment : Fragment() {
             when (status) {
                 com.philkes.notallyx.presentation.view.note.listitem.ListItemAdapter.WordStatus.MASTERED -> mastered++
                 com.philkes.notallyx.presentation.view.note.listitem.ListItemAdapter.WordStatus.LEARNING -> weak++
+                com.philkes.notallyx.presentation.view.note.listitem.ListItemAdapter.WordStatus.WEAK -> weak++
                 com.philkes.notallyx.presentation.view.note.listitem.ListItemAdapter.WordStatus.NEW -> {
                     // new -> sẽ tính ở unlearned
                 }
@@ -213,11 +256,12 @@ class StudySetsFragment : Fragment() {
         val progressPercent = when {
             savedPercent >= 0 -> {
                 // Sử dụng phần trăm đã được lưu từ thống kê vocabulary (từ Total Mastery Score)
-                savedPercent
+                savedPercent.coerceIn(0, 100) // Ensure valid range
             }
             savedTotalEarned >= 0 && savedTotalMax > 0 -> {
                 // Tính lại từ totalEarned và totalMax đã lưu (từ Total Mastery Score)
-                (savedTotalEarned * 100 / savedTotalMax)
+                // Safe division with range check
+                ((savedTotalEarned * 100L / savedTotalMax).toInt()).coerceIn(0, 100)
             }
             else -> {
                 // Tính lại từ quiz results nếu có
@@ -242,27 +286,34 @@ class StudySetsFragment : Fragment() {
                             
                             val jsonArray = JsonParser.parseString(matchPairsProgressJson).asJsonArray
                             jsonArray.forEach { element ->
-                                val obj = element.asJsonObject
-                                val vocab = obj.get("vocab")?.asString?.lowercase()?.trim() ?: return@forEach
-                                val status = obj.get("status")?.asString ?: ""
-                                if (vocab.isNotBlank()) {
-                                    vocabMaxPoints[vocab] = (vocabMaxPoints[vocab] ?: 0) + 1
-                                    if (status == "completed") {
-                                        vocabStats[vocab] = (vocabStats[vocab] ?: 0) + 1
+                                try {
+                                    val obj = element.asJsonObject
+                                    val vocab = obj.get("vocab")?.asString?.lowercase()?.trim()
+                                    val status = obj.get("status")?.asString ?: ""
+                                    if (!vocab.isNullOrBlank()) {
+                                        vocabMaxPoints[vocab] = (vocabMaxPoints[vocab] ?: 0) + 1
+                                        if (status == "completed") {
+                                            vocabStats[vocab] = (vocabStats[vocab] ?: 0) + 1
+                                        }
                                     }
+                                } catch (e: Exception) {
+                                    // Skip invalid elements
+                                    e.printStackTrace()
                                 }
                             }
                             
                             totalEarned += vocabStats.values.sum()
                             totalMax += vocabMaxPoints.values.sum()
-                        } catch (_: Exception) {
-                            // ignore parse errors
+                        } catch (e: Exception) {
+                            // Log parse errors for debugging
+                            e.printStackTrace()
                         }
                     }
                     
                     // Nếu có totalMax từ quiz results, tính phần trăm
                     if (totalMax > 0) {
-                        (totalEarned * 100 / totalMax)
+                        // Safe division with range check
+                        ((totalEarned * 100L / totalMax).toInt()).coerceIn(0, 100)
                     } else {
                         // Không có quiz results hợp lệ, trả về 0
                         0
@@ -281,64 +332,95 @@ class StudySetsFragment : Fragment() {
     }
 
     private fun updateUI(studySets: List<StudySetUI>) {
-        // "Đã học" = đã hoàn thành cả 3 quiz (COMPLETED) hoặc đã bắt đầu học (IN_PROGRESS)
-        val studied = studySets.filter { it.state == StudyState.COMPLETED || it.state == StudyState.IN_PROGRESS }
-        // "Chưa học" = chưa học gì cả (NOT_STARTED)
-        val notStudied = studySets.filter { it.state == StudyState.NOT_STARTED }
+        // Check if view is still valid before updating
+        val currentBinding = binding ?: return
+        if (view == null || !isAdded) return
         
-        // Update overview cards
-        // Sets: tổng số checklist (cả học và chưa học)
-        val totalSets = studySets.size
-        // Words: tổng số từ vựng của tất cả checklist (cả học và chưa học)
-        val totalWords = studySets.sumOf { it.total }
-        // Streak: số ngày học liên tục
-        val streak = calculateStreak()
-        
-        // Update Card 1: Sets (tổng số)
-        binding?.CardLearnedContent?.setBackgroundResource(R.drawable.bg_overview_learned)
-        binding?.CardLearnedIcon?.setImageResource(R.drawable.notebook)
-        binding?.CardLearnedIcon?.setColorFilter(android.graphics.Color.parseColor("#5E5CE6"))
-        binding?.CardLearnedValue?.text = "$totalSets Sets"
-        binding?.CardLearnedLabel?.text = "Topic"
-        
-        // Update Card 2: Words
-        binding?.CardWordsContent?.setBackgroundResource(R.drawable.bg_overview_words)
-        binding?.CardWordsIcon?.setImageResource(R.drawable.text_format)
-        binding?.CardWordsIcon?.setColorFilter(android.graphics.Color.parseColor("#FF9800"))
-        binding?.CardWordsValue?.text = "$totalWords Words"
-        binding?.CardWordsLabel?.text = "Words"
-        
-        // Update Card 3: Streak
-        binding?.CardStreakContent?.setBackgroundResource(R.drawable.bg_overview_streak)
-        binding?.CardStreakIcon?.setImageResource(R.drawable.ai_sparkle)
-        binding?.CardStreakIcon?.setColorFilter(android.graphics.Color.parseColor("#E53935"))
-        binding?.CardStreakValue?.text = "$streak-day"
-        binding?.CardStreakLabel?.text = "Streak"
-        
-        // Update sections
-        if (studied.isNotEmpty()) {
-            binding?.SectionStudiedHeader?.visibility = View.VISIBLE
-            studiedAdapter?.submitList(studied)
-        } else {
-            binding?.SectionStudiedHeader?.visibility = View.GONE
-        }
-        
-        if (notStudied.isNotEmpty()) {
-            binding?.SectionNotStudiedHeader?.visibility = View.VISIBLE
-            notStudiedAdapter?.submitList(notStudied)
-        } else {
-            binding?.SectionNotStudiedHeader?.visibility = View.GONE
-        }
-        
-        // Show empty state if no sets
-        if (studySets.isEmpty()) {
-            binding?.EmptyState?.visibility = View.VISIBLE
-            binding?.OverviewCardsContainer?.visibility = View.GONE
-            binding?.SectionStudiedHeader?.visibility = View.GONE
-            binding?.SectionNotStudiedHeader?.visibility = View.GONE
-        } else {
-            binding?.EmptyState?.visibility = View.GONE
-            binding?.OverviewCardsContainer?.visibility = View.VISIBLE
+        try {
+            // "Đã học" = đã hoàn thành cả 3 quiz (COMPLETED) hoặc đã bắt đầu học (IN_PROGRESS)
+            val studied = studySets.filter { it.state == StudyState.COMPLETED || it.state == StudyState.IN_PROGRESS }
+            // "Chưa học" = chưa học gì cả (NOT_STARTED)
+            val notStudied = studySets.filter { it.state == StudyState.NOT_STARTED }
+            
+            // Update overview cards
+            // Sets: tổng số checklist (cả học và chưa học)
+            val totalSets = studySets.size
+            // Words: tổng số từ vựng của tất cả checklist (cả học và chưa học)
+            val totalWords = studySets.sumOf { it.total }
+            // Streak: số ngày học liên tục
+            val streak = calculateStreak()
+            
+            // Update Card 1: Sets (tổng số)
+            currentBinding.CardLearnedContent?.setBackgroundResource(R.drawable.bg_overview_learned)
+            currentBinding.CardLearnedIcon?.setImageResource(R.drawable.notebook)
+            try {
+                currentBinding.CardLearnedIcon?.setColorFilter(android.graphics.Color.parseColor("#5E5CE6"))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            currentBinding.CardLearnedValue?.text = "$totalSets Sets"
+            currentBinding.CardLearnedLabel?.text = "Topic"
+            
+            // Update Card 2: Words
+            currentBinding.CardWordsContent?.setBackgroundResource(R.drawable.bg_overview_words)
+            currentBinding.CardWordsIcon?.setImageResource(R.drawable.text_format)
+            try {
+                currentBinding.CardWordsIcon?.setColorFilter(android.graphics.Color.parseColor("#FF9800"))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            // Format words text
+            val wordsText = if (totalWords >= 1000) {
+                "${totalWords / 1000}K Words"
+            } else {
+                "$totalWords Words"
+            }
+            currentBinding.CardWordsValue?.text = wordsText
+            currentBinding.CardWordsLabel?.text = "Words"
+            
+            // Update Card 3: Streak
+            currentBinding.CardStreakContent?.setBackgroundResource(R.drawable.bg_overview_streak)
+            currentBinding.CardStreakIcon?.setImageResource(R.drawable.ai_sparkle)
+            try {
+                currentBinding.CardStreakIcon?.setColorFilter(android.graphics.Color.parseColor("#E53935"))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            currentBinding.CardStreakValue?.text = "$streak-day"
+            currentBinding.CardStreakLabel?.text = "Streak"
+            
+            // Update sections - only update adapters if view is still valid
+            if (view != null && isAdded) {
+                if (studied.isNotEmpty()) {
+                    currentBinding.SectionStudiedHeader?.visibility = View.VISIBLE
+                    studiedAdapter?.submitList(studied)
+                } else {
+                    currentBinding.SectionStudiedHeader?.visibility = View.GONE
+                    studiedAdapter?.submitList(emptyList())
+                }
+                
+                if (notStudied.isNotEmpty()) {
+                    currentBinding.SectionNotStudiedHeader?.visibility = View.VISIBLE
+                    notStudiedAdapter?.submitList(notStudied)
+                } else {
+                    currentBinding.SectionNotStudiedHeader?.visibility = View.GONE
+                    notStudiedAdapter?.submitList(emptyList())
+                }
+            }
+            
+            // Show empty state if no sets
+            if (studySets.isEmpty()) {
+                currentBinding.EmptyState?.visibility = View.VISIBLE
+                currentBinding.OverviewCardsContainer?.visibility = View.GONE
+                currentBinding.SectionStudiedHeader?.visibility = View.GONE
+                currentBinding.SectionNotStudiedHeader?.visibility = View.GONE
+            } else {
+                currentBinding.EmptyState?.visibility = View.GONE
+                currentBinding.OverviewCardsContainer?.visibility = View.VISIBLE
+            }
+        } catch (e: Exception) {
+            // Log error but don't crash
+            e.printStackTrace()
         }
     }
 
@@ -349,22 +431,37 @@ class StudySetsFragment : Fragment() {
     }
 
     private fun toggleExpand(studySet: StudySetUI, isStudied: Boolean) {
+        // Check if view is still valid
+        if (view == null || !isAdded) return
+        
         val adapter = if (isStudied) studiedAdapter else notStudiedAdapter
         val currentList = adapter?.currentList?.toMutableList() ?: return
         
         val index = currentList.indexOfFirst { it.noteId == studySet.noteId }
-        if (index >= 0) {
-            val updated = currentList[index].copy(isExpanded = !currentList[index].isExpanded)
-            currentList[index] = updated
-            adapter.submitList(currentList)
+        if (index >= 0 && view != null && isAdded) {
+            try {
+                val updated = currentList[index].copy(isExpanded = !currentList[index].isExpanded)
+                currentList[index] = updated
+                adapter.submitList(currentList)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
     private fun openStudySet(studySet: StudySetUI) {
-        val intent = Intent(requireContext(), EditListActivity::class.java).apply {
-            putExtra(EditActivity.EXTRA_SELECTED_BASE_NOTE, studySet.noteId)
+        // Safe context access
+        val context = context ?: return
+        if (!isAdded) return
+        
+        try {
+            val intent = Intent(context, EditListActivity::class.java).apply {
+                putExtra(EditActivity.EXTRA_SELECTED_BASE_NOTE, studySet.noteId)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        startActivity(intent)
     }
 
     private data class StatsResult(

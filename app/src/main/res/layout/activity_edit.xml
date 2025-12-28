@@ -5,7 +5,7 @@
   xmlns:app="http://schemas.android.com/apk/res-auto"
   android:layout_height="match_parent"
   android:layout_width="match_parent"
-  android:background="@drawable/bg_background_layer"
+  android:background="@drawable/bg_background"
   android:transitionName="@string/transition_note_card">
     <LinearLayout
         android:layout_width="match_parent"
@@ -57,6 +57,34 @@
 
     </com.google.android.material.appbar.MaterialToolbar>
 
+        <!-- Canvas Full Screen Container - hiển thị khi mở drawing mode, nằm dưới toolbar -->
+        <FrameLayout
+            android:id="@+id/CanvasFullScreenContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:background="@drawable/bg_background">
+            
+            <!-- Canvas full screen với background trắng, bo góc -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/CanvasFullScreenCard"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_margin="16dp"
+                app:cardCornerRadius="20dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="@android:color/white"
+                app:strokeWidth="0dp">
+                
+                <!-- Canvas view for drawing full screen -->
+                <com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
+                    android:id="@+id/DrawingCanvasFullScreen"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:visibility="visible" />
+            </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
+
         <com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView
             android:id="@+id/ScrollView"
             android:layout_width="match_parent"
@@ -64,7 +92,7 @@
             android:fillViewport="true"
             android:visibility="gone"
             android:clipToPadding="false"
-            android:background="@drawable/bg_background_layer"
+            android:background="@drawable/bg_background"
           >
 
             <LinearLayout
@@ -74,20 +102,31 @@
                 android:focusable="false"
                 android:focusableInTouchMode="false"
                 android:orientation="vertical"
-                android:paddingBottom="16dp">
+                android:paddingBottom="16dp"
+                android:background="@android:color/transparent">
 
-                <androidx.constraintlayout.widget.ConstraintLayout
-                    android:id="@+id/ImageLayout"
+                <!-- Image Section: Full width, bo góc lớn -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/ImageCardContainer"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:layout_constraintTop_toTopOf="parent">
+                    android:layout_marginStart="0dp"
+                    android:layout_marginEnd="0dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="24dp"
+                    app:cardElevation="2dp"
+                    app:cardBackgroundColor="@android:color/transparent"
+                    app:strokeWidth="0dp">
 
-                <com.philkes.notallyx.presentation.view.misc.AspectRatioRecyclerView
-                    android:id="@+id/ImagePreview"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    app:layout_constraintTop_toTopOf="parent"
-                    />
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/ImagePreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="280dp"
+                        android:clipToPadding="false"
+                        android:clipChildren="false"
+                        android:paddingStart="0dp"
+                        android:paddingEnd="0dp" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/ImagePreviewPosition"
@@ -99,33 +138,46 @@
                         android:visibility="visible"
                         app:chipIcon="@drawable/add_images"
                         app:chipStartPadding="8dp"
-                        app:layout_constraintEnd_toEndOf="@id/ImagePreview"
-                        app:layout_constraintTop_toTopOf="@id/ImagePreview"
+                        android:layout_gravity="top|end"
                         app:textStartPadding="2dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_marginTop="8dp"
-                        />
-                </androidx.constraintlayout.widget.ConstraintLayout>
+                        android:layout_marginEnd="12dp"
+                        android:layout_marginTop="12dp" />
+                </com.google.android.material.card.MaterialCardView>
 
+                <!-- Title Section: Text to rõ đậm, có icon phía trước -->
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingTop="16dp"
-                    android:paddingBottom="8dp">
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="4dp">
+
+                    <ImageView
+                        android:id="@+id/TitleIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/pin"
+                        android:tint="@color/app_primary"
+                        android:contentDescription="@string/pin"
+                        android:visibility="gone"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent" />
 
                     <com.philkes.notallyx.presentation.view.misc.StylableEditTextWithHistory
                         android:id="@+id/EnterTitle"
                         android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                        android:layout_height="wrap_content"
                         android:background="@android:color/transparent"
-                    android:hint="@string/title"
-                    android:imeOptions="actionNext"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:paddingStart="24dp"
+                        android:hint="@string/title"
+                        android:imeOptions="actionNext"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:paddingStart="8dp"
                         android:paddingEnd="8dp"
-                        android:textSize="22sp"
+                        android:textSize="26sp"
                         android:textStyle="bold"
-                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintStart_toEndOf="@id/TitleIcon"
                         app:layout_constraintEnd_toStartOf="@id/StatsIcon"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintBottom_toBottomOf="parent" />
@@ -142,74 +194,77 @@
                         android:padding="8dp"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        android:layout_marginEnd="16dp" />
+                        app:layout_constraintBottom_toBottomOf="parent" />
 
                 </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <!-- Metadata: Text nhỏ mờ -->
+                <TextView
+                    android:id="@+id/Date"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
+                    android:text="@string/date"
+                    android:textSize="12sp"
+                    android:textColor="?android:textColorHint"
+                    android:alpha="0.6"
                     android:paddingStart="24dp"
                     android:paddingEnd="24dp"
                     android:paddingTop="2dp"
-                    android:paddingBottom="6dp">
-
-                    <TextView
-                        android:id="@+id/Date"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/date"
-                        android:textSize="12sp"
-                        android:textColor="?android:textColorHint"
-                        android:alpha="0.7" />
-
-                    <!-- InlineAiButton đã được di chuyển lên toolbar -->
-                    <androidx.appcompat.widget.AppCompatImageView
-                        android:id="@+id/InlineAiButton"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:contentDescription="@string/ai_assistant"
-                        android:background="@drawable/bg_ai_gradient"
-                        android:padding="10dp"
-                        android:src="@drawable/ai_sparkle"
-                        android:scaleType="centerInside"
-                        android:backgroundTint="@null"
-                        android:tint="@android:color/white"
-                        android:visibility="gone" />
-                </LinearLayout>
+                    android:paddingBottom="8dp" />
 
 
+                <!-- Files Preview: Card ngang/chip card -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/FilesPreview"
-                    android:paddingBottom="8dp"
-                    android:layout_marginStart="20dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    />
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="?android:attr/listDivider" />
-
-                <com.philkes.notallyx.presentation.view.misc.StylableEditTextWithHistory
-                    android:id="@+id/EnterBody"
+                <!-- Content Card: Nội dung trong card riêng, bo góc lớn, padding thoáng -->
+                <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
-                    android:minHeight="48dp"
-                    android:hint="@string/note"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:paddingStart="24dp"
-                    android:paddingTop="16dp"
-                    android:paddingEnd="24dp"
-                    android:textAppearance="?attr/textAppearanceBodyLarge" />
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="1dp"
+                    app:cardBackgroundColor="@android:color/white"
+                    app:strokeWidth="0dp">
 
-                <!-- Inline summary toolbar (preview/replace) -->
+                    <com.philkes.notallyx.presentation.view.misc.StylableEditTextWithHistory
+                        android:id="@+id/EnterBody"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@android:color/transparent"
+                        android:minHeight="48dp"
+                        android:hint="@string/note"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:paddingStart="20dp"
+                        android:paddingTop="20dp"
+                        android:paddingEnd="20dp"
+                        android:paddingBottom="20dp"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
+                        android:lineSpacingExtra="4dp" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Slide-to-Compare Summary View (full width, không margin, tự điều chỉnh chiều cao) -->
+                <com.philkes.notallyx.presentation.view.ai.AiSlideCompareView
+                    android:id="@+id/SlideCompareView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="200dp"
+                    android:layout_marginTop="0dp"
+                    android:layout_marginStart="0dp"
+                    android:layout_marginEnd="0dp"
+                    android:layout_marginBottom="0dp"
+                    android:visibility="gone" />
+
+                <!-- Inline summary toolbar (preview/replace) - DEPRECATED, giữ lại để tương thích -->
                 <include
                     android:id="@+id/InlineSummaryToolbarContainer"
                     layout="@layout/inline_summary_toolbar"
@@ -230,27 +285,56 @@
                     android:paddingEnd="4dp"
                     app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
-                <!-- Divider line for drawing area -->
-                <View
-                    android:id="@+id/DrawingDivider"
+                <!-- Canvas Preview Card: Preview với chiều cao cố định 140dp, click để mở full screen -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/CanvasCardContainer"
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginStart="24dp"
-                    android:layout_marginEnd="24dp"
-                    android:background="?android:attr/listDivider"
-                    android:visibility="gone" />
+                    android:layout_height="140dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="16dp"
+                    app:cardCornerRadius="20dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@android:color/white"
+                    app:strokeWidth="0dp"
+                    android:visibility="gone"
+                    android:clickable="true"
+                    android:focusable="true">
 
-                <!-- Canvas view for drawing -->
-                <com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
-                    android:id="@+id/DrawingCanvas"
-                    android:transitionName="shared_canvas"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="400dp"
-                    android:layout_margin="20dp"
-                    android:background="@drawable/bg_canvas_rounded"
-                    android:visibility="gone" />
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent">
+
+                        <!-- Canvas preview - chỉ hiển thị preview với chiều cao cố định -->
+                        <ImageView
+                            android:id="@+id/CanvasPreview"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:background="@android:color/white"
+                            android:contentDescription="Canvas preview" />
+
+                        <!-- Text "✏️ Canvas" góc trên trái -->
+                        <TextView
+                            android:id="@+id/CanvasLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="✏️ Canvas"
+                            android:textSize="12sp"
+                            android:textColor="#6A5AE0"
+                            android:layout_margin="12dp"
+                            android:layout_gravity="top|start" />
+
+                        <!-- Canvas view for drawing - ẩn đi, chỉ dùng khi mở full screen -->
+                        <com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView
+                            android:id="@+id/DrawingCanvas"
+                            android:transitionName="shared_canvas"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:visibility="gone" />
+                    </FrameLayout>
+                </com.google.android.material.card.MaterialCardView>
 
                 <TextView
                     android:id="@+id/AddItem"
@@ -355,11 +439,19 @@
         android:layout_marginEnd="0dp"
         android:layout_marginBottom="16dp" />
 
+
     <!-- DrawToolPickerView - hiển thị cố định ở bottom -->
     <com.philkes.notallyx.draw.ui.newdraw.view.drawtool.DrawToolPickerView
         android:id="@+id/DrawToolPickerView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:visibility="gone" />
+
+    <!-- Format Toolbar - hiển thị ở bottom khi format được chọn -->
+    <include
+        android:id="@+id/FormatToolbar"
+        layout="@layout/format_toolbar"
         android:layout_gravity="bottom"
         android:visibility="gone" />
 

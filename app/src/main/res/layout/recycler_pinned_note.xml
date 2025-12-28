@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    app:cardBackgroundColor="@android:color/white" xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="160dp"
     android:layout_height="140dp"
@@ -85,7 +86,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="#000000"
                 android:ellipsize="end"
                 android:textIsSelectable="false"
                 android:maxLines="1"
@@ -93,14 +94,14 @@
 
             <ImageView
                 android:id="@+id/RemindersView"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:clickable="false"
                 android:contentDescription="@string/reminders"
                 android:stateListAnimator="@null"
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:visibility="visible"
-                android:src="@drawable/notifications"
+                android:src="@drawable/schedule"
                 android:layout_weight="1"
                 android:scaleType="fitCenter" />
         </LinearLayout>
@@ -216,4 +217,5 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </com.google.android.material.card.MaterialCardView>
+
 

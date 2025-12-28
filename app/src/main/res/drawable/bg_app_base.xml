@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Layer 1: nền kem trắng chủ đạo -->
+    <!-- Layer 1: nền trắng tím nhạt chủ đạo -->
     <item>
         <shape>
-            <solid android:color="#FFF3DE" />
+            <solid android:color="#FAF8FF" />
         </shape>
     </item>
 
-    <!-- Layer 2: dải cam nhạt loang chéo -->
+    <!-- Layer 2: dải tím nhạt loang chéo -->
     <item>
         <shape>
             <gradient
                 android:type="linear"
                 android:angle="135"
-                android:startColor="#33FFDCAA"
-                android:centerColor="#00FFDCAA"
+                android:startColor="#33E8E6FF"
+                android:centerColor="#00E8E6FF"
                 android:endColor="#00FFFFFF" />
         </shape>
     </item>
@@ -40,7 +40,7 @@
                 android:type="linear"
                 android:angle="90"
                 android:startColor="#00FFFFFF"
-                android:endColor="#33ECECEC" />
+                android:endColor="#33F0F0F0" />
         </shape>
     </item>
 

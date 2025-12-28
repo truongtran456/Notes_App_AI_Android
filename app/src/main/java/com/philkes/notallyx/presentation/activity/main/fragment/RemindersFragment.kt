@@ -45,10 +45,48 @@ class RemindersFragment : Fragment(), NoteReminderListener {
             binding?.ImageView?.setImageResource(R.drawable.notifications)
         }
         binding?.ChipGroup?.setOnCheckedStateChangeListener { _, _ -> updateList() }
+        
+        // Set màu cho các chip programmatically để đảm bảo đúng màu #9787FF
+        setupChipColors()
 
         model.reminders.observe(viewLifecycleOwner) { reminders ->
             allReminders = reminders.sortedBy { it.title }
             updateList()
+        }
+    }
+    
+    private fun setupChipColors() {
+        binding?.ChipGroup?.let { chipGroup ->
+            for (i in 0 until chipGroup.childCount) {
+                val chip = chipGroup.getChildAt(i) as? com.google.android.material.chip.Chip
+                chip?.let {
+                    // Set background color programmatically
+                    val colorStateList = android.content.res.ColorStateList(
+                        arrayOf(
+                            intArrayOf(android.R.attr.state_checked),
+                            intArrayOf()
+                        ),
+                        intArrayOf(
+                            android.graphics.Color.parseColor("#9787FF"),
+                            android.graphics.Color.TRANSPARENT
+                        )
+                    )
+                    it.chipBackgroundColor = colorStateList
+                    
+                    // Set text color
+                    val textColorStateList = android.content.res.ColorStateList(
+                        arrayOf(
+                            intArrayOf(android.R.attr.state_checked),
+                            intArrayOf()
+                        ),
+                        intArrayOf(
+                            android.graphics.Color.WHITE,
+                            android.graphics.Color.parseColor("#1A1A1A")
+                        )
+                    )
+                    it.setTextColor(textColorStateList)
+                }
+            }
         }
     }
 
@@ -60,8 +98,10 @@ class RemindersFragment : Fragment(), NoteReminderListener {
         setHasOptionsMenu(true)
         binding = FragmentRemindersBinding.inflate(inflater)
 
-        // Luôn dùng nền gradient Home Today cho Reminders
-        binding?.root?.setBackgroundResource(R.drawable.bg_background_layer)
+        // Chỉ dùng gradient khi ở System mode, Light/Dark dùng màu thuần
+        if (model.preferences.theme.value == com.philkes.notallyx.presentation.viewmodel.preference.Theme.FOLLOW_SYSTEM) {
+            binding?.root?.setBackgroundResource(R.drawable.bg_background)
+        }
 
         return binding?.root
     }

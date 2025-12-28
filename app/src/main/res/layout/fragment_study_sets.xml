@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="@drawable/bg_background_layer">
+    android:background="@drawable/bg_background">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -54,7 +54,7 @@
                         android:layout_height="36dp"
                         android:src="@drawable/notebook"
                         android:contentDescription="@string/app_name"
-                        android:layout_marginEnd="6dp" />
+                        android:layout_marginEnd="4dp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -67,7 +67,7 @@
                             android:id="@+id/CardLearnedValue"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="0 Sets"
+                            android:text="3 Sets"
                             android:textStyle="bold"
                             android:textColor="#333333"
                             android:textSize="16sp"
@@ -79,7 +79,7 @@
                             android:id="@+id/CardLearnedLabel"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Learned"
+                            android:text="Topic"
                             android:textColor="#757575"
                             android:textSize="13sp"
                             android:singleLine="true"
@@ -122,7 +122,7 @@
                         android:layout_height="36dp"
                         android:src="@drawable/text_format"
                         android:contentDescription="@string/app_name"
-                        android:layout_marginEnd="10dp" />
+                        android:layout_marginEnd="4dp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -135,7 +135,7 @@
                             android:id="@+id/CardWordsValue"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="0 Words"
+                            android:text="15 Wor"
                             android:textStyle="bold"
                             android:textColor="#333333"
                             android:textSize="16sp"
@@ -189,7 +189,7 @@
                         android:layout_height="36dp"
                         android:src="@drawable/ai_sparkle"
                         android:contentDescription="@string/app_name"
-                        android:layout_marginEnd="10dp" />
+                        android:layout_marginEnd="4dp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -236,9 +236,9 @@
             android:layout_height="wrap_content"
             android:text="@string/section_studied"
             android:textAllCaps="true"
-            android:textSize="14sp"
+            android:textSize="@dimen/sp_16"
             android:textStyle="bold"
-            android:textColor="#7A7A7A"
+            android:textColor="@color/app_title_dark_purple"
             android:layout_marginTop="12dp"
             android:layout_marginBottom="8dp"
             android:visibility="gone" />
@@ -257,9 +257,9 @@
             android:layout_height="wrap_content"
             android:text="@string/section_not_studied"
             android:textAllCaps="true"
-            android:textSize="14sp"
+            android:textSize="@dimen/sp_16"
             android:textStyle="bold"
-            android:textColor="#7A7A7A"
+            android:textColor="@color/app_title_dark_purple"
             android:layout_marginTop="16dp"
             android:layout_marginBottom="12dp"
             android:visibility="gone" />

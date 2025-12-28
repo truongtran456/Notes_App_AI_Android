@@ -16,6 +16,7 @@ import android.view.View.MeasureSpec
 import android.view.View.VISIBLE
 import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
+import android.content.res.ColorStateList
 import androidx.core.content.ContextCompat
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.philkes.notallyx.R
@@ -73,7 +74,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     init {
         clipChildren = false
         clipToPadding = false
-        // ??m b?o view có background trong su?t ?? không che các view khác
+        // ??m b?o view cï¿½ background trong su?t ?? khï¿½ng che cï¿½c view khï¿½c
         setBackgroundColor(android.graphics.Color.TRANSPARENT)
     }
 
@@ -100,16 +101,22 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         addView(scrimView, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
 
         // Create main FAB - ??m b?o hi?n th? ngay
+        val mainFabColor = ContextCompat.getColor(context, R.color.app_title_color)
         mainFab =
-            FloatingActionButton(context).apply {
+            FloatingActionButton(context, null, R.style.FloatingActionButtonPrimary).apply {
                 id = View.generateViewId()
                 setImageResource(mainFabIcon)
                 visibility = VISIBLE
                 alpha = 1f
                 scaleX = 1f
                 scaleY = 1f
-                // ??m b?o có elevation
+                // ??m b?o cï¿½ elevation
                 elevation = 6.dp.toFloat()
+                // Set mÃ u tÃ­m Ä‘áº­m giá»‘ng FAB á»Ÿ trang Notes - dÃ¹ng style FloatingActionButtonPrimary
+                // Style nÃ y Ä‘Ã£ cÃ³ bg_fab_gradient vá»›i mÃ u #6D3FEF
+                // NhÆ°ng Ä‘á»ƒ Ä‘áº£m báº£o, set láº¡i backgroundTintList sau khi apply style
+                backgroundTintList = ColorStateList.valueOf(mainFabColor)
+                imageTintList = ColorStateList.valueOf(android.graphics.Color.WHITE)
                 setOnClickListener {
                     if (!isPrimaryExpanded) {
                         expandPrimary()
@@ -122,12 +129,12 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         val mainFabParams =
             LayoutParams(fabSize, fabSize).apply {
                 gravity = Gravity.BOTTOM or Gravity.END
-                // ??t v? trí ban ??u ? góc d??i bên ph?i
+                // ??t v? trï¿½ ban ??u ? gï¿½c d??i bï¿½n ph?i
                 setMargins(0, 0, 0, 0)
             }
         addView(mainFab, mainFabParams)
 
-        // ??m b?o mainFab ???c ??t ?úng v? trí ngay l?p t?c
+        // ??m b?o mainFab ???c ??t ?ï¿½ng v? trï¿½ ngay l?p t?c
         post {
             if (width > 0 && height > 0) {
                 val centerX = width - fabSize / 2f - 16.dp
@@ -138,15 +145,17 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         }
 
         // Create primary FABs (3 items in arc)
+        val primaryFabColor = ContextCompat.getColor(context, R.color.app_title_color)
         primaryItems.forEachIndexed { index, item ->
             val fab =
-                FloatingActionButton(context).apply {
+                FloatingActionButton(context, null, R.style.FloatingActionButtonPrimary).apply {
                     setImageResource(item.iconRes)
                     contentDescription = item.contentDescription
                     alpha = 0f
                     scaleX = 0f
                     scaleY = 0f
                     visibility = GONE
+                    // Style FloatingActionButtonPrimary Ä‘Ã£ cÃ³ bg_fab_gradient vá»›i mÃ u #6D3FEF
                     setOnClickListener {
                         if (item.isMoreButton) {
                             // Toggle secondary expansion
@@ -166,15 +175,17 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         }
 
         // Create secondary FABs (4 items)
+        val secondaryFabColor = ContextCompat.getColor(context, R.color.app_title_color)
         secondaryItems.forEachIndexed { index, item ->
             val fab =
-                FloatingActionButton(context).apply {
+                FloatingActionButton(context, null, R.style.FloatingActionButtonPrimary).apply {
                     setImageResource(item.iconRes)
                     contentDescription = item.contentDescription
                     alpha = 0f
                     scaleX = 0f
                     scaleY = 0f
                     visibility = GONE
+                    // Style FloatingActionButtonPrimary Ä‘Ã£ cÃ³ bg_fab_gradient vá»›i mÃ u #6D3FEF
                     setOnClickListener {
                         item.onClick()
                         collapseAll()
@@ -184,7 +195,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             addView(fab, LayoutParams(fabSize, fabSize))
         }
 
-        // Request layout ?? ??m b?o có kích th??c tr??c khi tính toán
+        // Request layout ?? ??m b?o cï¿½ kï¿½ch th??c tr??c khi tï¿½nh toï¿½n
         post {
             calculatePositions()
             updateFabPositions()
@@ -195,7 +206,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         primaryFabPositions.clear()
         secondaryFabPositions.clear()
 
-        // ??m b?o có kích th??c tr??c khi tính toán
+        // ??m b?o cï¿½ kï¿½ch th??c tr??c khi tï¿½nh toï¿½n
         if (width == 0 || height == 0) {
             return
         }
@@ -247,7 +258,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // ??m b?o có kích th??c t?i thi?u ?? ch?a FABs
+        // ??m b?o cï¿½ kï¿½ch th??c t?i thi?u ?? ch?a FABs
         val minSize = (fabSize + arcRadius * 2).toInt()
         val widthMode = MeasureSpec.getMode(widthMeasureSpec)
         val heightMode = MeasureSpec.getMode(heightMeasureSpec)
@@ -279,13 +290,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         val centerX = width - fabSize / 2f - 16.dp
         val centerY = height - fabSize / 2f - 16.dp
 
-        // Main FAB - ??t ? góc d??i bên ph?i
+        // Main FAB - ??t ? gï¿½c d??i bï¿½n ph?i
         if (::mainFab.isInitialized) {
             mainFab.x = centerX - fabSize / 2f
             mainFab.y = centerY - fabSize / 2f
         }
 
-        // Primary FABs - ch? update n?u ?ã có positions
+        // Primary FABs - ch? update n?u ?ï¿½ cï¿½ positions
         if (primaryFabPositions.isNotEmpty()) {
             primaryFabs.forEachIndexed { index, fab ->
                 if (index < primaryFabPositions.size) {
@@ -296,7 +307,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             }
         }
 
-        // Secondary FABs - ch? update n?u ?ã có positions
+        // Secondary FABs - ch? update n?u ?ï¿½ cï¿½ positions
         if (secondaryFabPositions.isNotEmpty()) {
             secondaryFabs.forEachIndexed { index, fab ->
                 if (index < secondaryFabPositions.size) {

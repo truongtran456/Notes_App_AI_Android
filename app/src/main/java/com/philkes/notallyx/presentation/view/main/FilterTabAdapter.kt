@@ -57,7 +57,6 @@ class FilterTabAdapter(
 
             binding.FilterTabText.text = text
 
-            // Style giống filter pills của Home Today
             val selectedDrawable =
                 ContextCompat.getDrawable(context, R.drawable.bg_filter_pill_selected)
             val unselectedDrawable =
@@ -71,7 +70,7 @@ class FilterTabAdapter(
             } else {
                 binding.FilterTabText.background = unselectedDrawable
                 binding.FilterTabText.setTextColor(
-                    ContextCompat.getColor(context, android.R.color.black)
+                    android.graphics.Color.parseColor("#1A1A1A")
                 )
             }
 

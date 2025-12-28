@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Base gradient cam/kem ấm -->
+    <!-- Base gradient tím nhạt hiện đại -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="270"
-                android:startColor="#FFF7EC"
-                android:centerColor="#FFF3DE"
-                android:endColor="#FFD5B0" />
+                android:startColor="#F8F7FF"
+                android:centerColor="#FAF8FF"
+                android:endColor="#E8E6FF" />
         </shape>
     </item>
     <!-- Radial gradient overlay for soft depth -->
@@ -24,4 +24,3 @@
         </shape>
     </item>
 </layer-list>
-

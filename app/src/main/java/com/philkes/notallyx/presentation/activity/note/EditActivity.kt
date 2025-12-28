@@ -123,6 +123,7 @@ abstract class EditActivity(private val type: Type) :
     private lateinit var exportNotesActivityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var exportFileActivityResultLauncher: ActivityResultLauncher<Intent>
     private lateinit var fullScreenDrawingActivityResultLauncher: ActivityResultLauncher<Intent>
+    private lateinit var viewCanvasActivityResultLauncher: ActivityResultLauncher<Intent>
 
     protected var search = Search()
 
@@ -143,6 +144,7 @@ abstract class EditActivity(private val type: Type) :
 
     private var currentDrawTool: DrawToolBrush? = null
     private var isDrawingModeActive: Boolean = false
+    private var isCanvasViewOnly: Boolean = false // Flag để phân biệt view only và draw mode
     private var canvasFixedHeight: Int = 0
 
     protected var colorInt: Int = -1
@@ -175,11 +177,21 @@ abstract class EditActivity(private val type: Type) :
 
         // Clear references
         try {
-            binding.DrawingCanvas.setBrush(null)
-            binding.DrawingCanvas.setOnColorPickedListener {}
+            // Clear canvas listeners and brushes
+            binding.DrawingCanvas?.setBrush(null)
+            binding.DrawingCanvas?.setOnColorPickedListener { } // Set empty listener instead of null
+            binding.DrawingCanvas?.setOnStrokesChangedListener(null)
+            
+            val fullScreenCanvas = binding.root.findViewById<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView>(R.id.DrawingCanvasFullScreen)
+            fullScreenCanvas?.setBrush(null)
+            fullScreenCanvas?.setOnColorPickedListener { } // Set empty listener instead of null
+            fullScreenCanvas?.setOnStrokesChangedListener(null)
         } catch (e: Exception) {
             // Ignore errors if view is already destroyed
         }
+        
+        // Cancel any pending coroutines
+        // lifecycleScope will be automatically cancelled when activity is destroyed
 
         super.onDestroy()
     }
@@ -284,8 +296,11 @@ abstract class EditActivity(private val type: Type) :
         // L?u strokes v?o notallyModel tr??c khi save
         if (isDrawingModeActive) {
             try {
-                val strokes = binding.DrawingCanvas.getStrokes()
-                notallyModel.drawingStrokes = ArrayList(strokes)
+                val canvas = getCurrentCanvas()
+                if (canvas != null) {
+                    val strokes = canvas.getStrokes()
+                    notallyModel.drawingStrokes = ArrayList(strokes)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -470,6 +485,29 @@ abstract class EditActivity(private val type: Type) :
                     val strokesJson =
                         result.data?.getStringExtra(FullScreenDrawingActivity.RESULT_STROKES)
                     handleDrawingStrokesResult(strokesJson)
+                }
+            }
+        
+        viewCanvasActivityResultLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == RESULT_OK) {
+                    val deleted = result.data?.getBooleanExtra(ViewCanvasActivity.RESULT_DELETED, false) ?: false
+                    if (deleted) {
+                        // Xóa canvas - clear tất cả
+                        notallyModel.drawingStrokes.clear()
+                        
+                        // Clear canvas views
+                        binding.DrawingCanvas?.clear()
+                        val fullScreenCanvas = binding.root.findViewById<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView>(R.id.DrawingCanvasFullScreen)
+                        fullScreenCanvas?.clear()
+                        
+                        // Ẩn preview
+                        binding.CanvasCardContainer?.visibility = View.GONE
+                        binding.CanvasPreview?.setImageBitmap(null)
+                        
+                        // Save để persist việc xóa
+                        notallyModel.modifiedTimestamp = System.currentTimeMillis()
+                    }
                 }
             }
     }
@@ -766,7 +804,8 @@ abstract class EditActivity(private val type: Type) :
                 com.philkes.notallyx.presentation.compose.JellyFabMenu(
                     onDrawClick = {
                         try {
-                            openFullScreenDrawing()
+                            // Mở drawing screen với drawtoolpen để vẽ
+                            openDrawingScreen()
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -791,24 +830,8 @@ abstract class EditActivity(private val type: Type) :
     }
 
     private fun setupInlineAIButton() {
-        binding.InlineAiButton?.apply {
-            // Re-apply styling to ensure gradient + white icon
-            setBackgroundResource(R.drawable.bg_ai_gradient)
-            setImageResource(R.drawable.ai_sparkle)
-            imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            isClickable = true
-            isFocusable = true
-            setOnClickListener {
-                animate()
-                    .scaleX(0.9f)
-                    .scaleY(0.9f)
-                    .setDuration(80)
-                    .withEndAction { animate().scaleX(1f).scaleY(1f).setDuration(80).start() }
-                    .start()
-                openAIActionsMenu()
-            }
-        }
+        // InlineAiButton đã được di chuyển lên toolbar, không còn trong layout này
+        // Function giữ lại để tương thích nhưng không làm gì
     }
 
     private fun hideAIFab(aiFabView: CardView?) {
@@ -865,7 +888,8 @@ abstract class EditActivity(private val type: Type) :
 
                     // B??C 3: ?p d?ng brush config v?o canvas ngay l?p t?c
                     // ?i?u n?y ??m b?o khi user touch canvas, n? s? v? v?i brush ?? ch?n
-                    binding.DrawingCanvas.setBrush(tool)
+                    val canvas = getCurrentCanvas()
+                    canvas?.setBrush(tool)
 
                     log(
                         "DrawTool selected: ${tool.brush}, color: ${tool.color}, size: ${tool.sliderSize}, opacity: ${tool.opacity}"
@@ -980,6 +1004,11 @@ abstract class EditActivity(private val type: Type) :
         // ?p d?ng tools v?o DrawToolPickerView
         binding.DrawToolPickerView.applyTools(toolsToShow)
 
+        // Hi?n th? canvas ngay l?p t?c khi m? drawing screen
+        if (!isDrawingModeActive) {
+            showDrawingArea()
+        }
+
         // Hi?n th? DrawToolPickerView
         showDrawingToolPicker()
     }
@@ -989,14 +1018,14 @@ abstract class EditActivity(private val type: Type) :
      * bottom bar v?i animation
      */
     private fun openFullScreenDrawing() {
+        isCanvasViewOnly = false // Đây là draw mode
         if (!isDrawingModeActive) {
             showDrawingArea()
         }
 
-        if (
-            notallyModel.drawingStrokes.isNotEmpty() && binding.DrawingCanvas.getStrokes().isEmpty()
-        ) {
-            binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
+        val canvas = getCurrentCanvas()
+        if (canvas != null && notallyModel.drawingStrokes.isNotEmpty() && canvas.getStrokes().isEmpty()) {
+            canvas.loadStrokes(notallyModel.drawingStrokes)
         }
 
         if (binding.DrawToolPickerView.listener == null) {
@@ -1020,7 +1049,8 @@ abstract class EditActivity(private val type: Type) :
                             showDrawingArea()
                         }
 
-                        binding.DrawingCanvas.setBrush(tool)
+                        val canvas = getCurrentCanvas()
+                        canvas?.setBrush(tool)
                     }
 
                     override fun onSave(tool: DrawToolBrush) {
@@ -1213,20 +1243,40 @@ abstract class EditActivity(private val type: Type) :
     }
 
     private fun setupCanvasStrokeListener() {
+        // Setup listener cho cả canvas normal và full screen
         binding.DrawingCanvas.setOnStrokesChangedListener {
             if (isDrawingModeActive) {
-                val ivUndo = binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView
-                val ivRedo = binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView
-                if (ivUndo != null && ivRedo != null) {
-                updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+                val canvas = getCurrentCanvas()
+                if (canvas == binding.DrawingCanvas) { // Chỉ update nếu đang dùng canvas normal
+                    val ivUndo = binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView
+                    val ivRedo = binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView
+                    if (ivUndo != null && ivRedo != null) {
+                        updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+                    }
+                }
+            }
+        }
+        
+        // Setup listener cho canvas full screen
+        val fullScreenCanvas = binding.root.findViewById<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView>(R.id.DrawingCanvasFullScreen)
+        fullScreenCanvas?.setOnStrokesChangedListener {
+            if (isDrawingModeActive) {
+                val canvas = getCurrentCanvas()
+                if (canvas == fullScreenCanvas) { // Chỉ update nếu đang dùng canvas full screen
+                    val ivUndo = binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView
+                    val ivRedo = binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView
+                    if (ivUndo != null && ivRedo != null) {
+                        updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+                    }
                 }
             }
         }
     }
 
     private fun updateDrawingUndoRedoButtons(ivUndo: ImageView, ivRedo: ImageView) {
-        val canUndoDrawing = binding.DrawingCanvas.canUndo()
-        val canRedoDrawing = binding.DrawingCanvas.canRedo()
+        val canvas = getCurrentCanvas()
+        val canUndoDrawing = canvas?.canUndo() ?: false
+        val canRedoDrawing = canvas?.canRedo() ?: false
         ivUndo.isEnabled = canUndoDrawing
         ivUndo.alpha = if (canUndoDrawing) 1f else 0.5f
         ivRedo.isEnabled = canRedoDrawing
@@ -1242,7 +1292,17 @@ abstract class EditActivity(private val type: Type) :
         val ivPin = toolbar.findViewById<View>(R.id.ivPin)
         val ivMore = toolbar.findViewById<View>(R.id.ivMore)
 
-        ivBack.setOnClickListener { finish() }
+        ivBack.setOnClickListener { 
+            if (isDrawingModeActive) {
+                // Nếu đang ở drawing mode, back về edit ghi chú
+                hideDrawingArea()
+            } else if (isCanvasViewOnly) {
+                // Nếu đang ở view only mode, đóng về preview
+                hideDrawingArea()
+            } else {
+                finish() 
+            }
+        }
         
         // Hiển thị nút AI cho cả NOTE và LIST (checklist)
         ivAI?.visibility = View.VISIBLE
@@ -1252,7 +1312,8 @@ abstract class EditActivity(private val type: Type) :
 
         ivUndo.setOnClickListener {
             if (isDrawingModeActive) {
-                if (binding.DrawingCanvas.undo()) {
+                val canvas = getCurrentCanvas()
+                if (canvas != null && canvas.undo()) {
                     updateDrawingUndoRedoButtons(ivUndo as ImageView, ivRedo as ImageView)
                 }
             } else {
@@ -1275,7 +1336,8 @@ abstract class EditActivity(private val type: Type) :
 
         ivRedo.setOnClickListener {
             if (isDrawingModeActive) {
-                if (binding.DrawingCanvas.redo()) {
+                val canvas = getCurrentCanvas()
+                if (canvas != null && canvas.redo()) {
                     updateDrawingUndoRedoButtons(ivUndo as ImageView, ivRedo as ImageView)
                 }
             } else {
@@ -1302,70 +1364,225 @@ abstract class EditActivity(private val type: Type) :
 
         ivMore.setOnClickListener { openMoreMenu() }
     }
+    
+    private fun generateCanvasPreview() {
+        if (notallyModel.drawingStrokes.isEmpty() || binding.CanvasPreview == null) return
+        
+        // Tạo bitmap preview từ strokes
+        binding.CanvasPreview.post {
+            try {
+                // Đảm bảo DrawingCanvas có kích thước trước khi load strokes
+                if (binding.DrawingCanvas.width <= 0 || binding.DrawingCanvas.height <= 0) {
+                    // Measure canvas với kích thước preview
+                    val previewWidth = binding.CanvasPreview.width.takeIf { it > 0 } 
+                        ?: (resources.displayMetrics.widthPixels - dpToPx(32))
+                    val previewHeight = dpToPx(140)
+                    
+                    binding.DrawingCanvas.measure(
+                        View.MeasureSpec.makeMeasureSpec(previewWidth, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(previewHeight, View.MeasureSpec.EXACTLY)
+                    )
+                    binding.DrawingCanvas.layout(0, 0, previewWidth, previewHeight)
+                }
+                
+                // Load strokes vào canvas tạm để render
+                binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
+                
+                // Lấy bitmap từ canvas
+                val drawingBitmap = binding.DrawingCanvas.getDrawingBitmap()
+                if (drawingBitmap != null) {
+                    // Scale bitmap để fit preview size
+                    val previewWidth = binding.CanvasPreview.width.takeIf { it > 0 } 
+                        ?: (resources.displayMetrics.widthPixels - dpToPx(32))
+                    val previewHeight = dpToPx(140)
+                    
+                    val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(
+                        drawingBitmap,
+                        previewWidth,
+                        previewHeight,
+                        true
+                    )
+                    binding.CanvasPreview.setImageBitmap(scaledBitmap)
+                    
+                    // Set background của preview giống canvas
+                    binding.CanvasPreview.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                } else {
+                    binding.CanvasPreview.setImageBitmap(null)
+                }
+            } catch (e: Exception) {
+                // Nếu không thể tạo preview, ẩn preview
+                binding.CanvasPreview?.setImageBitmap(null)
+            }
+        }
+    }
+    
+    /**
+     * Mở canvas full screen chỉ để XEM (view only), giống như xem ảnh
+     * Được gọi khi click vào canvas preview
+     */
+    private fun openCanvasViewOnly() {
+        // Đảm bảo canvas có kích thước trước khi load strokes
+        if (binding.DrawingCanvas.width <= 0 || binding.DrawingCanvas.height <= 0) {
+            // Measure canvas với kích thước màn hình
+            val screenWidth = resources.displayMetrics.widthPixels
+            val screenHeight = resources.displayMetrics.heightPixels
+            binding.DrawingCanvas.measure(
+                View.MeasureSpec.makeMeasureSpec(screenWidth, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(screenHeight, View.MeasureSpec.EXACTLY)
+            )
+            binding.DrawingCanvas.layout(0, 0, screenWidth, screenHeight)
+        }
+        
+        // Load strokes vào canvas để lấy bitmap FULL SIZE
+        binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
+        val bitmap = binding.DrawingCanvas.getDrawingBitmap()
+        
+        if (bitmap != null) {
+            // Save bitmap tạm thời và mở ViewCanvasActivity
+            try {
+                val cacheDir = cacheDir
+                val tempFile = File(cacheDir, "canvas_view_${System.currentTimeMillis()}.png")
+                tempFile.outputStream().use { out ->
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                }
+                
+                val intent = Intent(this, ViewCanvasActivity::class.java).apply {
+                    putExtra(ViewCanvasActivity.EXTRA_CANVAS_BITMAP_PATH, tempFile.absolutePath)
+                    putExtra(ViewCanvasActivity.EXTRA_NOTE_ID, notallyModel.id)
+                }
+                
+                viewCanvasActivityResultLauncher.launch(intent)
+            } catch (e: Exception) {
+                showToast("Error opening canvas view")
+            }
+        }
+    }
 
     protected open fun openMoreMenu() {}
 
     private fun showDrawingArea() {
         if (isDestroyed || isFinishing) return
 
-        binding.DrawingDivider.visibility = View.VISIBLE
-        binding.DrawingCanvas.visibility = View.VISIBLE
-        applySavedBackgroundToCanvas()
-        binding.DrawingCanvas.isEnabled = true
+        // Ẩn preview card và ScrollView
+        binding.CanvasCardContainer?.visibility = View.GONE
+        binding.CanvasPreview?.visibility = View.GONE
+        binding.ScrollView.visibility = View.GONE
+        
+        // Hiển thị canvas full screen container
+        binding.CanvasFullScreenContainer?.visibility = View.VISIBLE
+        
+        // Setup canvas full screen - optimize to avoid blocking UI
+        val fullScreenCanvas = binding.root.findViewById<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView>(R.id.DrawingCanvasFullScreen)
+        if (fullScreenCanvas != null) {
+            // Load strokes nếu có - move to background if large
+            if (notallyModel.drawingStrokes.isNotEmpty()) {
+                if (notallyModel.drawingStrokes.size > 100) {
+                    // Large stroke list - load on background
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) {
+                            // Prepare strokes
+                        }
+                        withContext(Dispatchers.Main) {
+                            if (!isDestroyed && !isFinishing) {
+                                fullScreenCanvas.loadStrokes(notallyModel.drawingStrokes)
+                            }
+                        }
+                    }
+                } else {
+                    // Small stroke list - load directly
+                    fullScreenCanvas.loadStrokes(notallyModel.drawingStrokes)
+                }
+            }
+            
+            // Apply background
+            applySavedBackgroundToCanvasForView(fullScreenCanvas)
+            
+            // Enable drawing
+            fullScreenCanvas.isEnabled = !isCanvasViewOnly
+            
+            // Setup stroke listener for full screen canvas
+            fullScreenCanvas.setOnStrokesChangedListener {
+                if (isDrawingModeActive) {
+                    val canvas = getCurrentCanvas()
+                    if (canvas == fullScreenCanvas) {
+                        val ivUndo = binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView
+                        val ivRedo = binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView
+                        if (ivUndo != null && ivRedo != null) {
+                            updateDrawingUndoRedoButtons(ivUndo, ivRedo)
+                        }
+                    }
+                }
+            }
+            
+            // Animation: canvas fade in
+            fullScreenCanvas.alpha = 0f
+            fullScreenCanvas.animate()
+                .alpha(1f)
+                .setDuration(300)
+                .start()
+        }
+        
         isDrawingModeActive = true
+        
+        // Update toolbar: Ẩn AI và Pin, thay More bằng Save
+        val ivAI = binding.Toolbar.findViewById<View>(R.id.ivAI)
+        val ivPin = binding.Toolbar.findViewById<View>(R.id.ivPin)
+        val ivMore = binding.Toolbar.findViewById<View>(R.id.ivMore) as? ImageButton
+        
+        ivAI?.visibility = View.GONE
+        ivPin?.visibility = View.GONE
+        
+        // Thay More bằng Save
+        ivMore?.let { moreButton ->
+            moreButton.setImageResource(R.drawable.save)
+            moreButton.contentDescription = getString(R.string.save)
+            moreButton.setOnClickListener {
+                // Save canvas và back về edit
+                hideDrawingArea()
+            }
+        }
+        
         // Sync undo/redo state for drawing
         (binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView)?.let { ivUndo ->
             (binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView)?.let { ivRedo ->
                 updateDrawingUndoRedoButtons(ivUndo, ivRedo)
             }
         }
-
-        if (notallyModel.drawingStrokes.isNotEmpty()) {
-            binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
+    }
+    
+    private fun getCurrentCanvas(): com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView? {
+        val fullScreenCanvas = binding.root.findViewById<com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView>(R.id.DrawingCanvasFullScreen)
+        return if (fullScreenCanvas != null && binding.CanvasFullScreenContainer?.visibility == View.VISIBLE) {
+            fullScreenCanvas
+        } else {
+            binding.DrawingCanvas
         }
-
-        val postRunnable = Runnable {
-            if (isDestroyed || isFinishing) return@Runnable
-
-            val dividerTop = binding.DrawingDivider.top
-            val canvasTop = binding.DrawingCanvas.top
-            val dividerYRelative = (dividerTop - canvasTop).toFloat()
-            binding.DrawingCanvas.setDividerY(dividerYRelative)
-
-            val marginPx = dpToPx(20)
-            val bottomBarHeight = measureBottomBarHeight()
-            val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
-            applyCanvasLayout(availableHeight, marginPx)
-
-            if (
-                binding.ScrollView
-                    is com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView
-            ) {
-                (binding.ScrollView
-                        as
-                        com.philkes.notallyx.presentation.view.misc.NonScrollableNestedScrollView)
-                    .setScrollEnabled(false)
-            }
-
-            binding.ScrollView.smoothScrollTo(0, binding.DrawingCanvas.top)
-        }
-        postRunnables.add(postRunnable)
-        binding.ScrollView.post(postRunnable)
     }
 
     private fun applyAndPersistBackground(colorInt: Int, drawableResId: Int?) {
         notallyModel.drawingBackgroundColor = colorInt
         notallyModel.drawingBackgroundDrawableResId = drawableResId
 
-        if (drawableResId != null) {
-            binding.DrawingCanvas.setCanvasBackgroundDrawable(drawableResId)
-        } else {
-            binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
+        // Áp dụng background ngay lập tức lên canvas
+        binding.DrawingCanvas.post {
+            if (drawableResId != null) {
+                binding.DrawingCanvas.setCanvasBackgroundDrawable(drawableResId)
+            } else {
+                binding.DrawingCanvas.setCanvasBackgroundColor(colorInt)
+            }
+            // Force refresh canvas để hiển thị background mới
+            binding.DrawingCanvas.invalidate()
+            binding.DrawingCanvas.requestLayout()
         }
+        
         persistCurrentBackground()
     }
 
     private fun applySavedBackgroundToCanvas() {
+        applySavedBackgroundToCanvasForView(binding.DrawingCanvas)
+    }
+    
+    private fun applySavedBackgroundToCanvasForView(canvasView: com.philkes.notallyx.draw.ui.newdraw.view.canvas.DrawingCanvasView) {
         // Load persisted preference (per note). If not found, fallback to draft key (id=0) then
         // migrate.
         loadDrawingBackgroundPreference()?.let { (color, drawableResId) ->
@@ -1374,10 +1591,10 @@ abstract class EditActivity(private val type: Type) :
         }
 
         notallyModel.drawingBackgroundDrawableResId?.let { resId ->
-            binding.DrawingCanvas.setCanvasBackgroundDrawable(resId)
+            canvasView.setCanvasBackgroundDrawable(resId)
         }
             ?: run {
-                binding.DrawingCanvas.setCanvasBackgroundColor(notallyModel.drawingBackgroundColor)
+                canvasView.setCanvasBackgroundColor(notallyModel.drawingBackgroundColor)
             }
     }
 
@@ -1447,18 +1664,31 @@ abstract class EditActivity(private val type: Type) :
     private fun bgResKey(id: Long) = "bg_res_$id"
 
     private fun hideDrawingArea() {
-        val strokes = binding.DrawingCanvas.getStrokes()
-        if (strokes.isNotEmpty()) {
-            notallyModel.drawingStrokes = ArrayList(strokes)
-        } else {
-            notallyModel.drawingStrokes.clear()
+        // Lưu strokes từ canvas đang active
+        val canvas = getCurrentCanvas()
+        if (canvas != null) {
+            val strokes = canvas.getStrokes()
+            if (strokes.isNotEmpty()) {
+                notallyModel.drawingStrokes = ArrayList(strokes)
+            } else {
+                notallyModel.drawingStrokes.clear()
+            }
+            canvas.setBrush(null)
+            canvas.setZoomModeEnabled(false)
+            canvas.setEyeDropperMode(false)
+            canvas.isEnabled = false
         }
 
-        binding.DrawingCanvas.setBrush(null)
         currentDrawTool = null
-        binding.DrawingCanvas.setZoomModeEnabled(false)
-        binding.DrawingCanvas.setEyeDropperMode(false)
-        binding.DrawingCanvas.isEnabled = false
+        
+        // Reset view only flag
+        isCanvasViewOnly = false
+        
+        // Ẩn canvas full screen container
+        binding.CanvasFullScreenContainer?.visibility = View.GONE
+        
+        // Hiển thị lại ScrollView
+        binding.ScrollView.visibility = View.VISIBLE
 
         // Re-enable scroll
         if (
@@ -1470,15 +1700,30 @@ abstract class EditActivity(private val type: Type) :
                 .setScrollEnabled(true)
         }
 
-        // Keep canvas visible on note screen
-        binding.DrawingDivider.visibility = View.VISIBLE
-        binding.DrawingCanvas.visibility = View.VISIBLE
+        // Keep canvas preview visible on note screen (không phải canvas full)
+        binding.CanvasCardContainer?.visibility = View.VISIBLE
+        binding.DrawingCanvas.visibility = View.GONE
+        binding.CanvasPreview?.visibility = View.VISIBLE
+        
+        // Setup click listener để mở full screen VIEW (chỉ xem, không vẽ)
+        binding.CanvasCardContainer?.setOnClickListener {
+            openCanvasViewOnly()
+        }
+        
+        // Generate preview nếu có strokes
+        if (notallyModel.drawingStrokes.isNotEmpty()) {
+            generateCanvasPreview()
+        }
 
         // Hide tool picker and show FABs back
         hideDrawingToolPicker()
         showFABs()
 
         isDrawingModeActive = false
+        
+        // Restore toolbar icons
+        restoreToolbarAfterDrawing()
+        
         // Restore undo/redo state for note content
         (binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView)?.let { ivUndo ->
             (binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView)?.let { ivRedo ->
@@ -1491,15 +1736,33 @@ abstract class EditActivity(private val type: Type) :
             }
         }
     }
+    
+    private fun restoreToolbarAfterDrawing() {
+        // Restore AI, Pin, More icons
+        val ivAI = binding.Toolbar.findViewById<View>(R.id.ivAI)
+        val ivPin = binding.Toolbar.findViewById<View>(R.id.ivPin)
+        val ivMore = binding.Toolbar.findViewById<View>(R.id.ivMore) as? ImageButton
+        
+        ivAI?.visibility = View.VISIBLE
+        ivPin?.visibility = View.VISIBLE
+        
+        // Restore More icon (from Save back to More)
+        ivMore?.let { moreButton ->
+            moreButton.setImageResource(R.drawable.more_vert)
+            moreButton.contentDescription = getString(R.string.tap_for_more_options)
+            moreButton.setOnClickListener { openMoreMenu() }
+        }
+    }
 
     private fun enableEyeDropperMode() {
-        binding.DrawingCanvas.setEyeDropperMode(true)
-        binding.DrawingCanvas.setOnColorPickedListener { color ->
+        val canvas = getCurrentCanvas()
+        canvas?.setEyeDropperMode(true)
+        canvas?.setOnColorPickedListener { color ->
             currentDrawTool?.let { tool ->
                 val colorHex = String.format("#%06X", 0xFFFFFF and color)
                 val updatedTool = tool.copy(color = colorHex)
                 currentDrawTool = updatedTool
-                binding.DrawingCanvas.setBrush(updatedTool)
+                canvas.setBrush(updatedTool)
                 showToast("Color selected: $colorHex")
             }
         }
@@ -1507,8 +1770,9 @@ abstract class EditActivity(private val type: Type) :
     }
 
     private fun toggleZoomMode() {
-        val isZoomMode = binding.DrawingCanvas.isZoomModeEnabled()
-        binding.DrawingCanvas.setZoomModeEnabled(!isZoomMode)
+        val canvas = getCurrentCanvas()
+        val isZoomMode = canvas?.isZoomModeEnabled() ?: false
+        canvas?.setZoomModeEnabled(!isZoomMode)
 
         if (!isZoomMode) {
             showToast("Zoom mode enabled")
@@ -1639,38 +1903,20 @@ abstract class EditActivity(private val type: Type) :
         )
         setColor()
 
-        // Load drawing strokes v?o canvas n?u c?
+        // Load drawing strokes và hiển thị preview nếu có
         if (notallyModel.drawingStrokes.isNotEmpty()) {
-            binding.DrawingCanvas.loadStrokes(notallyModel.drawingStrokes)
-            // Hi?n th? divider v? canvas n?u c? strokes
-            binding.DrawingDivider.visibility = View.VISIBLE
-            binding.DrawingCanvas.visibility = View.VISIBLE
-            isDrawingModeActive = true
-            (binding.Toolbar.findViewById<View>(R.id.ivUndo) as? ImageView)?.let { ivUndo ->
-                (binding.Toolbar.findViewById<View>(R.id.ivRedo) as? ImageView)?.let { ivRedo ->
-                    updateDrawingUndoRedoButtons(ivUndo, ivRedo)
-                }
+            // Chỉ hiển thị preview card, không hiển thị canvas full
+            binding.CanvasCardContainer?.visibility = View.VISIBLE
+            binding.DrawingCanvas.visibility = View.GONE
+            binding.CanvasPreview?.visibility = View.VISIBLE
+            
+            // Setup click listener để mở full screen
+            binding.CanvasCardContainer?.setOnClickListener {
+                openFullScreenDrawing()
             }
-
-            // Set divider position
-            val postRunnable = Runnable {
-                if (isDestroyed || isFinishing) return@Runnable
-
-                val dividerTop = binding.DrawingDivider.top
-                val canvasTop = binding.DrawingCanvas.top
-                val dividerYRelative = (dividerTop - canvasTop).toFloat()
-                binding.DrawingCanvas.setDividerY(dividerYRelative)
-
-                val marginPx = dpToPx(20)
-                val bottomBarHeight = measureBottomBarHeight()
-                val availableHeight = computeAvailableCanvasHeight(bottomBarHeight, marginPx)
-                val contentHeight =
-                    computeContentHeightFromStrokes(notallyModel.drawingStrokes, dpToPx(50))
-                val targetHeight = max(availableHeight, contentHeight)
-                applyCanvasLayout(targetHeight, marginPx)
-            }
-            postRunnables.add(postRunnable)
-            binding.ScrollView.post(postRunnable)
+            
+            // Generate preview từ strokes
+            generateCanvasPreview()
         }
     }
 
@@ -2009,15 +2255,16 @@ abstract class EditActivity(private val type: Type) :
     protected open fun setColor() {
         colorInt = extractColor(notallyModel.color)
         
-        // Nếu là màu mặc định, dùng nền gradient cam/kem
+        // Nếu là note mới hoặc màu mặc định, dùng nền bg_background
         val isDefaultColor = notallyModel.color == com.philkes.notallyx.data.model.BaseNote.COLOR_DEFAULT
+        val isNewNote = notallyModel.isNewNote
+        val useDefaultBackground = isDefaultColor || isNewNote
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (isDefaultColor) {
-                // Thanh system dùng màu kem nhạt gần với nền home today
-                val bgColor = Color.parseColor("#FFE6C0")
-                window.statusBarColor = bgColor
-                window.navigationBarColor = bgColor
+            if (useDefaultBackground) {
+                // Thanh system trong suốt để hiển thị bg_background
+                window.statusBarColor = Color.TRANSPARENT
+                window.navigationBarColor = Color.TRANSPARENT
                 window.setLightStatusAndNavBar(true)
             } else {
             window.statusBarColor = colorInt
@@ -2027,10 +2274,9 @@ abstract class EditActivity(private val type: Type) :
         }
         
         binding.apply {
-            if (isDefaultColor) {
-                // Màn Edit dùng nền bg_background_layer full trên–dưới (giống Home Today)
-                val bg =
-                    ContextCompat.getDrawable(this@EditActivity, R.drawable.bg_background_layer)
+            if (useDefaultBackground) {
+                // Màn Edit mới dùng nền bg_background
+                val bg = ContextCompat.getDrawable(this@EditActivity, R.drawable.bg_background)
                 ScrollView.background = bg
                 root.background = bg
                 RecyclerView.background = bg

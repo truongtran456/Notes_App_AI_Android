@@ -13,6 +13,8 @@ import android.view.inputmethod.InputMethodManager
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
+import android.widget.TextView
+import android.widget.ImageView
 import androidx.appcompat.widget.PopupMenu
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
@@ -70,6 +72,18 @@ import com.philkes.notallyx.presentation.viewmodel.preference.NotesView
 import com.philkes.notallyx.presentation.viewmodel.preference.Theme
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences.Companion.START_VIEW_DEFAULT
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences.Companion.START_VIEW_UNLABELED
+import com.philkes.notallyx.presentation.viewmodel.preference.DateFormat
+import com.philkes.notallyx.presentation.viewmodel.preference.TextSize
+import com.philkes.notallyx.presentation.viewmodel.preference.NotesSort
+import com.philkes.notallyx.presentation.viewmodel.preference.NotesSortBy
+import com.philkes.notallyx.presentation.viewmodel.preference.SortDirection
+import com.philkes.notallyx.presentation.viewmodel.preference.ListItemSort
+import com.philkes.notallyx.databinding.DialogDateFormatBinding
+import com.philkes.notallyx.databinding.DialogNotesSortBinding
+import com.philkes.notallyx.databinding.DialogSelectionBoxBinding
+import com.philkes.notallyx.databinding.ChoiceItemBinding
+import com.philkes.notallyx.presentation.checkedTag
+import com.philkes.notallyx.presentation.select
 import com.philkes.notallyx.utils.backup.exportNotes
 import com.philkes.notallyx.utils.shareNote
 import com.philkes.notallyx.utils.showColorSelectDialog
@@ -127,44 +141,53 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     }
 
     private fun showAppearancePopup(anchor: View) {
-        val popup = PopupMenu(this, anchor)
-        popup.menuInflater.inflate(R.menu.menu_appearance_popup, popup.menu)
-
-        popup.setOnMenuItemClickListener { menuItem ->
-            when (menuItem.itemId) {
-                R.id.appearance_view -> {
-                    showViewChoiceDialog()
-                    true
-                }
-                R.id.appearance_theme -> {
-                    showThemeChoiceDialog()
-                    true
-                }
-                R.id.appearance_date_format -> {
-                    // TODO: Date format giống Settings
-                    true
-                }
-                R.id.appearance_text_size -> {
-                    // TODO: Text size giống Settings
-                    true
-                }
-                R.id.appearance_notes_sort -> {
-                    // TODO: Notes sort order giống Settings
-                    true
-                }
-                R.id.appearance_list_sort -> {
-                    // TODO: List item sorting giống Settings
-                    true
-                }
-                R.id.appearance_start_view -> {
-                    // TODO: Start view giống Settings
-                    true
-                }
-                else -> false
+        var popup: android.widget.PopupWindow? = null
+        val content = layoutInflater.inflate(R.layout.popup_appearance, null).apply {
+            findViewById<View>(R.id.itemView).setOnClickListener {
+                showViewChoiceDialog()
+                popup?.dismiss()
+            }
+            findViewById<View>(R.id.itemTheme).setOnClickListener {
+                showThemeChoiceDialog()
+                popup?.dismiss()
+            }
+            findViewById<View>(R.id.itemDateFormat).setOnClickListener {
+                showDateFormatDialog()
+                popup?.dismiss()
+            }
+            findViewById<View>(R.id.itemTextSize).setOnClickListener {
+                showTextSizeDialog()
+                popup?.dismiss()
+            }
+            findViewById<View>(R.id.itemNotesSort).setOnClickListener {
+                showNotesSortDialog()
+                popup?.dismiss()
+            }
+            findViewById<View>(R.id.itemListSort).setOnClickListener {
+                showListItemSortDialog()
+                popup?.dismiss()
+            }
+            findViewById<View>(R.id.itemStartView).setOnClickListener {
+                showStartViewDialog()
+                popup?.dismiss()
             }
         }
 
-        popup.show()
+        popup = android.widget.PopupWindow(
+            content,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+            true,
+        ).apply {
+            isOutsideTouchable = true
+            elevation = 8f
+        }
+
+        val location = IntArray(2)
+        anchor.getLocationOnScreen(location)
+        val anchorBottom = location[1] + anchor.height
+
+        popup.showAtLocation(binding.root, android.view.Gravity.TOP or android.view.Gravity.END, 0, anchorBottom)
     }
 
     private fun showViewChoiceDialog() {
@@ -181,21 +204,28 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val newValue = values[checkedItem]
                 baseModel.savePreference(preferences.notesView, newValue)
-                // Cập nhật ngay giao diện danh sách ghi chú
-                navigateToStartView()
+                // Đảm bảo quay lại Notes fragment sau khi chọn
+                ensureNotesFragmentVisible()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
     private fun applyBackgroundForTheme(theme: Theme) {
-        // Dùng gradient thống nhất cho toàn app
-        window.setBackgroundDrawableResource(R.drawable.bg_app_gradient)
-        binding.root.setBackgroundResource(R.drawable.bg_app_gradient)
-        binding.DrawerLayout.setBackgroundResource(R.drawable.bg_app_gradient)
-        // Đồng bộ màu thanh điều hướng với nền app để tránh ám đen
-        val navColor = ContextCompat.getColor(this, R.color.md_theme_background)
-        window.navigationBarColor = navColor
+        // Chỉ dùng gradient khi ở System mode, Light/Dark dùng màu thuần từ theme
+        if (theme == Theme.FOLLOW_SYSTEM) {
+            window.setBackgroundDrawableResource(R.drawable.bg_background)
+            binding.root.setBackgroundResource(R.drawable.bg_background)
+            binding.DrawerLayout.setBackgroundResource(R.drawable.bg_background)
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+        } else {
+            // Light/Dark mode: xóa gradient, dùng màu thuần từ theme
+            window.setBackgroundDrawable(null)
+            binding.root.background = null
+            binding.DrawerLayout.background = null
+            // Để theme tự động set màu status bar và navigation bar
+        }
     }
 
     private fun setupWindowInsets() {
@@ -225,13 +255,17 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             binding.Toolbar.updatePadding(top = statusBars.top)
             binding.HomeToolbar.updatePadding(top = statusBars.top)
             binding.NotesToolbar.updatePadding(top = statusBars.top)
+            binding.SettingsToolbar?.updatePadding(top = statusBars.top)
+            binding.RemindersToolbar?.updatePadding(top = statusBars.top)
+            binding.LabelsToolbar?.updatePadding(top = statusBars.top)
+            binding.DeletedToolbar?.updatePadding(top = statusBars.top)
             binding.ActionMode.updatePadding(top = statusBars.top)
             
             // Điều chỉnh margin bottom cho bottom bar theo chiều cao navigation bar
             // Chỉ set bottomMargin, không thay đổi margin khác
             val bottomBarBottomMargin = navBars.bottom
-            // FAB cần cao hơn bottom bar (68dp minHeight + 16dp margin + 16dp padding = 100dp) + nav bar
-            val fabMargin = resources.getDimensionPixelSize(R.dimen.dp_100) + navBars.bottom
+            // FAB cần cao hơn bottom bar (68dp minHeight + 16dp margin + 16dp padding = 100dp) + nav bar + thêm 30dp để tránh che
+            val fabMargin = resources.getDimensionPixelSize(R.dimen.dp_100) + navBars.bottom + resources.getDimensionPixelSize(R.dimen.dp_30)
             
             // BottomBarContainer là MaterialCardView trong ConstraintLayout
             val bottomBarContainer = binding.root.findViewById<ViewGroup>(R.id.BottomBarContainer)
@@ -273,8 +307,174 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                         )
                 }
                 applyBackgroundForTheme(newValue)
+                // Đảm bảo quay lại Notes fragment sau khi chọn
+                ensureNotesFragmentVisible()
             }
             .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showDateFormatDialog() {
+        val dateFormatValue = preferences.dateFormat.value
+        val applyToNoteViewValue = preferences.applyDateFormatInNoteView.value
+        val layout = DialogDateFormatBinding.inflate(layoutInflater, null, false)
+        
+        DateFormat.entries.forEachIndexed { idx, dateFormat ->
+            ChoiceItemBinding.inflate(layoutInflater).root.apply {
+                id = idx
+                text = dateFormat.getText(this@MainActivity)
+                tag = dateFormat
+                layout.DateFormatRadioGroup.addView(this)
+                if (dateFormat == dateFormatValue) {
+                    layout.DateFormatRadioGroup.check(this.id)
+                }
+            }
+        }
+
+        layout.ApplyToNoteView.isChecked = applyToNoteViewValue
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.date_format)
+            .setView(layout.root)
+            .setPositiveButton(R.string.save) { dialog, _ ->
+                dialog.cancel()
+                val dateFormat = layout.DateFormatRadioGroup.checkedTag() as DateFormat
+                val applyToNoteView = layout.ApplyToNoteView.isChecked
+                baseModel.savePreference(preferences.dateFormat, dateFormat)
+                baseModel.savePreference(preferences.applyDateFormatInNoteView, applyToNoteView)
+                // Đảm bảo quay lại Notes fragment sau khi chọn
+                ensureNotesFragmentVisible()
+            }
+            .setCancelButton()
+            .show()
+    }
+
+    private fun showTextSizeDialog() {
+        val current = preferences.textSize.value
+        val values = TextSize.values()
+        val items = values.map { getString(it.textResId) }.toTypedArray()
+        var checkedItem = values.indexOf(current).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.text_size)
+            .setSingleChoiceItems(items, checkedItem) { _, which ->
+                checkedItem = which
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val newValue = values[checkedItem]
+                baseModel.savePreference(preferences.textSize, newValue)
+                // Đảm bảo quay lại Notes fragment sau khi chọn
+                ensureNotesFragmentVisible()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showNotesSortDialog() {
+        val notesSort = preferences.notesSorting.value
+        val layout = DialogNotesSortBinding.inflate(layoutInflater, null, false)
+        
+        NotesSortBy.entries.forEachIndexed { idx, notesSortBy ->
+            ChoiceItemBinding.inflate(layoutInflater).root.apply {
+                id = idx
+                text = getString(notesSortBy.textResId)
+                tag = notesSortBy
+                layout.NotesSortByRadioGroup.addView(this)
+                setCompoundDrawablesRelativeWithIntrinsicBounds(notesSortBy.iconResId, 0, 0, 0)
+                if (notesSortBy == notesSort.sortedBy) {
+                    layout.NotesSortByRadioGroup.check(this.id)
+                }
+            }
+        }
+
+        SortDirection.entries.forEachIndexed { idx, sortDir ->
+            ChoiceItemBinding.inflate(layoutInflater).root.apply {
+                id = idx
+                text = getString(sortDir.textResId)
+                tag = sortDir
+                setCompoundDrawablesRelativeWithIntrinsicBounds(sortDir.iconResId, 0, 0, 0)
+                layout.NotesSortDirectionRadioGroup.addView(this)
+                if (sortDir == notesSort.sortDirection) {
+                    layout.NotesSortDirectionRadioGroup.check(this.id)
+                }
+            }
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.notes_sorted_by)
+            .setView(layout.root)
+            .setPositiveButton(R.string.save) { dialog, _ ->
+                dialog.cancel()
+                val newSortBy = layout.NotesSortByRadioGroup.checkedTag() as NotesSortBy
+                val newSortDirection = layout.NotesSortDirectionRadioGroup.checkedTag() as SortDirection
+                baseModel.savePreference(
+                    preferences.notesSorting,
+                    NotesSort(newSortBy, newSortDirection),
+                )
+                // Đảm bảo quay lại Notes fragment sau khi chọn
+                ensureNotesFragmentVisible()
+            }
+            .setCancelButton()
+            .show()
+    }
+
+    private fun showListItemSortDialog() {
+        val current = preferences.listItemSorting.value
+        val values = ListItemSort.values()
+        val items = values.map { getString(it.textResId) }.toTypedArray()
+        var checkedItem = values.indexOf(current).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.list_item_auto_sort)
+            .setSingleChoiceItems(items, checkedItem) { _, which ->
+                checkedItem = which
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val newValue = values[checkedItem]
+                baseModel.savePreference(preferences.listItemSorting, newValue)
+                // Đảm bảo quay lại Notes fragment sau khi chọn
+                ensureNotesFragmentVisible()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showStartViewDialog() {
+        val startViewValue = preferences.startView.value
+        val labels = baseModel.labels.value
+        val layout = DialogSelectionBoxBinding.inflate(layoutInflater, null, false)
+        layout.Message.setText(R.string.start_view_hint)
+        
+        val notesText = "${getText(R.string.notes)} (${getText(R.string.text_default)})"
+        val unlabeledText = getText(R.string.unlabeled).toString()
+        val textValue = when (startViewValue) {
+            START_VIEW_DEFAULT -> notesText
+            START_VIEW_UNLABELED -> unlabeledText
+            else -> startViewValue
+        }
+        
+        val values = mutableListOf(notesText to START_VIEW_DEFAULT, unlabeledText to START_VIEW_UNLABELED)
+            .apply { labels?.forEach { add(it to it) } }
+        var selected = values.indexOfFirst { it.first == textValue }.coerceAtLeast(0)
+        
+        layout.SelectionBox.apply {
+            setSimpleItems(values.map { it.first }.toTypedArray())
+            select(textValue)
+            setOnItemClickListener { _, _, position, _ -> selected = position }
+        }
+        
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.start_view)
+            .setView(layout.root)
+            .setPositiveButton(R.string.save) { dialog, _ ->
+                dialog.cancel()
+                val newValue = values[selected].second
+                baseModel.savePreference(preferences.startView, newValue)
+                if (!isStartViewFragment) {
+                    navigateToStartView()
+                }
+            }
+            .setCancelButton()
             .show()
     }
 
@@ -308,14 +508,22 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             binding.Toolbar?.isVisible = false
             binding.HomeToolbar?.isVisible = true
             binding.NotesToolbar?.isVisible = false
-        } else if (currentDestination == R.id.Notes || currentDestination == R.id.DisplayLabel || currentDestination == R.id.Unlabeled || currentDestination == R.id.Checklist) {
+            binding.SettingsToolbar?.isVisible = false
+            } else if (currentDestination == R.id.Notes || currentDestination == R.id.DisplayLabel || currentDestination == R.id.Unlabeled) {
             binding.Toolbar?.isVisible = false
             binding.HomeToolbar?.isVisible = false
             binding.NotesToolbar?.isVisible = true
+            binding.SettingsToolbar?.isVisible = false
+        } else if (currentDestination == R.id.Settings) {
+            binding.Toolbar?.isVisible = false
+            binding.HomeToolbar?.isVisible = false
+            binding.NotesToolbar?.isVisible = false
+            binding.SettingsToolbar?.isVisible = true
         } else {
             binding.Toolbar?.isVisible = true
             binding.HomeToolbar?.isVisible = false
             binding.NotesToolbar?.isVisible = false
+            binding.SettingsToolbar?.isVisible = false
         }
 
         setupActivityResultLaunchers()
@@ -324,7 +532,11 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         if (fragmentIdToLoad != -1) {
             navController.navigate(fragmentIdToLoad, Bundle())
         } else if (savedInstanceState == null) {
-            navigateToStartView()
+            // Đảm bảo navigate vào Home Today ngay từ đầu
+            // Sử dụng post để đảm bảo view đã được inflate hoàn toàn
+            binding.root.post {
+                navigateToStartView()
+            }
         }
 
         onBackPressedDispatcher.addCallback(
@@ -334,9 +546,17 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                     if (baseModel.actionMode.enabled.value) {
                         return
                     }
-                    if (!isStartViewFragment) {
+                    val currentDestination = navController.currentDestination?.id
+                    // Nếu đang ở Notes, DisplayLabel, hoặc Unlabeled, back về Home
+                    if (currentDestination == R.id.Notes || 
+                        currentDestination == R.id.DisplayLabel || 
+                        currentDestination == R.id.Unlabeled) {
+                        navigateWithAnimation(R.id.Home)
+                    } else if (!isStartViewFragment) {
+                        // Các fragment khác: về start view
                         navigateToStartView()
                     } else {
+                        // Đã ở start view: finish app
                         finish()
                     }
                 }
@@ -347,11 +567,16 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
 
     private fun getStartViewNavigation(): Pair<Int, Bundle> {
         return when (val startView = preferences.startView.value) {
-            START_VIEW_DEFAULT -> Pair(R.id.Home, Bundle()) // Home là màn hình đầu tiên
+            START_VIEW_DEFAULT -> Pair(R.id.Home, Bundle()) // Home là màn hình đầu tiên (mặc định)
             START_VIEW_UNLABELED -> Pair(R.id.Unlabeled, Bundle())
             else -> {
-                val bundle = Bundle().apply { putString(EXTRA_DISPLAYED_LABEL, startView) }
-                Pair(R.id.DisplayLabel, bundle)
+                // Nếu startView là empty string hoặc null, mặc định về Home
+                if (startView.isNullOrEmpty()) {
+                    Pair(R.id.Home, Bundle())
+                } else {
+                    val bundle = Bundle().apply { putString(EXTRA_DISPLAYED_LABEL, startView) }
+                    Pair(R.id.DisplayLabel, bundle)
+                }
             }
         }
     }
@@ -359,6 +584,23 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     private fun navigateToStartView() {
         val (id, bundle) = getStartViewNavigation()
         navController.navigate(id, bundle)
+    }
+
+    /**
+     * Đảm bảo Notes fragment được hiển thị sau khi chọn các tùy chọn trong "more" menu.
+     * Nếu đang ở Notes fragment thì giữ nguyên, nếu không thì navigate về Notes.
+     */
+    private fun ensureNotesFragmentVisible() {
+        val currentDestination = navController.currentDestination?.id
+        // Nếu đang ở Notes, DisplayLabel, hoặc Unlabeled thì giữ nguyên
+        if (currentDestination == R.id.Notes || 
+            currentDestination == R.id.DisplayLabel || 
+            currentDestination == R.id.Unlabeled) {
+            // Đã ở Notes fragment, không cần làm gì
+            return
+        }
+        // Nếu không, navigate về Notes
+        navController.navigate(R.id.Notes)
     }
 
     // Trạng thái FAB menu
@@ -372,8 +614,21 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     
     // Track postDelayed runnables for cleanup
     private val fabPostRunnables = mutableListOf<Runnable>()
+    private val bottomBarPostRunnables = mutableListOf<Runnable>()
     
     private fun setupFAB() {
+        // Set gradient background cho tất cả FAB bằng cách dùng backgroundTintList với màu trung gian
+        // FloatingActionButton không hỗ trợ gradient trực tiếp, nên dùng ColorStateList với màu trung gian
+        val gradientColor = Color.parseColor("#6D3FEF") // Màu tím đậm
+        val colorStateList = ColorStateList.valueOf(gradientColor)
+        
+        binding.MainFab.backgroundTintList = colorStateList
+        binding.MainFab.imageTintList = ColorStateList.valueOf(Color.WHITE)
+        binding.TakeNote.backgroundTintList = colorStateList
+        binding.TakeNote.imageTintList = ColorStateList.valueOf(Color.WHITE)
+        binding.MakeList.backgroundTintList = colorStateList
+        binding.MakeList.imageTintList = ColorStateList.valueOf(Color.WHITE)
+        
         // Main FAB (dấu +) - click để toggle expand/collapse menu
         binding.MainFab.setOnClickListener {
             animateFAB()
@@ -562,11 +817,18 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     private val searchDebounceHandler = android.os.Handler(android.os.Looper.getMainLooper())
     
     private fun setupHomeTopBar() {
+        // Set màu đen cho các icon trên toolbar
+        val iconColor = Color.BLACK
+        binding.HomeMenuButton?.imageTintList = ColorStateList.valueOf(iconColor)
+        binding.HomeSearchButton?.imageTintList = ColorStateList.valueOf(iconColor)
+        
         binding.HomeMenuButton?.setOnClickListener {
             binding.DrawerLayout.openDrawer(GravityCompat.START)
         }
         binding.HomeSearchButton?.setOnClickListener { toggleSearch() }
         binding.HomeAddButton?.setOnClickListener { homeAddListener?.invoke() }
+        // Set màu tím đậm cho nút + trong toolbar
+        binding.HomeAddButton?.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.app_title_color))
         
         // Debounce search input to avoid lag when typing
         binding.HomeSearchInput?.addTextChangedListener(object : TextWatcher {
@@ -586,6 +848,11 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     }
 
     private fun setupNotesTopBar() {
+        // Set màu đen cho các icon trên toolbar
+        val iconColor = Color.BLACK
+        binding.NotesMenuButton?.imageTintList = ColorStateList.valueOf(iconColor)
+        binding.NotesSearchButton?.imageTintList = ColorStateList.valueOf(iconColor)
+        
         // NotesMenuButton và NotesSearchButton sẽ được setup trong setupActionMode()
         // để xử lý cả normal mode và action mode
         
@@ -602,7 +869,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         }
         // Đảm bảo icon more luôn hiển thị và có màu đen
         binding.NotesMoreButton?.visibility = View.VISIBLE
-        binding.NotesMoreButton?.imageTintList = ColorStateList.valueOf(Color.BLACK)
+        binding.NotesMoreButton?.imageTintList = ColorStateList.valueOf(iconColor)
         
         // Debounce search input to avoid lag when typing
         binding.NotesSearchInput?.addTextChangedListener(object : TextWatcher {
@@ -713,6 +980,8 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
 
     private fun buildDrawerEntries(labels: List<String>): List<DrawerEntry> {
         val list = mutableListOf<DrawerEntry>()
+        // Home
+        list.add(DrawerEntry.Item("home", getString(R.string.home), R.drawable.notebook))
         // Notes
         list.add(DrawerEntry.Item("notes", getString(R.string.notes), R.drawable.notebook))
         // Study Sets (học từ vựng) ngay dưới Notes
@@ -737,11 +1006,15 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 R.drawable.notifications,
             )
         )
-        if (labels.isNotEmpty()) {
-            list.add(DrawerEntry.Section("labels_header", getString(R.string.labels)))
-            list.addAll(labels.map { DrawerEntry.Child(id = "label:$it", title = it) })
-        }
-        list.add(DrawerEntry.Section("storage_header", getString(R.string.nav_storage)))
+        // Labels - ngang bằng với các item khác, không có label con
+        list.add(
+            DrawerEntry.Item(
+                "labels",
+                getString(R.string.labels),
+                R.drawable.label,
+            )
+        )
+        // Archived - ngang bằng, không có section Storage
         list.add(
             DrawerEntry.Item(
                 "archived",
@@ -749,6 +1022,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 R.drawable.archive,
             )
         )
+        // Deleted - ngang bằng, không có section Storage
         list.add(
             DrawerEntry.Item(
                 "deleted",
@@ -756,7 +1030,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 R.drawable.delete,
             )
         )
-        list.add(DrawerEntry.Section("settings_header", getString(R.string.settings)))
+        // Settings - ngang bằng, không có section Settings
         list.add(
             DrawerEntry.Item(
                 "settings",
@@ -776,13 +1050,11 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
 
     private fun handleDrawerItemClick(id: String) {
         when {
+            id == "home" -> navigateWithAnimation(R.id.Home)
             id == "notes" -> navigateWithAnimation(R.id.Notes)
             id == "studysets" -> navigateWithAnimation(R.id.Checklist)
             id == "unlabeled" -> navigateWithAnimation(R.id.Unlabeled)
-            id.startsWith("label:") -> {
-                val label = id.removePrefix("label:")
-                            navigateToLabel(label)
-            }
+            id == "labels" -> navigateWithAnimation(R.id.Labels)
             id == "deleted" -> navigateWithAnimation(R.id.Deleted)
             id == "archived" -> navigateWithAnimation(R.id.Archived)
             id == "reminders" -> navigateWithAnimation(R.id.Reminders)
@@ -831,8 +1103,15 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         
         binding.NotesSearchButton?.setOnClickListener {
             if (baseModel.actionMode.isEnabled()) {
-                // Trong action mode: delete
-                moveNotes(Folder.DELETED)
+                // Trong action mode: delete hoặc unarchive tùy theo folder
+                val currentFolder = baseModel.folder.value ?: Folder.NOTES
+                if (currentFolder == Folder.ARCHIVED) {
+                    // Ở Archive: unarchive (xóa khỏi lưu trữ, trả về Notes)
+                    moveNotes(Folder.NOTES)
+                } else {
+                    // Ở Notes: delete (xóa vào thùng rác)
+                    moveNotes(Folder.DELETED)
+                }
             } else {
                 // Normal mode: toggle search
                 toggleNotesSearch()
@@ -853,15 +1132,35 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             }
 
         baseModel.actionMode.enabled.observe(this) { enabled ->
+            // Luôn update toolbar khi action mode thay đổi, nhưng chỉ hiển thị nếu đang ở Notes, Archive, hoặc Deleted
+            val currentDestination = navController.currentDestination?.id
+            val isNotesOrArchiveOrDeleted = currentDestination == R.id.Notes || currentDestination == R.id.Archived || 
+                                           currentDestination == R.id.DisplayLabel || currentDestination == R.id.Unlabeled ||
+                                           currentDestination == R.id.Deleted
+            
             TransitionManager.beginDelayedTransition(binding.RelativeLayout, transition)
             if (enabled) {
-                // Chuyển NotesToolbar sang action mode
-                switchNotesToolbarToActionMode()
-                binding.DrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                // Chỉ chuyển toolbar sang action mode nếu đang ở Notes, Archive, hoặc Deleted
+                if (isNotesOrArchiveOrDeleted) {
+                    if (currentDestination == R.id.Deleted) {
+                        // Ở Deleted: hiển thị DeletedToolbar với action mode
+                        switchDeletedToolbarToActionMode()
+                    } else {
+                        // Ở Notes/Archive: dùng NotesToolbar với action mode
+                        switchNotesToolbarToActionMode()
+                    }
+                    binding.DrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                }
             } else {
-                // Trả NotesToolbar về normal mode
-                switchNotesToolbarToNormalMode()
-                binding.DrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNDEFINED)
+                // Trả toolbar về normal mode
+                if (isNotesOrArchiveOrDeleted) {
+                    if (currentDestination == R.id.Deleted) {
+                        switchDeletedToolbarToNormalMode()
+                    } else {
+                        switchNotesToolbarToNormalMode()
+                    }
+                    binding.DrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNDEFINED)
+                }
             }
             actionModeCancelCallback.isEnabled = enabled
         }
@@ -902,6 +1201,48 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         
         // More button: setup action mode menu
         setupActionModeMoreMenu(baseModel.folder.value ?: Folder.NOTES)
+    }
+    
+    private fun switchDeletedToolbarToActionMode() {
+        // Đổi icon menu thành X
+        binding.DeletedMenuButton?.setImageResource(R.drawable.close)
+        binding.DeletedMenuButton?.contentDescription = getString(R.string.cancel)
+        
+        // Ẩn title
+        binding.DeletedTitle?.visibility = View.GONE
+        
+        // Hiển thị restore và delete buttons
+        binding.DeletedRestoreButton?.visibility = View.VISIBLE
+        binding.DeletedDeleteButton?.visibility = View.VISIBLE
+        
+        // Setup click listeners
+        binding.DeletedMenuButton?.setOnClickListener {
+            baseModel.actionMode.close(true)
+        }
+        binding.DeletedRestoreButton?.setOnClickListener {
+            moveNotes(Folder.NOTES)
+        }
+        binding.DeletedDeleteButton?.setOnClickListener {
+            deleteForever()
+        }
+    }
+    
+    private fun switchDeletedToolbarToNormalMode() {
+        // Đổi icon X thành menu
+        binding.DeletedMenuButton?.setImageResource(R.drawable.menu)
+        binding.DeletedMenuButton?.contentDescription = getString(R.string.navigation_drawer_open)
+        
+        // Hiển thị title
+        binding.DeletedTitle?.visibility = View.VISIBLE
+        
+        // Ẩn restore và delete buttons
+        binding.DeletedRestoreButton?.visibility = View.GONE
+        binding.DeletedDeleteButton?.visibility = View.GONE
+        
+        // Setup menu button để mở drawer
+        binding.DeletedMenuButton?.setOnClickListener {
+            binding.DrawerLayout.openDrawer(GravityCompat.START)
+        }
     }
     
     private fun switchNotesToolbarToNormalMode() {
@@ -1006,6 +1347,9 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                     }
                 }
                 Folder.ARCHIVED -> {
+                    menu.add(R.string.delete, R.drawable.delete) {
+                        moveNotes(Folder.DELETED)
+                    }
                     menu.add(R.string.unarchive, R.drawable.unarchive) {
                         moveNotes(Folder.NOTES)
                     }
@@ -1086,7 +1430,35 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 }
             }
             
+            // Set icon tint color to #9787FF for all menu items
+            for (i in 0 until menu.size()) {
+                val item = menu.getItem(i)
+                item.icon?.setTint(android.graphics.Color.parseColor("#9787FF"))
+            }
+            
             popup.show()
+            
+            // Set text color programmatically after menu is shown
+            try {
+                val popupMenuHelper = popup.javaClass.getDeclaredField("mPopup")
+                popupMenuHelper.isAccessible = true
+                val menuPopupHelper = popupMenuHelper.get(popup)
+                val menuView = menuPopupHelper.javaClass.getDeclaredMethod("getMenuView").invoke(menuPopupHelper) as android.view.ViewGroup
+                for (i in 0 until menuView.childCount) {
+                    val itemView = menuView.getChildAt(i)
+                    if (itemView is android.widget.LinearLayout) {
+                        for (j in 0 until itemView.childCount) {
+                            val child = itemView.getChildAt(j)
+                            if (child is android.widget.TextView) {
+                                child.setTextColor(ContextCompat.getColor(this, R.color.color3D2A00))
+                                child.textSize = resources.getDimension(R.dimen.sp_14) / resources.displayMetrics.scaledDensity
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Fallback: use theme
+            }
         }
     }
 
@@ -1228,19 +1600,25 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 binding.Toolbar.navigationIcon = null
             } else {
                 supportActionBar?.setDisplayHomeAsUpEnabled(true)
+                // Set màu đen cho navigation icon
+                val navIcon = ContextCompat.getDrawable(this, androidx.appcompat.R.drawable.abc_ic_ab_back_material)
+                navIcon?.setTint(android.graphics.Color.BLACK)
+                binding.Toolbar.navigationIcon = navIcon
                     }
             
             selectedDrawerId =
                 when (destination.id) {
+                    R.id.Home -> "home"
                     R.id.DisplayLabel -> {
                         val label = bundle?.getString(EXTRA_DISPLAYED_LABEL)
                         baseModel.currentLabel = label ?: CURRENT_LABEL_EMPTY
-                        label?.let { "label:$it" } ?: "labels"
+                        "labels" // Highlight Labels item when viewing a specific label
                     }
                 R.id.Unlabeled -> {
                     baseModel.currentLabel = CURRENT_LABEL_NONE
                         "unlabeled"
                 }
+                    R.id.Labels -> "labels"
                     R.id.Deleted -> "deleted"
                     R.id.Archived -> "archived"
                     R.id.Reminders -> "reminders"
@@ -1282,23 +1660,128 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                 binding.Toolbar?.isVisible = false // Ẩn toolbar mặc định
                 binding.HomeToolbar?.isVisible = true // Hiển thị Home toolbar
                 binding.NotesToolbar?.isVisible = false
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
                 collapseNotesSearch(clearText = true, hideKeyboard = true)
-            } else if (destination.id == R.id.Notes || destination.id == R.id.DisplayLabel || destination.id == R.id.Unlabeled || destination.id == R.id.Checklist) {
+            } else if (destination.id == R.id.Checklist) {
+                // Hiển thị Notes toolbar cho Study Sets nhưng không có nút more
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false
+                binding.HomeToolbar?.isVisible = false
+                binding.NotesToolbar?.isVisible = true
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
+                // Ẩn nút more ở Study Sets
+                binding.NotesMoreButton?.visibility = View.GONE
+                binding.NotesMoreButton?.isVisible = false
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else if (destination.id == R.id.Notes || destination.id == R.id.DisplayLabel || destination.id == R.id.Unlabeled) {
                 // Hiển thị Notes toolbar (giống Home nhưng không có avatar và có nút more)
                 supportActionBar?.setDisplayShowTitleEnabled(false)
                 binding.Toolbar?.isVisible = false // Ẩn toolbar mặc định
                 binding.HomeToolbar?.isVisible = false // Đảm bảo HomeToolbar bị ẩn
                 binding.NotesToolbar?.isVisible = true // Hiển thị Notes toolbar
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
                 // Đảm bảo icon more luôn hiển thị
                 binding.NotesMoreButton?.visibility = View.VISIBLE
                 binding.NotesMoreButton?.isVisible = true
                 collapseSearch(clearText = true, hideKeyboard = true)
                 collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else if (destination.id == R.id.Archived) {
+                // Hiển thị Notes toolbar cho Archive
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false
+                binding.HomeToolbar?.isVisible = false
+                binding.NotesToolbar?.isVisible = true
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
+                // Đảm bảo icon more luôn hiển thị
+                binding.NotesMoreButton?.visibility = View.VISIBLE
+                binding.NotesMoreButton?.isVisible = true
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else if (destination.id == R.id.Settings) {
+                // Settings: hiển thị SettingsToolbar với menu 3 gạch và chữ Settings
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false
+                binding.HomeToolbar?.isVisible = false
+                binding.NotesToolbar?.isVisible = false
+                binding.SettingsToolbar?.isVisible = true
+                binding.LabelsToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
+                // Setup menu button
+                binding.SettingsMenuButton?.setOnClickListener {
+                    binding.DrawerLayout.openDrawer(GravityCompat.START)
+                }
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else if (destination.id == R.id.Labels) {
+                // Labels: hiển thị LabelsToolbar với menu 3 gạch và chữ Labels
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false
+                binding.HomeToolbar?.isVisible = false
+                binding.NotesToolbar?.isVisible = false
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = true
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
+                // Setup menu button
+                binding.LabelsMenuButton?.setOnClickListener {
+                    binding.DrawerLayout.openDrawer(GravityCompat.START)
+                }
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else if (destination.id == R.id.Deleted) {
+                // Deleted: hiển thị DeletedToolbar với menu 3 gạch và chữ Deleted
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false
+                binding.HomeToolbar?.isVisible = false
+                binding.NotesToolbar?.isVisible = false
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = true
+                // Setup menu button (sẽ được override trong action mode)
+                switchDeletedToolbarToNormalMode()
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
+            } else if (destination.id == R.id.Reminders) {
+                // Reminders: hiển thị RemindersToolbar với menu 3 gạch và chữ Reminders
+                supportActionBar?.setDisplayShowTitleEnabled(false)
+                binding.Toolbar?.isVisible = false
+                binding.HomeToolbar?.isVisible = false
+                binding.NotesToolbar?.isVisible = false
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = true
+                // Setup menu button
+                binding.RemindersMenuButton?.setOnClickListener {
+                    binding.DrawerLayout.openDrawer(GravityCompat.START)
+                }
+                collapseSearch(clearText = true, hideKeyboard = true)
+                collapseNotesSearch(clearText = true, hideKeyboard = true)
             } else {
+                // Các trang khác
                 supportActionBar?.setDisplayShowTitleEnabled(true)
                 binding.Toolbar?.isVisible = true // Hiển thị toolbar mặc định
                 binding.HomeToolbar?.isVisible = false
                 binding.NotesToolbar?.isVisible = false
+                binding.SettingsToolbar?.isVisible = false
+                binding.LabelsToolbar?.isVisible = false
+                binding.DeletedToolbar?.isVisible = false
+                binding.RemindersToolbar?.isVisible = false
                 collapseSearch(clearText = true, hideKeyboard = true)
                 collapseNotesSearch(clearText = true, hideKeyboard = true)
             }
@@ -1335,6 +1818,137 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
 
     private var isUpdatingBottomBar = false // Flag để tránh loop khi update programmatically
     
+    /**
+     * Cập nhật màu icon và text của bottom bar item thành màu trắng khi được chọn
+     */
+    private fun updateBottomBarItemColors(bottomBar: ExpandableBottomBar, menuItem: Any) {
+        try {
+            // Tìm view của menu item
+            val itemId = when {
+                menuItem is MenuItem -> menuItem.itemId
+                else -> {
+                    try {
+                        val getItemIdMethod = menuItem.javaClass.getMethod("getItemId")
+                        getItemIdMethod.invoke(menuItem) as? Int
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+            } ?: return
+            
+            // Delay một chút để đảm bảo view đã được render
+            val updateColorsRunnable = Runnable {
+                // Tìm tất cả các item views trong bottom bar
+                val allItemViews = findAllItemViews(bottomBar)
+                
+                // Set màu và background cho tất cả items
+                allItemViews.forEach { (view, id) ->
+                    val iconView = findImageViewInView(view)
+                    val textView = findTextViewInView(view)
+                    
+                    if (id == itemId) {
+                        // Item được chọn: màu trắng và background gradient
+                        iconView?.setColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
+                        textView?.setTextColor(android.graphics.Color.WHITE)
+                        // Set background gradient cho item được chọn
+                        val gradientDrawable = ContextCompat.getDrawable(this, R.drawable.bg_filter_pill_selected)
+                        view.background = gradientDrawable
+                        // Đảm bảo padding cho background (8dp horizontal, 4dp vertical)
+                        val paddingH = (8 * resources.displayMetrics.density).toInt()
+                        val paddingV = (4 * resources.displayMetrics.density).toInt()
+                        view.setPadding(paddingH, paddingV, paddingH, paddingV)
+                    } else {
+                        // Item không được chọn: màu xám và background trong suốt
+                        iconView?.setColorFilter(android.graphics.Color.parseColor("#9787FF"), android.graphics.PorterDuff.Mode.SRC_IN)
+                        textView?.setTextColor(android.graphics.Color.parseColor("#9787FF"))
+                        view.background = null
+                        view.setPadding(0, 0, 0, 0)
+                    }
+                }
+            }
+            bottomBarPostRunnables.add(updateColorsRunnable)
+            bottomBar.postDelayed(updateColorsRunnable, 100) // Delay 100ms để đảm bảo view đã render
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * Cập nhật màu bottom bar item bằng itemId trực tiếp
+     */
+    private fun updateBottomBarItemColorsById(bottomBar: ExpandableBottomBar, itemId: Int) {
+        val updateColorsByIdRunnable = Runnable {
+            val allItemViews = findAllItemViews(bottomBar)
+            allItemViews.forEach { (view, id) ->
+                val iconView = findImageViewInView(view)
+                val textView = findTextViewInView(view)
+                
+                if (id == itemId) {
+                    iconView?.setColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
+                    textView?.setTextColor(android.graphics.Color.WHITE)
+                    val gradientDrawable = ContextCompat.getDrawable(this, R.drawable.bg_filter_pill_selected)
+                    view.background = gradientDrawable
+                    // Đảm bảo padding cho background (8dp horizontal, 4dp vertical)
+                    val paddingH = (8 * resources.displayMetrics.density).toInt()
+                    val paddingV = (4 * resources.displayMetrics.density).toInt()
+                    view.setPadding(paddingH, paddingV, paddingH, paddingV)
+                } else {
+                    iconView?.setColorFilter(android.graphics.Color.parseColor("#9787FF"), android.graphics.PorterDuff.Mode.SRC_IN)
+                    textView?.setTextColor(android.graphics.Color.parseColor("#9787FF"))
+                    view.background = null
+                    view.setPadding(0, 0, 0, 0)
+                }
+            }
+        }
+        bottomBarPostRunnables.add(updateColorsByIdRunnable)
+        bottomBar.postDelayed(updateColorsByIdRunnable, 100)
+    }
+    
+    private fun findAllItemViews(parent: ViewGroup): List<Pair<View, Int>> {
+        val result = mutableListOf<Pair<View, Int>>()
+        for (i in 0 until parent.childCount) {
+            val child = parent.getChildAt(i)
+            if (child.id != View.NO_ID && (child.id == R.id.icon_home || 
+                child.id == R.id.icon_notes || 
+                child.id == R.id.icon_list || 
+                child.id == R.id.icon_settings)) {
+                result.add(Pair(child, child.id))
+            }
+            if (child is ViewGroup) {
+                result.addAll(findAllItemViews(child))
+            }
+        }
+        return result
+    }
+    
+    private fun findImageViewInView(view: View): android.widget.ImageView? {
+        if (view is android.widget.ImageView) {
+            return view
+        }
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val child = view.getChildAt(i)
+                val result = findImageViewInView(child)
+                if (result != null) return result
+            }
+        }
+        return null
+    }
+    
+    private fun findTextViewInView(view: View): TextView? {
+        if (view is TextView) {
+            return view
+        }
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                val child = view.getChildAt(i)
+                val result = findTextViewInView(child)
+                if (result != null) return result
+            }
+        }
+        return null
+    }
+
     private fun setupExpandableBottomBar() {
         val bottomBar = binding.root.findViewById<ExpandableBottomBar>(R.id.expandable_bottom_bar)
             ?: return
@@ -1352,6 +1966,9 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
         
         // Dùng onItemSelectedListener của ExpandableBottomBar
         bottomBar.onItemSelectedListener = { view, menuItem, byUser ->
+            // Set màu trắng cho icon và text của item được chọn
+            updateBottomBarItemColors(bottomBar, menuItem)
+            
             // Chỉ xử lý nếu không đang update programmatically
             if (!isUpdatingBottomBar) {
                 // Lấy itemId từ menuItem
@@ -1413,22 +2030,32 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
                     val selectMethod = bottomBar.javaClass.getMethod("select", Int::class.java, Boolean::class.java)
                     isUpdatingBottomBar = true
                     selectMethod.invoke(bottomBar, menuItemId, false) // false = không trigger listener
+                    
+                    // Set màu trắng cho icon và text của item được chọn
+                    updateBottomBarItemColorsById(bottomBar, menuItemId)
+                    
                     // Reset flag sau một chút
-                    bottomBar.postDelayed({ isUpdatingBottomBar = false }, 100)
+                    val resetFlagRunnable = Runnable { isUpdatingBottomBar = false }
+                    bottomBarPostRunnables.add(resetFlagRunnable)
+                    bottomBar.postDelayed(resetFlagRunnable, 100)
                 } catch (e: Exception) {
                     // Nếu không có method select, thử cách khác
                     isUpdatingBottomBar = false
                     // Fallback: tìm view và trigger click programmatically
                     try {
                         // Tìm view bằng cách duyệt qua children
-                        bottomBar.postDelayed({
+                        val findViewRunnable = Runnable {
                             val view = findViewByMenuItemId(bottomBar, menuItemId)
                             if (view != null && view.isClickable) {
                                 isUpdatingBottomBar = true
                                 view.performClick()
-                                bottomBar.postDelayed({ isUpdatingBottomBar = false }, 200)
+                                val resetFlagRunnable2 = Runnable { isUpdatingBottomBar = false }
+                                bottomBarPostRunnables.add(resetFlagRunnable2)
+                                bottomBar.postDelayed(resetFlagRunnable2, 200)
                             }
-                        }, 50)
+                        }
+                        bottomBarPostRunnables.add(findViewRunnable)
+                        bottomBar.postDelayed(findViewRunnable, 50)
                     } catch (e2: Exception) {
                         // Ignore
                         e2.printStackTrace()
@@ -1641,7 +2268,7 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     }
 
     fun setupHomeAvatarButton(onClick: () -> Unit) {
-        binding.HomeAppAvatarCard?.setOnClickListener { onClick() }
+        binding.HomeAppAvatar?.setOnClickListener { onClick() }
     }
     
     fun setupHomeSearch(onQueryChange: (String) -> Unit) {
@@ -1655,6 +2282,8 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
     fun setupHomeAddButton(onClick: () -> Unit) {
         homeAddListener = onClick
         binding.HomeAddButton?.setOnClickListener { homeAddListener?.invoke() }
+        // Set màu tím đậm cho nút + trong toolbar
+        binding.HomeAddButton?.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.app_title_color))
     }
 
     override fun onDestroy() {
@@ -1672,6 +2301,16 @@ class MainActivity : LockedActivity<ActivityMainBinding>() {
             }
         }
         fabPostRunnables.clear()
+        
+        // Cleanup bottom bar postDelayed runnables
+        bottomBarPostRunnables.forEach { runnable ->
+            try {
+                binding.expandableBottomBar?.removeCallbacks(runnable)
+            } catch (e: Exception) {
+                // Ignore if views are already destroyed
+            }
+        }
+        bottomBarPostRunnables.clear()
         // Cancel animations
         try {
             binding.MainFab?.clearAnimation()

@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="-16dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="?attr/colorSurfaceContainerHigh">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Top toolbar: 44dp height, rounded top corners, 8 items with 24dp spacing -->
+        <LinearLayout
+            android:id="@+id/TopToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:background="@drawable/bg_format_toolbar_top"
+            android:clipToPadding="false">
+
+            <ImageView
+                android:id="@+id/IconFont"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/font"
+                android:contentDescription="Font"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconSize"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/size"
+                android:contentDescription="Size"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconEllipse"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ellipse20"
+                android:contentDescription="Text Color"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconBold"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/bold"
+                android:contentDescription="Bold"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconItalic"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/italic"
+                android:contentDescription="Italic"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconUnderline"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/underline"
+                android:contentDescription="Underline"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconTextLine"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/textlight"
+                android:contentDescription="Strikethrough"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconTextHighlight"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/texthightlight"
+                android:contentDescription="Text Highlight"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp" />
+
+            <ImageView
+                android:id="@+id/IconJustify"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/alignmiddle"
+                android:contentDescription="Justify"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="2dp"
+                app:tint="#6D3FEF" />
+
+        </LinearLayout>
+
+        <!-- Bottom section: Font, Size, Color -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp">
+
+            <!-- Font row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Font"
+                    android:textColor="@color/color3D2A00"
+                    android:textSize="@dimen/sp_16" />
+
+                <TextView
+                    android:id="@+id/CurrentFont"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Inknut Antiqua"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+            </LinearLayout>
+
+            <!-- Size row with slider -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Size"
+                    android:textColor="@color/color3D2A00"
+                    android:textSize="@dimen/sp_16"
+                    android:layout_marginEnd="16dp" />
+
+                <com.philkes.notallyx.common.ui.view.sliderview.SliderView
+                    android:id="@+id/SizeSliderView"
+                    android:layout_width="0dp"
+                    android:layout_height="20dp"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="8dp" />
+
+                <TextView
+                    android:id="@+id/CurrentSize"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="14"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:layout_marginStart="16dp"
+                    android:minWidth="60dp"
+                    android:maxWidth="60dp"
+                    android:background="@drawable/bg_corner_20"
+                    android:gravity="center"
+                    android:paddingVertical="4dp"
+                    android:paddingHorizontal="8dp" />
+
+            </LinearLayout>
+
+            <!-- Color row: Ellipse + Color + Divider + 4 alignment items -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingVertical="12dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Color"
+                    android:textColor="@color/color3D2A00"
+                    android:textSize="@dimen/sp_16"
+                    android:layout_marginEnd="16dp" />
+
+                <!-- Ellipse icon (clickable to open color picker) -->
+                <ImageView
+                    android:id="@+id/ColorEllipse"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ellipse20"
+                    android:contentDescription="Text Color"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    android:layout_marginEnd="4dp"
+                    app:tint="#6D3FEF" />
+
+                <!-- Current color swatch -->
+                <View
+                    android:id="@+id/ColorSwatch"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/bg_color_swatch"
+                    android:layout_marginEnd="16dp" />
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="24dp"
+                    android:background="?attr/colorOutline"
+                    android:layout_marginEnd="16dp" />
+
+                <!-- Alignment and list items -->
+                <ImageView
+                    android:id="@+id/IconAlignLeft"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/alignleft"
+                    android:contentDescription="Align Left"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    android:layout_marginEnd="12dp"
+                    app:tint="#6D3FEF" />
+
+                <ImageView
+                    android:id="@+id/IconAlignMiddle"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/alignmiddle"
+                    android:contentDescription="Align Center"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    android:layout_marginEnd="12dp"
+                    app:tint="#6D3FEF" />
+
+                <ImageView
+                    android:id="@+id/IconAlignRight"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/alignright"
+                    android:contentDescription="Align Right"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    android:layout_marginEnd="12dp"
+                    app:tint="#6D3FEF" />
+
+                <ImageView
+                    android:id="@+id/IconList"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/format_list_bulleted"
+                    android:contentDescription="Bullet List"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    android:layout_marginEnd="12dp"
+                    app:tint="#6D3FEF" />
+
+                <ImageView
+                    android:id="@+id/IconListNumbered"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/format_list_numbered"
+                    android:contentDescription="Numbered List"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    android:layout_marginEnd="12dp"
+                    app:tint="#6D3FEF" />
+
+                <ImageView
+                    android:id="@+id/IconListDash"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/textlight"
+                    android:contentDescription="Dash List"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    android:layout_marginEnd="12dp"
+                    app:tint="#6D3FEF" />
+
+                <ImageView
+                    android:id="@+id/IconListPlus"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/list"
+                    android:contentDescription="Plus List"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:padding="2dp"
+                    app:tint="#6D3FEF" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>
+
+

@@ -365,15 +365,56 @@ class ListItemVH(
         (this * binding.root.resources.displayMetrics.density).toInt()
 
     private fun renderStatus(item: ListItem, position: Int, status: ListItemAdapter.WordStatus) {
-        val view = binding.StatusIcon
-        val (label, color) =
-            when (status) {
-                ListItemAdapter.WordStatus.NEW -> "●" to android.R.color.darker_gray
-                ListItemAdapter.WordStatus.LEARNING -> "↺" to android.R.color.holo_orange_dark
-                ListItemAdapter.WordStatus.MASTERED -> "✓" to android.R.color.holo_green_dark
+        // Hiển thị status badge đẹp hơn
+        val statusBadgeContainer = binding.StatusBadgeContainer
+        val statusBadge = binding.StatusBadge
+        val statusIcon = binding.StatusIcon
+        val statusText = binding.StatusText
+        
+        when (status) {
+            ListItemAdapter.WordStatus.NEW -> {
+                // Ẩn badge cho NEW status
+                statusBadgeContainer.visibility = View.GONE
             }
-        view.text = label
-        view.setTextColor(ContextCompat.getColor(view.context, color))
-        view.setOnClickListener { onStatusClick(item, position) }
+            ListItemAdapter.WordStatus.LEARNING -> {
+                statusBadgeContainer.visibility = View.VISIBLE
+                statusBadge.setCardBackgroundColor(android.graphics.Color.parseColor("#E3F2FD"))
+                statusIcon.text = "●"
+                statusIcon.setTextColor(android.graphics.Color.parseColor("#2196F3"))
+                statusText.text = "Learning"
+                statusText.setTextColor(android.graphics.Color.parseColor("#2196F3"))
+            }
+            ListItemAdapter.WordStatus.WEAK -> {
+                statusBadgeContainer.visibility = View.VISIBLE
+                statusBadge.setCardBackgroundColor(android.graphics.Color.parseColor("#FFF3E0"))
+                statusIcon.text = "📚"
+                statusIcon.setTextColor(android.graphics.Color.parseColor("#FF9800"))
+                statusText.text = "Weak"
+                statusText.setTextColor(android.graphics.Color.parseColor("#FF9800"))
+            }
+            ListItemAdapter.WordStatus.MASTERED -> {
+                statusBadgeContainer.visibility = View.VISIBLE
+                statusBadge.setCardBackgroundColor(android.graphics.Color.parseColor("#E8F5E9"))
+                statusIcon.text = "✓"
+                statusIcon.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+                statusText.text = "Learned"
+                statusText.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
+            }
+        }
+        
+        // Click để cycle status
+        statusBadgeContainer.setOnClickListener { onStatusClick(item, position) }
+        
+        // Hiển thị More button để cycle status
+        binding.MoreButton.setOnClickListener { onStatusClick(item, position) }
+        
+        // Hiển thị Speak button nếu có text
+        val word = item.body.trim()
+        if (word.isNotBlank()) {
+            binding.SpeakButton.visibility = View.VISIBLE
+            binding.SpeakButton.setOnClickListener { onSpeakClick(word) }
+        } else {
+            binding.SpeakButton.visibility = View.GONE
+        }
     }
 }

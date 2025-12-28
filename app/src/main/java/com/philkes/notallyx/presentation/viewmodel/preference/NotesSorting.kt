@@ -59,7 +59,7 @@ enum class NotesSortBy(val textResId: Int, val iconResId: Int, val value: String
 }
 
 data class NotesSort(
-    val sortedBy: NotesSortBy = NotesSortBy.CREATION_DATE,
+    val sortedBy: NotesSortBy = NotesSortBy.MODIFIED_DATE, // Changed to MODIFIED_DATE
     val sortDirection: SortDirection = SortDirection.DESC,
 ) : TextProvider {
     override fun getText(context: Context): String {

@@ -55,7 +55,9 @@ class ListItemAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ListItemVH {
         val inflater = LayoutInflater.from(parent.context)
         val binding = RecyclerListItemBinding.inflate(inflater, parent, false)
-        binding.root.background = parent.background
+        // KHÔNG set background cho item để tránh khoảng cách quá lớn
+        // binding.root.background = parent.background
+        binding.root.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         return ListItemVH(
             binding,
             listManager,
@@ -172,12 +174,14 @@ class ListItemAdapter(
     enum class WordStatus {
         NEW,
         LEARNING,
+        WEAK,
         MASTERED;
 
         fun next(): WordStatus =
             when (this) {
                 NEW -> LEARNING
-                LEARNING -> MASTERED
+                LEARNING -> WEAK
+                WEAK -> MASTERED
                 MASTERED -> NEW
             }
     }

@@ -2,14 +2,65 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_background">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/Toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:navigationIcon="?attr/homeAsUpIndicator"
-        app:title="@string/edit_reminders" />
+        android:background="@android:color/transparent"
+        app:contentInsetEnd="16dp"
+        app:navigationIcon="@null">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp">
+
+            <ImageButton
+                android:id="@+id/RemindersBackButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_circular_button_ripple"
+                android:src="?attr/homeAsUpIndicator"
+                android:contentDescription="@string/cancel"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <TextView
+                android:id="@+id/RemindersTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="@string/edit_reminders"
+                android:textColor="@color/app_title_dark_purple"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+            <ImageButton
+                android:id="@+id/RemindersAddButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_circular_button_ripple"
+                android:src="@drawable/add"
+                android:contentDescription="@string/add_reminder"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </com.google.android.material.appbar.MaterialToolbar>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/RecyclerView"

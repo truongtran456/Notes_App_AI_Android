@@ -12,7 +12,7 @@
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/bg_background_layer"
+        android:background="@drawable/bg_background"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -84,27 +84,17 @@
                         android:paddingEnd="12dp"
                         android:background="@drawable/bg_search_pill">
 
-                        <com.google.android.material.card.MaterialCardView
-                            android:id="@+id/HomeAppAvatarCard"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:layout_marginEnd="12dp"
-                            app:cardCornerRadius="20dp"
-                            app:cardElevation="0dp"
-                            app:strokeWidth="0dp"
-                            app:cardBackgroundColor="@android:color/transparent"
+                        <ImageView
+                            android:id="@+id/HomeAppAvatar"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="16dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo"
+                            android:contentDescription="@string/app_name"
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toTopOf="parent"
-                            app:layout_constraintBottom_toBottomOf="parent">
-
-                            <ImageView
-                                android:id="@+id/HomeAppAvatar"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:scaleType="centerCrop"
-                android:src="@drawable/ic_avatar"
-                                android:contentDescription="@string/app_name" />
-                        </com.google.android.material.card.MaterialCardView>
+                            app:layout_constraintBottom_toBottomOf="parent" />
 
                         <TextView
                             android:id="@+id/HomeSearchHint"
@@ -114,7 +104,7 @@
                             android:text="@string/search"
                             android:textColor="@color/nav_text_secondary"
                             android:textSize="15sp"
-                            app:layout_constraintStart_toEndOf="@id/HomeAppAvatarCard"
+                            app:layout_constraintStart_toEndOf="@id/HomeAppAvatar"
                             app:layout_constraintEnd_toStartOf="@id/HomeSearchButton"
                             app:layout_constraintTop_toTopOf="parent"
                             app:layout_constraintBottom_toBottomOf="parent" />
@@ -133,7 +123,7 @@
                             android:textColor="@color/nav_text_primary"
                             android:textColorHint="@color/nav_text_secondary"
                             android:visibility="gone"
-                            app:layout_constraintStart_toEndOf="@id/HomeAppAvatarCard"
+                            app:layout_constraintStart_toEndOf="@id/HomeAppAvatar"
                             app:layout_constraintEnd_toStartOf="@id/HomeSearchButton"
                             app:layout_constraintTop_toTopOf="parent"
                             app:layout_constraintBottom_toBottomOf="parent" />
@@ -316,6 +306,232 @@
 
         </com.google.android.material.appbar.MaterialToolbar>
 
+        <!-- Settings Toolbar (giống Notes nhưng không có more và search, có chữ Settings) -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/SettingsToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:contentDescription="SettingsToolbar"
+            android:visibility="gone"
+            app:contentInsetEnd="16dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <ImageButton
+                    android:id="@+id/SettingsMenuButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_circular_button_ripple"
+                    android:src="@drawable/menu"
+                    android:contentDescription="@string/navigation_drawer_open"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/SettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings"
+                    android:textColor="@color/app_title_dark_purple"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- Reminders Toolbar (giống Settings nhưng có chữ Reminders) -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/RemindersToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:contentDescription="RemindersToolbar"
+            android:visibility="gone"
+            app:contentInsetEnd="16dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <ImageButton
+                    android:id="@+id/RemindersMenuButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_circular_button_ripple"
+                    android:src="@drawable/menu"
+                    android:contentDescription="@string/navigation_drawer_open"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/RemindersTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/reminders"
+                    android:textColor="@color/app_title_dark_purple"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- Labels Toolbar (giống Settings) -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/LabelsToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:contentDescription="LabelsToolbar"
+            android:visibility="gone"
+            app:contentInsetEnd="16dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <ImageButton
+                    android:id="@+id/LabelsMenuButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_circular_button_ripple"
+                    android:src="@drawable/menu"
+                    android:contentDescription="@string/navigation_drawer_open"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/LabelsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/select_labels"
+                    android:textColor="@color/app_title_dark_purple"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- Deleted Toolbar (giống Settings nhưng có thêm buttons cho action mode) -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/DeletedToolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:contentDescription="DeletedToolbar"
+            android:visibility="gone"
+            app:contentInsetEnd="16dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="12dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <ImageButton
+                    android:id="@+id/DeletedMenuButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_circular_button_ripple"
+                    android:src="@drawable/menu"
+                    android:contentDescription="@string/navigation_drawer_open"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <TextView
+                    android:id="@+id/DeletedTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/deleted"
+                    android:textColor="@color/app_title_dark_purple"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <!-- Action mode buttons (ẩn mặc định) -->
+                <ImageButton
+                    android:id="@+id/DeletedRestoreButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_circular_button_ripple"
+                    android:src="@drawable/restore"
+                    android:contentDescription="@string/restore"
+                    android:visibility="gone"
+                    app:layout_constraintEnd_toStartOf="@id/DeletedDeleteButton"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+                <ImageButton
+                    android:id="@+id/DeletedDeleteButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_circular_button_ripple"
+                    android:src="@drawable/delete"
+                    android:contentDescription="@string/delete_forever"
+                    android:visibility="gone"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/ActionMode"
             android:layout_width="match_parent"
@@ -332,7 +548,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             app:barrierDirection="bottom"
-            app:constraint_referenced_ids="Toolbar,HomeToolbar,NotesToolbar,ActionMode" />
+            app:constraint_referenced_ids="Toolbar,HomeToolbar,NotesToolbar,SettingsToolbar,RemindersToolbar,LabelsToolbar,DeletedToolbar,ActionMode" />
 
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/NavHostFragment"
@@ -366,7 +582,7 @@
                 android:id="@+id/expandable_bottom_bar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="64dp"
+                android:minHeight="40dp"
                 app:exb_backgroundCornerRadius="0dp"
                 app:exb_backgroundColor="@android:color/transparent"
                 app:exb_elevation="0dp"
@@ -380,7 +596,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="16dp"
-            android:layout_marginBottom="100dp"
+            android:layout_marginBottom="140dp"
             android:clipChildren="false"
             android:clipToPadding="false"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -421,7 +637,6 @@
                 android:contentDescription="@string/add"
                 android:tooltipText="@string/add"
                 style="@style/FloatingActionButtonPrimary"
-                android:background="@drawable/bg_add_color_palette"
                 app:srcCompat="@drawable/add" />
 
         </FrameLayout>

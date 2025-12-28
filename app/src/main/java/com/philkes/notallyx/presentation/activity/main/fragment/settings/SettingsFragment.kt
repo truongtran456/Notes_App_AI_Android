@@ -82,8 +82,10 @@ class SettingsFragment : Fragment() {
     ): View {
         val binding = FragmentSettingsBinding.inflate(inflater)
 
-        // Luôn dùng nền gradient Home Today cho Settings
-        binding.root.setBackgroundResource(R.drawable.bg_background_layer)
+        // Chỉ dùng gradient khi ở System mode, Light/Dark dùng màu thuần
+        if (model.preferences.theme.value == Theme.FOLLOW_SYSTEM) {
+            binding.root.setBackgroundResource(R.drawable.bg_background)
+        }
 
         model.preferences.apply {
             setupAppearance(binding)

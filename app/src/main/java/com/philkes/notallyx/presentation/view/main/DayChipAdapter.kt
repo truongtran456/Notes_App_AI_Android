@@ -60,11 +60,13 @@ class DayChipAdapter(
             
             binding.root.background = if (selected) selectedDrawable else unselectedDrawable
             
+            // Selected: background is gradient (#FF8400 -> #FFC340), text should be white for contrast
+            // Unselected: background is light, text is dark
             val primary = if (selected) android.graphics.Color.WHITE else 0xFF1A1A1A.toInt()
-            val secondary = if (selected) 0xFFEEEEEE.toInt() else 0xFF5A5A5A.toInt()
+            val secondary = if (selected) android.graphics.Color.WHITE else 0xFF5A5A5A.toInt()
             binding.DayOfWeek.setTextColor(primary)
             binding.DayOfMonth.setTextColor(primary)
-            binding.Month.setTextColor(if (selected) primary else secondary)
+            binding.Month.setTextColor(secondary)
 
             binding.root.setOnClickListener {
                 onSelect(chip.date)

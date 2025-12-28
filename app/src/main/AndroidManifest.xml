@@ -78,6 +78,7 @@
         </activity>
 
         <activity android:name=".presentation.activity.note.ViewImageActivity" />
+        <activity android:name=".presentation.activity.note.ViewCanvasActivity" />
 
         <activity android:name=".presentation.activity.note.SelectLabelsActivity" />
 

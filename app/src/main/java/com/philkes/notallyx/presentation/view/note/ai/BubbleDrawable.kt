@@ -17,7 +17,7 @@ class BubbleDrawable(
     private val arrowHeight: Float,
     private val arrowX: Float, // Vị trí X của mũi nhọn (tính từ trái)
     private val fillColor: Int = Color.WHITE,
-    private val strokeColor: Int = 0xFFE0E0E0.toInt(),
+    private val strokeColor: Int = android.graphics.Color.parseColor("#9787FF"), // #9787FF
     private val strokeWidth: Float = 1f
 ) : Drawable() {
 

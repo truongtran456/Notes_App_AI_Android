@@ -363,19 +363,19 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             // V? strokeBitmap (?ang v? v?i eraser) - ?� copy t? layerBitmap v� x�a m?t ph?n
             strokeBitmap?.let { canvas.drawBitmap(it, 0f, 0f, null) }
         } else {
+            // Vẽ tất cả saved strokes trước
+            savedStrokes.forEach { stroke ->
+                if (stroke.brush != Brush.HardEraser && stroke.brush != Brush.SoftEraser) {
+                    val path = DrawingStroke.stringToPath(stroke.pathData)
+                    val paint = createPaintFromStroke(stroke)
+                    canvas.drawPath(path, paint)
+                }
+            }
+            
             // V? b�nh th??ng: v? t? layerBitmap ho?c t? strokes
-            if (layerBitmap != null) {
+            if (layerBitmap != null && hasEraserBeenUsed) {
                 // V? t? layerBitmap (?� ???c update v?i eraser)
                 canvas.drawBitmap(layerBitmap!!, 0f, 0f, null)
-            } else {
-                // Fallback: v? t? strokes (khi ch?a c� layerBitmap)
-                savedStrokes.forEach { stroke ->
-                    if (stroke.brush != Brush.HardEraser && stroke.brush != Brush.SoftEraser) {
-                        val path = DrawingStroke.stringToPath(stroke.pathData)
-                        val paint = createPaintFromStroke(stroke)
-                        canvas.drawPath(path, paint)
-                    }
-                }
             }
 
             // V? c�c paths hi?n t?i (?ang v? - kh�ng ph?i eraser)
@@ -767,14 +767,19 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     /** L?y bitmap ?� v? (?? l?u ho?c export) */
     fun getDrawingBitmap(): Bitmap? {
         if (width <= 0 || height <= 0) {
-            // N?u ch?a c� k�ch th??c, t?o bitmap t?i thi?u
+            // Nếu chưa có kích thước, tạo bitmap tối thiểu
             val minWidth = 100
             val minHeight = 100
             val bitmap = Bitmap.createBitmap(minWidth, minHeight, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
-            canvas.drawColor(Color.WHITE)
+            
+            // Vẽ background (màu hoặc drawable)
+            backgroundBitmap?.let { bmp ->
+                val dest = android.graphics.Rect(0, 0, minWidth, minHeight)
+                canvas.drawBitmap(bmp, null, dest, null)
+            } ?: canvas.drawColor(canvasBackgroundColor)
 
-            // V? strokes
+            // Vẽ strokes
             savedStrokes.forEach { stroke ->
                 val path = DrawingStroke.stringToPath(stroke.pathData)
                 val paint = createPaintFromStroke(stroke)
@@ -784,21 +789,24 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
             return bitmap
         }
 
-        // T?o bitmap v?i t?t c? drawing
+        // Tạo bitmap với tất cả drawing
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        // V? n?n tr?ng
-        canvas.drawColor(Color.WHITE)
+        // Vẽ background (màu hoặc drawable) thay vì màu trắng
+        backgroundBitmap?.let { bmp ->
+            val dest = android.graphics.Rect(0, 0, width, height)
+            canvas.drawBitmap(bmp, null, dest, null)
+        } ?: canvas.drawColor(canvasBackgroundColor)
 
-        // V? saved strokes
+        // Vẽ saved strokes
         savedStrokes.forEach { stroke ->
             val path = DrawingStroke.stringToPath(stroke.pathData)
             val paint = createPaintFromStroke(stroke)
             canvas.drawPath(path, paint)
         }
 
-        // V? paths hi?n t?i
+        // Vẽ paths hiện tại
         paths.forEach { drawingPath -> canvas.drawPath(drawingPath.path, drawingPath.paint) }
 
         return bitmap

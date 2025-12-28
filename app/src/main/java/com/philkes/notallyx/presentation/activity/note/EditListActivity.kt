@@ -5,12 +5,16 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.philkes.notallyx.presentation.view.vocab.VocabStatAdapter
+import com.philkes.notallyx.presentation.view.vocab.VocabStatItem
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.gson.Gson
 import com.google.gson.JsonParser
@@ -22,6 +26,10 @@ import com.philkes.notallyx.data.model.Type
 import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.presentation.activity.ai.AISummaryActivity
+import com.philkes.notallyx.presentation.activity.ai.TextMcqQuizActivity
+import com.philkes.notallyx.data.api.models.VocabQuiz
+import com.philkes.notallyx.data.api.models.MCQ
+import android.content.Intent
 import com.philkes.notallyx.presentation.dp
 import com.philkes.notallyx.presentation.setOnNextAction
 import com.philkes.notallyx.presentation.showToast
@@ -153,14 +161,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                     popup?.dismiss()
                 }
                 findViewById<View>(R.id.itemExport).setOnClickListener {
-                    val exportMenu = PopupMenu(this@EditListActivity, anchor, Gravity.END)
-                    ExportMimeType.entries.forEach { mime: ExportMimeType ->
-                        exportMenu.menu.add(mime.name).setOnMenuItemClickListener {
-                            export(mime)
-                            true
-                        }
-                    }
-                    exportMenu.show()
+                    showExportDialog()
                     popup?.dismiss()
                 }
                 findViewById<View>(R.id.itemChangeColor).setOnClickListener {
@@ -384,50 +385,24 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         val completedCountView = sheetView.findViewById<TextView>(R.id.CompletedCount)
         completedCountView.text = "$completedCount/$totalCount completed"
 
-        // Hiển thị thống kê từng từ với card design
-        val statsContainer = sheetView.findViewById<LinearLayout>(R.id.VocabStatsContainer)
-        statsContainer.removeAllViews()
-
-        vocabStats.values
+        // Hiển thị thống kê từng từ với RecyclerView
+        val statsRecyclerView = sheetView.findViewById<RecyclerView>(R.id.VocabStatsRecyclerView)
+        statsRecyclerView.layoutManager = LinearLayoutManager(this)
+        
+        val vocabStatItems = vocabStats.values
             .sortedByDescending { it.percentage }
-            .forEach { stat ->
-                val itemView = layoutInflater.inflate(R.layout.item_vocab_stat, statsContainer, false)
-                
-                // Title
-                val vocabTitle = itemView.findViewById<TextView>(R.id.VocabTitle)
-                vocabTitle.text = stat.vocab.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-
-                // Progress text (giống format "8 / 8 hours" -> "2 / 7")
-                val progressText = itemView.findViewById<TextView>(R.id.ProgressText)
-                progressText.text = "${stat.earnedPoints} / ${stat.maxPoints}"
-
-                // Percentage
-                val percentageText = itemView.findViewById<TextView>(R.id.PercentageText)
-                percentageText.text = "${stat.percentage}%"
-                
-                // Màu sắc theo phần trăm (xanh cho >= 80%, cam cho >= 60%, đỏ cho < 60%)
-                val colorRes = when {
-                    stat.percentage >= 80 -> android.R.color.holo_green_dark
-                    stat.percentage >= 60 -> android.R.color.holo_orange_dark
-                    else -> android.R.color.holo_red_dark
-                }
-                val color = ContextCompat.getColor(this, colorRes)
-                percentageText.setTextColor(color)
-
-                // Progress bar - set max = 100 và progress = percentage
-                val progressBar = itemView.findViewById<com.google.android.material.progressindicator.LinearProgressIndicator>(R.id.ProgressBar)
-                progressBar.max = 100
-                progressBar.setProgressCompat(stat.percentage, true) // animated
-                progressBar.setIndicatorColor(color)
-                progressBar.trackColor = ContextCompat.getColor(this, android.R.color.darker_gray)
-                
-                // Icon color - màu xanh lá cho tất cả (giống hình)
-                val icon = itemView.findViewById<android.widget.ImageView>(R.id.Icon)
-                val iconColor = ContextCompat.getColor(this, android.R.color.holo_green_dark)
-                icon.setColorFilter(iconColor)
-
-                statsContainer.addView(itemView)
+            .map { stat ->
+                VocabStatItem(
+                    vocab = stat.vocab,
+                    earnedPoints = stat.earnedPoints,
+                    maxPoints = stat.maxPoints,
+                    percentage = stat.percentage
+                )
             }
+        
+        val adapter = VocabStatAdapter()
+        statsRecyclerView.adapter = adapter
+        adapter.submitList(vocabStatItems)
 
         dialog.setContentView(sheetView)
         dialog.show()
@@ -556,21 +531,39 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     }
     
     private fun processVocabAIForOption(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
-        // Collect checked items (vocabulary words)
-        val checkedItems =
-            items
-                .toMutableList()
+        // Với SUMMARY (bảng dịch từ vựng), không cần tick - lấy TẤT CẢ items
+        // Với các chức năng khác, phải tick chọn từ trước
+        val allItems = items.toMutableList()
+        
+        val vocabItems = if (option.type == com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY) {
+            // SUMMARY: Lấy TẤT CẢ items, không cần checked
+            allItems
+                .map { it.body.toString().trim() }
+                .filter { it.isNotBlank() }
+        } else {
+            // Các chức năng khác: Chỉ lấy checked items
+            allItems
                 .filter { it.checked }
                 .map { it.body.toString().trim() }
                 .filter { it.isNotBlank() }
+        }
+
+        // Debug logging
+        android.util.Log.d("EditListActivity", "Option type: ${option.type}")
+        android.util.Log.d("EditListActivity", "Total items: ${allItems.size}")
+        android.util.Log.d("EditListActivity", "Vocab items count: ${vocabItems.size}")
+        android.util.Log.d("EditListActivity", "Vocab items: $vocabItems")
 
         // Collect all items (for better content hash, including unchecked items)
-        val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
-        val checkedVocabItems = checkedItems.joinToString("\n")
+        val allItemsText = allItems.joinToString("\n") { item -> item.body.toString() }
+        val checkedVocabItems = vocabItems.joinToString("\n")
+
+        android.util.Log.d("EditListActivity", "checkedVocabItems: '$checkedVocabItems'")
 
         val attachmentUris = getAttachedFileUris()
 
         if (checkedVocabItems.isBlank() && attachmentUris.isEmpty()) {
+            android.util.Log.e("EditListActivity", "ERROR: checkedVocabItems is blank!")
             showToast(R.string.ai_error_empty_note)
             return
         }
@@ -913,17 +906,10 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             )
         }
 
-        // Vocab MCQ
+        // Vocab MCQ - Start quiz trực tiếp, bỏ qua chọn difficulty
         sheetView.findViewById<View>(R.id.ActionVocabMCQ).setOnClickListener {
             dialog.dismiss()
-            AISummaryActivity.startWithResult(
-                context = this,
-                summaryResponse = cachedResult,
-                noteId = notallyModel.id,
-                showAllSections = false,
-                initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
-                isVocabMode = true,
-            )
+            startChecklistMcqFlow(cachedResult)
         }
 
         // Flashcards
@@ -1078,7 +1064,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             }
         }
 
-        // Fetch mới cho từ này
+        // Fetch mới cho từ này - KHÔNG dùng cache vì chỉ xử lý 1 từ
         val attachments = getAttachedFileUris()
         val loadingDialog =
             android.app.ProgressDialog(this).apply {
@@ -1102,7 +1088,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                             noteId = ensureBackendNoteIdForVocab(notallyModel.id, null),
                             contentType = "checklist",
                             checkedVocabItems = word,
-                            useCache = true,
+                            useCache = false,  // KHÔNG dùng cache khi chỉ xử lý 1 từ
                         )
                     }
 
@@ -1489,5 +1475,159 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             "ensureBackendNoteIdForVocab: localNoteId=$localNoteId or no hash, generating temporary UUID",
         )
         return UUID.randomUUID().toString()
+    }
+
+    private fun showExportDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_export_format, null)
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
+        
+        // Ensure dialog can display full content
+        dialog.window?.let { window ->
+            window.setLayout(
+                (resources.displayMetrics.widthPixels * 0.9).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            window.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+
+        val formatGrid = dialogView.findViewById<android.widget.GridLayout>(R.id.FormatGrid)
+        val buttonCancel = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.ButtonCancel)
+        val buttonExport = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.ButtonExport)
+
+        // Map format to icon drawable
+        val formatIconMap = mapOf(
+            ExportMimeType.TXT to R.drawable.txt,
+            ExportMimeType.PDF to R.drawable.pdf,
+            ExportMimeType.JSON to R.drawable.json,
+            ExportMimeType.HTML to R.drawable.html,
+            ExportMimeType.JPEG to R.drawable.jpeg,
+            ExportMimeType.TIFF to R.drawable.tiff
+        )
+
+        var selectedFormat: ExportMimeType? = null
+
+        // Create format items
+        ExportMimeType.entries.forEach { format ->
+            val itemView = layoutInflater.inflate(R.layout.item_export_format, formatGrid, false)
+            val formatIcon = itemView.findViewById<android.widget.ImageView>(R.id.FormatIcon)
+            val formatText = itemView.findViewById<android.widget.TextView>(R.id.FormatText)
+            val formatCard = itemView as com.google.android.material.card.MaterialCardView
+
+            formatIcon.setImageResource(formatIconMap[format] ?: R.drawable.note)
+            
+            // For TXT, HTML, JSON: icon is 32x32 inside larger canvas (76x62) with transparent background
+            // ImageView is wrapped in 32dp FrameLayout, ImageView itself is 76dp x 62dp
+            // Using centerCrop will crop to show only the center portion (the icon)
+            when (format) {
+                ExportMimeType.TXT, ExportMimeType.HTML, ExportMimeType.JSON -> {
+                    // ImageView is already 76dp x 62dp in layout, centerCrop will show center (icon)
+                    formatIcon.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                }
+                else -> {
+                    // PDF, JPEG, TIFF: icons are already correct size, resize ImageView to 32dp
+                    formatIcon.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    val density = resources.displayMetrics.density
+                    formatIcon.layoutParams.width = (32 * density).toInt()
+                    formatIcon.layoutParams.height = (32 * density).toInt()
+                }
+            }
+            formatIcon.adjustViewBounds = false
+            formatText.text = format.name
+
+            // Set initial selection (first item)
+            if (format == ExportMimeType.entries.first()) {
+                selectedFormat = format
+                formatCard.strokeColor = android.graphics.Color.parseColor("#FF9800")
+                formatCard.strokeWidth = 2
+            } else {
+                formatCard.strokeColor = android.graphics.Color.TRANSPARENT
+                formatCard.strokeWidth = 0
+            }
+
+            itemView.setOnClickListener {
+                // Reset all cards
+                for (i in 0 until formatGrid.childCount) {
+                    val child = formatGrid.getChildAt(i) as? com.google.android.material.card.MaterialCardView
+                    child?.strokeColor = android.graphics.Color.TRANSPARENT
+                    child?.strokeWidth = 0
+                }
+                // Select clicked card
+                formatCard.strokeColor = android.graphics.Color.parseColor("#FF9800")
+                formatCard.strokeWidth = 2
+                selectedFormat = format
+            }
+
+            // Calculate row and column based on index
+            val index = ExportMimeType.entries.indexOf(format)
+            val row = index / 3
+            val col = index % 3
+            
+            val params = android.widget.GridLayout.LayoutParams().apply {
+                width = 0
+                height = android.widget.GridLayout.LayoutParams.WRAP_CONTENT
+                setMargins(6, 6, 6, 6)
+            }
+            // Use FILL to ensure proper sizing
+            params.columnSpec = android.widget.GridLayout.spec(
+                col,
+                android.widget.GridLayout.FILL,
+                1f
+            )
+            params.rowSpec = android.widget.GridLayout.spec(
+                row,
+                android.widget.GridLayout.FILL,
+                1f
+            )
+            formatGrid.addView(itemView, params)
+        }
+
+        buttonCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        buttonExport.setOnClickListener {
+            selectedFormat?.let { format ->
+                export(format)
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
+    }
+
+    /**
+     * Start checklist MCQ quiz flow - bỏ qua chọn difficulty, vào quiz luôn
+     */
+    private fun startChecklistMcqFlow(cachedResult: SummaryResponse) {
+        val vocabMcqs = (cachedResult.vocabMcqs ?: cachedResult.review?.vocabMcqs).orEmpty()
+        if (vocabMcqs.isEmpty()) {
+            showToast(getString(R.string.ai_error_generic))
+            return
+        }
+
+        // Convert VocabQuiz sang MCQ format
+        val mcqList = vocabMcqs.map { vocabQuiz ->
+            MCQ(
+                question = vocabQuiz.question ?: "",
+                options = vocabQuiz.options ?: emptyMap(),
+                answer = vocabQuiz.answer ?: ""
+            )
+        }
+
+        if (mcqList.isEmpty()) {
+            showToast("No questions available")
+            return
+        }
+
+        // Start quiz activity trực tiếp, không cần chọn difficulty
+        val json = Gson().toJson(mcqList)
+        val intent = Intent(this, TextMcqQuizActivity::class.java).apply {
+            putExtra(TextMcqQuizActivity.EXTRA_MCQS_JSON, json)
+            putExtra(TextMcqQuizActivity.EXTRA_DIFFICULTY, "medium") // Default difficulty
+        }
+        startActivity(intent)
     }
 }

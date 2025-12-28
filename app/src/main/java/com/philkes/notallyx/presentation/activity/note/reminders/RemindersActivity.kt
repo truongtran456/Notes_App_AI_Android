@@ -94,10 +94,10 @@ class RemindersActivity : LockedActivity<ActivityRemindersBinding>(), ReminderLi
     }
 
     private fun setupToolbar() {
-        binding.Toolbar.apply {
-            setNavigationOnClickListener { finish() }
-            menu.add(R.string.add_reminder, R.drawable.add) { showDatePickerDialog() }
-        }
+        // Đảm bảo không có navigation icon
+        binding.Toolbar.navigationIcon = null
+        binding.RemindersBackButton?.setOnClickListener { finish() }
+        binding.RemindersAddButton?.setOnClickListener { showDatePickerDialog() }
     }
 
     private fun setupRecyclerView() {

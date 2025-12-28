@@ -826,9 +826,11 @@ fun ChipGroup.bindLabels(
         val labelSize = textSize.displayBodySize
         for (label in labels) {
             LabelBinding.inflate(inflater, this, true).root.apply {
-                background = getOutlinedDrawable(this@bindLabels.context)
+                // Highlight label với màu giống date chip (#9787FF)
+                background = ContextCompat.getDrawable(this@bindLabels.context, R.drawable.bg_date_time_chip)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, labelSize)
                 text = label
+                setTextColor(ContextCompat.getColor(this@bindLabels.context, android.R.color.white))
                 color?.let { setControlsContrastColorForAllViews(it) }
             }
         }

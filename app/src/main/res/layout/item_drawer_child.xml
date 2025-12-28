@@ -16,8 +16,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:textColor="@color/nav_item_text"
-        android:textSize="15sp" />
+        android:textColor="@color/color3D2A00"
+        android:textSize="@dimen/sp_16" />
 
     <TextView
         android:id="@+id/TvBadge"

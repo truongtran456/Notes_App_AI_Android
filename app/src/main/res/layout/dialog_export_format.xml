@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="24dp"
+    android:maxHeight="500dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="@android:color/white"
+    app:strokeWidth="0dp">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="795px"
+        android:fillViewport="false">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:background="@drawable/bg_background">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/export"
+            android:textColor="#6D3FEF"
+            android:textSize="@dimen/sp_16"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Format Grid -->
+        <GridLayout
+            android:id="@+id/FormatGrid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="3"
+            android:rowCount="2"
+            android:alignmentMode="alignMargins"
+            android:useDefaultMargins="false"
+            android:columnOrderPreserved="false"
+            android:layout_marginBottom="24dp"
+            android:padding="8dp">
+
+            <!-- Format items will be added programmatically -->
+
+        </GridLayout>
+
+        <!-- Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/ButtonCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel"
+                android:textColor="#6B4EFF"
+                android:backgroundTint="#FFFFFF"
+                android:layout_marginEnd="8dp"
+                style="@style/Widget.Material3.Button.TextButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/ButtonExport"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/export"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#6B4EFF"
+                style="@style/Widget.Material3.Button" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+        
+    </androidx.core.widget.NestedScrollView>
+
+</com.google.android.material.card.MaterialCardView>
+

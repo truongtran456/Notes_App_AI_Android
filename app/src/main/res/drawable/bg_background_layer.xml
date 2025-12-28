@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Base gradient: tăng độ đậm phía trên, cam kem sâu hơn rồi chuyển dần xuống trắng xám -->
+    <!-- Base gradient: tím nhạt hiện đại -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="270"
-                android:startColor="#FFE6C0"
-                android:centerColor="#FFF7EC"
-                android:endColor="#F3F3F3" />
+                android:startColor="#E8E6FF"
+                android:centerColor="#F8F7FF"
+                android:endColor="#F8F8F8" />
         </shape>
     </item>
     <!-- Overlay mờ để nền mềm hơn -->
@@ -24,4 +24,3 @@
         </shape>
     </item>
 </layer-list>
-

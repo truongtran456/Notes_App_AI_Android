@@ -53,6 +53,9 @@
         <item name="elevationOverlayEnabled">false</item>
         <item name="materialAlertDialogTheme">@style/Dialog.Dark</item>
         <item name="popupMenuBackground">@color/md_theme_surfaceContainerLow</item>
+        
+        <!-- Dark mode: nền đen thuần, không dùng gradient -->
+        <item name="android:windowBackground">@color/md_theme_scrim</item>
     </style>
 
     <style name="Dialog.Dark" parent="ThemeOverlay.Material3.MaterialAlertDialog">

@@ -276,6 +276,7 @@
     <string name="recording">Recording…</string>
     <string name="redo">Redo</string>
     <string name="draw">Draw</string>
+    <string name="drawing">Drawing</string>
     <string name="background">Background</string>
     <string name="reminder_no_repetition">No repetition</string>
     <string name="reminders">Reminders</string>

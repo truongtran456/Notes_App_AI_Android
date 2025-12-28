@@ -65,22 +65,22 @@ data class AIOption(
                     type = AIOptionType.KEY
                 ),
                 AIOption(
-                    iconResId = com.philkes.notallyx.R.drawable.document_scanner,
+                    iconResId = com.philkes.notallyx.R.drawable.notebook,
                     titleResId = com.philkes.notallyx.R.string.ai_vocab_flashcards,
                     type = AIOptionType.QUESTION
                 ),
                 AIOption(
-                    iconResId = com.philkes.notallyx.R.drawable.ic_checkbox_list,
+                    iconResId = com.philkes.notallyx.R.drawable.text_format,
                     titleResId = com.philkes.notallyx.R.string.ai_vocab_quiz,
                     type = AIOptionType.MCQ
                 ),
                 AIOption(
-                    iconResId = com.philkes.notallyx.R.drawable.ic_checkbox_list,
+                    iconResId = com.philkes.notallyx.R.drawable.edit,
                     titleResId = com.philkes.notallyx.R.string.ai_vocab_cloze,
                     type = AIOptionType.CLOZE
                 ),
                 AIOption(
-                    iconResId = com.philkes.notallyx.R.drawable.ic_checkbox_list,
+                    iconResId = com.philkes.notallyx.R.drawable.link,
                     titleResId = com.philkes.notallyx.R.string.ai_vocab_match_pairs,
                     type = AIOptionType.MATCH
                 )

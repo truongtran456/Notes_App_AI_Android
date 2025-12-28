@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:fillViewport="true"
-    android:background="?attr/colorSurface">
+    android:background="@drawable/bg_background">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,9 +23,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Goals &amp; Progress"
-                android:textAppearance="?attr/textAppearanceHeadline5"
+                android:textColor="@color/color3D2A00"
+                android:textSize="@dimen/sp_16"
                 android:textStyle="bold"
-                android:textColor="?attr/colorOnSurface"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
@@ -80,11 +80,11 @@
         </com.google.android.material.card.MaterialCardView>
 
         <!-- Vocabulary Stats Container -->
-        <LinearLayout
-            android:id="@+id/VocabStatsContainer"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/VocabStatsRecyclerView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical" />
+            android:nestedScrollingEnabled="false" />
 
     </LinearLayout>
 

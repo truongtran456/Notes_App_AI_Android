@@ -64,8 +64,10 @@ class LabelsFragment : Fragment(), LabelListener {
         setHasOptionsMenu(true)
         binding = FragmentNotesBinding.inflate(inflater)
 
-        // Luôn dùng nền gradient Home Today cho Labels
-        binding?.root?.setBackgroundResource(R.drawable.bg_background_layer)
+        // Chỉ dùng gradient khi ở System mode, Light/Dark dùng màu thuần
+        if (model.preferences.theme.value == com.philkes.notallyx.presentation.viewmodel.preference.Theme.FOLLOW_SYSTEM) {
+            binding?.root?.setBackgroundResource(R.drawable.bg_background)
+        }
 
         return binding?.root
     }

@@ -102,14 +102,14 @@ class DrawerAdapter(
         fun bind(entry: DrawerEntry.Child) {
             val isSelected = entry.id == selectedId
             applySelected(binding.root, isSelected)
-            val selectedColor = color(binding.root, R.color.nav_item_selected)
+            val selectedColor = android.graphics.Color.WHITE
             val unselectedColor = color(binding.root, R.color.nav_item_unselected)
             binding.TvTitle.text = entry.title
             binding.TvTitle.setTextColor(if (isSelected) selectedColor else unselectedColor)
             binding.TvBadge.apply {
                 text = entry.badge
                 visibility = if (entry.badge.isNullOrEmpty()) View.GONE else View.VISIBLE
-                setTextColor(color(binding.root, R.color.nav_text_secondary))
+                setTextColor(if (isSelected) selectedColor else color(binding.root, R.color.nav_text_secondary))
             }
             binding.root.setOnClickListener { onItemClick(entry) }
         }
@@ -122,7 +122,7 @@ class DrawerAdapter(
         fun bind(entry: DrawerEntry.Item) {
             val isSelected = entry.id == selectedId
             applySelected(binding.root, isSelected)
-            val selectedColor = color(binding.root, R.color.nav_item_selected)
+            val selectedColor = android.graphics.Color.WHITE
             val unselectedColor = color(binding.root, R.color.nav_item_unselected)
             val badgeColor = color(binding.root, R.color.nav_text_secondary)
             binding.TvTitle.text = entry.title

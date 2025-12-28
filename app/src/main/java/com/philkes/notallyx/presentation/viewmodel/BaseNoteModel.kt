@@ -106,7 +106,23 @@ class BaseNoteModel(private val app: Application) : AndroidViewModel(app) {
         set(value) {
             if (field != value || searchResults?.value?.isEmpty() == true) {
                 field = value
-                searchResults!!.fetch(keyword, folder.value, currentLabel)
+                // Đảm bảo searchResults được init trước khi fetch
+                // searchResults sẽ được init trong init() khi database ready
+                // Nếu chưa init, sẽ init ngay bây giờ
+                try {
+                    if (searchResults == null && ::baseNoteDao.isInitialized) {
+                        searchResults = SearchResult(viewModelScope, baseNoteDao, ::transform)
+                    }
+                    // Debounce search để tránh lag khi typing
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(150) // Debounce 150ms
+                        if (field == value) { // Chỉ fetch nếu keyword chưa thay đổi
+                            searchResults?.fetch(keyword, folder.value, currentLabel)
+                        }
+                    }
+                } catch (e: UninitializedPropertyAccessException) {
+                    // Database chưa ready, sẽ init sau trong init()
+                }
             }
         }
 
@@ -179,10 +195,22 @@ class BaseNoteModel(private val app: Application) : AndroidViewModel(app) {
         //        colors = baseNoteDao.getAllColorsAsync()
         reminders = baseNoteDao.getAllRemindersAsync()
 
-        allNotes?.removeObserver(allNotesObserver!!)
+        allNotes?.let { notes ->
+            allNotesObserver?.let { observer ->
+                try {
+                    notes.removeObserver(observer)
+                } catch (e: Exception) {
+                    // Ignore if already removed
+                }
+            }
+        }
         allNotesObserver = Observer { list -> Cache.list = list }
         allNotes = baseNoteDao.getAllAsync()
-        allNotes!!.observeForever(allNotesObserver!!)
+        allNotes?.let { notes ->
+            allNotesObserver?.let { observer ->
+                notes.observeForever(observer)
+            }
+        }
 
         if (baseNotes == null) {
             baseNotes = Content(baseNoteDao.getFrom(Folder.NOTES), ::transform)
@@ -451,6 +479,13 @@ class BaseNoteModel(private val app: Application) : AndroidViewModel(app) {
                             counter = counter,
                             total = notes.size,
                         )
+                    }
+
+                    ExportMimeType.JPEG,
+                    ExportMimeType.TIFF -> {
+                        // TODO: Implement JPEG and TIFF export functionality
+                        // For now, show a toast message
+                        app.showToast("${selectedExportMimeType.name} export is not yet implemented")
                     }
                 }
             }
@@ -779,4 +814,6 @@ enum class ExportMimeType(val mimeType: String, val fileExtension: String) {
     PDF("application/pdf", "pdf"),
     JSON(MIME_TYPE_JSON, "json"),
     HTML("text/html", "html"),
+    JPEG("image/jpeg", "jpeg"),
+    TIFF("image/tiff", "tiff"),
 }

@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Base gradient mới: cam/kem ấm, bỏ tím -->
+    <!-- Base gradient mới: tím nhạt hiện đại -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="135"
-                android:startColor="#FFF7EC"
-                android:centerColor="#FFF3DE"
-                android:endColor="#FFD5B0" />
+                android:startColor="#F8F7FF"
+                android:centerColor="#FAF8FF"
+                android:endColor="#E8E6FF" />
         </shape>
     </item>
     
-    <!-- Overlay loang 1 - góc trên trái (cam nhạt) -->
+    <!-- Overlay loang 1 - góc trên trái (tím nhạt) -->
     <item>
         <shape android:shape="rectangle">
             <gradient
@@ -20,13 +20,13 @@
                 android:centerX="0.0"
                 android:centerY="0.0"
                 android:gradientRadius="700dp"
-                android:startColor="#40FFD5B0"
-                android:centerColor="#20FFCFA0"
+                android:startColor="#40E8E6FF"
+                android:centerColor="#20E0DEFF"
                 android:endColor="#00FFFFFF" />
         </shape>
     </item>
     
-    <!-- Overlay loang 2 - góc dưới phải (cam nhạt) -->
+    <!-- Overlay loang 2 - góc dưới phải (tím nhạt) -->
     <item>
         <shape android:shape="rectangle">
             <gradient
@@ -34,8 +34,8 @@
                 android:centerX="1.0"
                 android:centerY="1.0"
                 android:gradientRadius="900dp"
-                android:startColor="#40FFF3DE"
-                android:centerColor="#20FFE3C5"
+                android:startColor="#40F0EEFF"
+                android:centerColor="#20E8E6FF"
                 android:endColor="#00FFFFFF" />
         </shape>
     </item>
@@ -48,8 +48,8 @@
                 android:centerX="0.15"
                 android:centerY="0.5"
                 android:gradientRadius="600dp"
-                android:startColor="#30FFD5B0"
-                android:centerColor="#15FFE3C5"
+                android:startColor="#30E8E6FF"
+                android:centerColor="#15F0EEFF"
                 android:endColor="#00FFFFFF" />
         </shape>
     </item>
@@ -62,8 +62,8 @@
                 android:centerX="0.85"
                 android:centerY="0.5"
                 android:gradientRadius="650dp"
-                android:startColor="#30FFF3DE"
-                android:centerColor="#15FFE3C5"
+                android:startColor="#30FAF8FF"
+                android:centerColor="#15E8E6FF"
                 android:endColor="#00FFFFFF" />
         </shape>
     </item>
@@ -96,27 +96,27 @@
         </shape>
     </item>
     
-    <!-- Dải loang chéo 1 - từ trên trái xuống dưới phải (cam) -->
+    <!-- Dải loang chéo 1 - từ trên trái xuống dưới phải (tím) -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="135"
-                android:startColor="#20FFD5B0"
+                android:startColor="#20E8E6FF"
                 android:centerColor="#00FFFFFF"
-                android:endColor="#10FFE3C5" />
+                android:endColor="#10F0EEFF" />
         </shape>
     </item>
     
-    <!-- Dải loang chéo 2 - từ trên phải xuống dưới trái (cam) -->
+    <!-- Dải loang chéo 2 - từ trên phải xuống dưới trái (tím) -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="45"
-                android:startColor="#15FFF3DE"
+                android:startColor="#15FAF8FF"
                 android:centerColor="#00FFFFFF"
-                android:endColor="#10FFD5B0" />
+                android:endColor="#10E8E6FF" />
         </shape>
     </item>
     
@@ -126,9 +126,9 @@
             <gradient
                 android:type="linear"
                 android:angle="0"
-                android:startColor="#10FFD5B0"
+                android:startColor="#10E8E6FF"
                 android:centerColor="#00FFFFFF"
-                android:endColor="#10FFE3C5" />
+                android:endColor="#10F0EEFF" />
         </shape>
     </item>
     
@@ -138,9 +138,9 @@
             <gradient
                 android:type="linear"
                 android:angle="90"
-                android:startColor="#10FFF3DE"
+                android:startColor="#10FAF8FF"
                 android:centerColor="#00FFFFFF"
-                android:endColor="#10FFD5B0" />
+                android:endColor="#10E8E6FF" />
         </shape>
     </item>
     

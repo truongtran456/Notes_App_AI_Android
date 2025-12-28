@@ -15,9 +15,9 @@
     <color name="md_theme_onError">#FFFFFF</color>
     <color name="md_theme_errorContainer">#FFDAD6</color>
     <color name="md_theme_onErrorContainer">#410002</color>
-    <color name="md_theme_background">#FFF3DE</color>
+    <color name="md_theme_background">#FAF8FF</color>
     <color name="md_theme_onBackground">#1A1B21</color>
-    <color name="md_theme_surface">#FFF3DE</color>
+    <color name="md_theme_surface">#FAF8FF</color>
     <color name="md_theme_surface_dark">#121318</color>
     <color name="md_theme_onSurface">#1A1B21</color>
     <color name="md_theme_surfaceVariant">#E2E1EC</color>
@@ -63,9 +63,9 @@
     <color name="md_theme_onError_mediumContrast">#FFFFFF</color>
     <color name="md_theme_errorContainer_mediumContrast">#DA342E</color>
     <color name="md_theme_onErrorContainer_mediumContrast">#FFFFFF</color>
-    <color name="md_theme_background_mediumContrast">#F9F4EC</color>
+    <color name="md_theme_background_mediumContrast">#FAF8FF</color>
     <color name="md_theme_onBackground_mediumContrast">#1A1B21</color>
-    <color name="md_theme_surface_mediumContrast">#F9F4EC</color>
+    <color name="md_theme_surface_mediumContrast">#FAF8FF</color>
     <color name="md_theme_onSurface_mediumContrast">#1A1B21</color>
     <color name="md_theme_surfaceVariant_mediumContrast">#E2E1EC</color>
     <color name="md_theme_onSurfaceVariant_mediumContrast">#41424B</color>
@@ -152,8 +152,17 @@
     <color name="nav_item_unselected_bg">#00000000</color>
     <color name="nav_text_primary">#1A1A1A</color>
     <color name="nav_text_secondary">#6A6A6A</color>
-    <color name="nav_divider">#E0E0E0</color>
+    <color name="nav_divider">#6D3FEF</color>
+    <color name="app_title_dark_purple">#4A2C7A</color>
 
+    <!-- App Primary Colors -->
+    <color name="app_primary">#6D3FEF</color>
+    <color name="app_primary_selected">#6B4EFF</color>
+    <color name="app_title_color">#6D3FEF</color>
+    <color name="app_background">@drawable/bg_background</color>
+    <color name="app_card_background">#FEFDFF</color>
+    <color name="app_icon_color">#6D3FEF</color>
+    <color name="app_icon_selected">#6B4EFF</color>
 
     <color name="Transparent">#00000000</color>
 
@@ -223,7 +232,8 @@
     <color name="colorFFD2AA">#FFD2AA</color>
     <color name="colorFF6EB4">#FF6EB4</color>
     <color name="colorFFDCAA">#FFDCAA</color>
-    <color name="color3D2A00">#3D2A00</color>
+    <color name="color3D2A00">#343A40</color>
+    <color name="colorFFBD2F">#FFBD2F</color>
 
     <!-- Lavender Glass Background Palette -->
     <!-- Base -->

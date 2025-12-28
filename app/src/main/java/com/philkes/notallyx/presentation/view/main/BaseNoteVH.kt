@@ -1,5 +1,6 @@
 package com.philkes.notallyx.presentation.view.main
 
+import android.content.res.ColorStateList
 import android.graphics.drawable.Drawable
 import android.util.TypedValue
 import android.view.View.GONE
@@ -49,7 +50,7 @@ data class BaseNoteVHPreferences(
 )
 
 class BaseNoteVH(
-    private val binding: RecyclerBaseNoteBinding,
+    val binding: RecyclerBaseNoteBinding,
     private val dateFormat: DateFormat,
     private val preferences: BaseNoteVHPreferences,
     listener: ItemListener,
@@ -70,10 +71,7 @@ class BaseNoteVH(
             Date.setTextSize(TypedValue.COMPLEX_UNIT_SP, body)
             Note.setTextSize(TypedValue.COMPLEX_UNIT_SP, body)
 
-            LinearLayout.children.forEach { view ->
-                view as TextView
-                view.setTextSize(TypedValue.COMPLEX_UNIT_SP, body)
-            }
+            // Checklist items sẽ được set text size trong adapter
 
             Title.maxLines = preferences.maxTitleLines
             Note.maxLines = preferences.maxLines
@@ -150,10 +148,12 @@ class BaseNoteVH(
         setColor(baseNote.color, baseNote.id)
 
         binding.RemindersView.isVisible = baseNote.reminders.any { it.hasUpcomingNotification() }
+        // Set màu #9787FF cho icon reminder
+        binding.RemindersView.setColorFilter(android.graphics.Color.parseColor("#9787FF"), android.graphics.PorterDuff.Mode.SRC_IN)
     }
 
     private fun bindNote(body: String, spans: List<SpanRepresentation>, isTitleEmpty: Boolean) {
-        binding.LinearLayout.visibility = GONE
+        binding.ChecklistRecyclerView.visibility = GONE
 
         binding.Note.apply {
             text = body.applySpans(spans)
@@ -170,61 +170,78 @@ class BaseNoteVH(
         binding.apply {
             Note.visibility = GONE
             if (items.isEmpty()) {
-                LinearLayout.visibility = GONE
+                ChecklistRecyclerView.visibility = GONE
             } else {
-                LinearLayout.visibility = VISIBLE
-                val forceShowFirstItem = preferences.maxItems < 1 && isTitleEmpty
-                val filteredList = items.take(if (forceShowFirstItem) 1 else preferences.maxItems)
-                LinearLayout.children.forEachIndexed { index, view ->
-                    if (view.id != R.id.ItemsRemaining) {
-                        if (index < filteredList.size) {
-                            val item = filteredList[index]
-                            (view as TextView).apply {
-                                text = item.body
-                                handleChecked(this, item.checked)
-                                visibility = VISIBLE
-                                if (item.isChild) {
-                                    updateLayoutParams<LinearLayout.LayoutParams> {
-                                        marginStart = 20.dp
-                                    }
-                                }
-                                if (index == filteredList.lastIndex) {
-                                    updatePadding(bottom = 0)
-                                }
-                            }
-                        } else view.visibility = GONE
-                    }
+                ChecklistRecyclerView.visibility = VISIBLE
+                // Nếu maxItems = 0, hiển thị tất cả items (hoặc tối đa 10 items để tránh lag)
+                val maxItemsToShow = if (preferences.maxItems < 1) {
+                    if (isTitleEmpty) 1 else items.size.coerceAtMost(10)
+                } else {
+                    preferences.maxItems
                 }
+                val filteredList = items.take(maxItemsToShow)
+                
+                // Setup RecyclerView với adapter
+                val bodySize = preferences.textSize.displayBodySize
+                val adapter = ChecklistItemAdapter(
+                    bodySize,
+                    ::handleChecked
+                )
+                ChecklistRecyclerView.adapter = adapter
+                ChecklistRecyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(binding.root.context)
+                
+                // QUAN TRỌNG: Tắt khả năng click và focus của RecyclerView để không chặn click events của card
+                ChecklistRecyclerView.isClickable = false
+                ChecklistRecyclerView.isFocusable = false
+                ChecklistRecyclerView.isFocusableInTouchMode = false
+                
+                // Submit list to adapter
+                adapter.submitList(filteredList)
 
                 if (preferences.maxItems > 0 && items.size > preferences.maxItems) {
                     ItemsRemaining.apply {
                         visibility = VISIBLE
                         text = (items.size - preferences.maxItems).toString()
                     }
-                } else ItemsRemaining.visibility = GONE
+                } else if (preferences.maxItems < 1 && items.size > maxItemsToShow) {
+                    // Hiển thị số items còn lại khi maxItems = 0
+                    ItemsRemaining.apply {
+                        visibility = VISIBLE
+                        text = (items.size - maxItemsToShow).toString()
+                    }
+                } else {
+                    ItemsRemaining.visibility = GONE
+                }
             }
         }
     }
 
     private fun setColor(color: String, noteId: Long) {
+        // CHỈ set màu #FEFDFF cho card - KHÔNG làm gì khác
+        // Xóa tất cả gradient và màu ngẫu nhiên
+        val cardColor = android.graphics.Color.parseColor("#FEFDFF")
         binding.root.apply {
-            if (color == BaseNote.COLOR_DEFAULT) {
-                // Sử dụng gradient distributor để phân phối gradient không trùng
-                val gradientRes = GradientDistributor.getGradientForNote(noteId)
-                
-                // Cache drawable để tránh lag
-                val drawable = drawableCache.getOrPut(gradientRes) {
-                    context.getDrawable(gradientRes)
-                }
-                background = drawable
-                setCardBackgroundColor(0) // Transparent để hiển thị gradient background
-                setControlsContrastColorForAllViews(android.graphics.Color.WHITE) // Text màu trắng trên gradient
-            } else {
-                val colorInt = context.extractColor(color)
-                setCardBackgroundColor(colorInt)
-                setControlsContrastColorForAllViews(colorInt)
-            }
+            // Set màu #FEFDFF cho MaterialCardView
+            setCardBackgroundColor(cardColor)
+            // KHÔNG set background = null vì sẽ làm card trong suốt
         }
+        
+        // Set text màu đen để dễ đọc trên nền trắng
+        val blackColor = android.graphics.Color.BLACK
+        val grayColor = android.graphics.Color.parseColor("#666666")
+        val purpleColor = android.graphics.Color.parseColor("#9787FF") // Purple for date
+        
+        binding.Title.setTextColor(blackColor)
+        binding.Date.setTextColor(purpleColor) // Changed to purple
+        binding.Note.setTextColor(blackColor)
+        binding.Message?.setTextColor(blackColor)
+        
+        // Set màu cho các TextView trong ChecklistRecyclerView (list items)
+        // Màu sẽ được set trong adapter
+        
+        // Set màu cho FileView và FileViewMore nếu có
+        binding.FileView?.setTextColor(blackColor)
+        binding.FileViewMore?.setTextColor(grayColor)
     }
 
     private fun setImages(images: List<FileAttachment>, mediaRoot: File?) {
@@ -245,7 +262,9 @@ class BaseNoteVH(
                         .load(file)
                         .centerCrop()
                         .transition(DrawableTransitionOptions.withCrossFade())
-                        .diskCacheStrategy(DiskCacheStrategy.NONE)
+                        .diskCacheStrategy(DiskCacheStrategy.RESOURCE) // Cache decoded images
+                        .skipMemoryCache(false) // Enable memory cache
+                        .thumbnail(0.1f) // Load thumbnail first for better UX
                         .listener(
                             object : RequestListener<Drawable> {
 

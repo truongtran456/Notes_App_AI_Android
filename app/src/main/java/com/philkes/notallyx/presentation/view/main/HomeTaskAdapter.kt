@@ -1,5 +1,6 @@
 package com.philkes.notallyx.presentation.view.main
 
+import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
@@ -78,13 +79,12 @@ class HomeTaskViewHolder(
             // Set transition name cho Material Container Transform
             CardRoot.transitionName = "note_card_${note.id}"
             
-            // Set gradient background cho MaterialCardView
-            CardRoot.setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
-            // Cache drawable to avoid repeated getDrawable() calls
-            val drawable = drawableCache.getOrPut(gradientDrawable) {
-                root.context.getDrawable(gradientDrawable)
-            }
-            CardRoot.background = drawable
+            // Set màu #FEFDFF cho MaterialCardView
+            val cardColor = android.graphics.Color.parseColor("#FEFDFF")
+            CardRoot.setCardBackgroundColor(cardColor)
+            // Set text màu đen để dễ đọc
+            TitleText.setTextColor(android.graphics.Color.BLACK)
+            DescriptionText.setTextColor(android.graphics.Color.parseColor("#666666"))
             
             // Set date and time
             val date = Date(note.modifiedTimestamp)
@@ -121,7 +121,7 @@ class HomeTaskViewHolder(
             
             // Icon cố định: đồng hồ báo thức
             ActionButton.setImageResource(android.R.drawable.ic_lock_idle_alarm)
-            ActionButton.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.BLACK)
+            ActionButton.imageTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#9787FF"))
             
             // Set click listener
             root.setOnClickListener {

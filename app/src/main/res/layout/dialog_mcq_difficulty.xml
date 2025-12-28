@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="24dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="8dp"
+    app:cardBackgroundColor="@android:color/white"
+    app:strokeWidth="0dp">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="false">
+        
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:background="@drawable/bg_background">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="AI MCQ Practice"
+            android:textColor="#6D3FEF"
+            android:textSize="@dimen/sp_16"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Difficulty Grid -->
+        <GridLayout
+            android:id="@+id/DifficultyGrid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="3"
+            android:rowCount="1"
+            android:alignmentMode="alignMargins"
+            android:useDefaultMargins="false"
+            android:columnOrderPreserved="false"
+            android:layout_marginBottom="24dp"
+            android:padding="8dp">
+
+            <!-- Difficulty items will be added programmatically -->
+
+        </GridLayout>
+
+        <!-- Buttons -->
+        <LinearLayout
+            android:id="@+id/ButtonsLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/ButtonCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel"
+                android:textColor="#6D3FEF"
+                android:backgroundTint="#FFFFFF"
+                android:layout_marginEnd="8dp"
+                style="@style/Widget.Material3.Button.TextButton" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/ButtonStart"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Start"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#6D3FEF"
+                style="@style/Widget.Material3.Button" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+        
+    </androidx.core.widget.NestedScrollView>
+
+</com.google.android.material.card.MaterialCardView>
+

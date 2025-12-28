@@ -4,15 +4,15 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="@color/md_theme_surfaceContainerHigh">
+    android:background="@drawable/bg_background">
 
     <TextView
         android:id="@+id/AppearanceTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/appearance"
-        android:textAppearance="?attr/textAppearanceTitleMedium"
-        android:textColor="@color/md_theme_onSurface"
+        android:textColor="@color/color3D2A00"
+        android:textSize="@dimen/sp_16"
         android:paddingBottom="8dp" />
 
     <View

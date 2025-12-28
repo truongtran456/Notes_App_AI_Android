@@ -96,9 +96,8 @@ class DrawToolPickerView @JvmOverloads constructor(
 
     private fun setupAction() {
         viewBinding().apply {
-            ivDone.setOnClickListener {
-                listener?.onDoneClick()
-            }
+            // Đã xóa nút X (ivDone)
+            
             eraserView.setOnClickListener {
                 // Nếu eraser đã được chọn → mở menu chỉnh sửa (click lần 2)
                 if (isEraserSelected) {

@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.github.iprashantpanwar.sample.JellyFab
 import com.github.iprashantpanwar.sample.JellyFabItem
@@ -60,6 +61,16 @@ fun JellyFabMenu(
         modifier = Modifier.fillMaxSize().padding(end = 0.dp, bottom = 0.dp),
         contentAlignment = Alignment.BottomEnd,
     ) {
-        JellyFab(state = jellyState, primaryItems = primaryItems, secondaryItems = secondaryItems)
+        // Set màu tím đậm #6D3FEF cho main FAB, màu hồng ban đầu cho secondary FABs (3 chấm và các fab phụ)
+        val fabColor = Color(0xFF6D3FEF)
+        // Màu hồng ban đầu: #FF7F86
+        val secondLayerFabColor = Color(0xFFFF7F86)
+        JellyFab(
+            state = jellyState,
+            primaryItems = primaryItems,
+            secondaryItems = secondaryItems,
+            fabColor = fabColor,
+            secondLayerFabColor = secondLayerFabColor
+        )
     }
 }

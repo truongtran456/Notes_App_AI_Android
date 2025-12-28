@@ -4,13 +4,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/bg_background_layer">
+    android:background="@drawable/bg_background">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/Toolbar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:background="@color/colorFF9D0A"
+        android:background="#6D3FEF"
         android:title="AI MCQ Practice"
         android:titleTextColor="@android:color/white"
         app:navigationIcon="@drawable/ic_arrow_left" />
@@ -26,7 +26,7 @@
         android:layout_height="wrap_content"
         app:cardCornerRadius="16dp"
         app:cardElevation="4dp"
-        android:backgroundTint="@android:color/white">
+        app:cardBackgroundColor="@android:color/white">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -117,7 +117,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Previous"
-                    android:textColor="@color/colorFF9D0A" />
+                    android:textColor="#6D3FEF" />
 
                 <View
                     android:layout_width="12dp"
@@ -130,7 +130,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Next"
-                    android:backgroundTint="@color/colorFF9D0A"
+                    android:backgroundTint="#6D3FEF"
                     android:textColor="@android:color/white" />
             </LinearLayout>
 
@@ -175,7 +175,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Share" />
+                android:text="Share"
+                android:backgroundTint="#6B4EFF"
+                android:textColor="@android:color/white" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/BtnBack"
@@ -183,7 +185,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Back to Notes" />
+                android:text="Back to Notes"
+                android:textColor="#6B4EFF" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

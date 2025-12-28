@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/bg_background"
     android:fitsSystemWindows="true">
 
     <com.google.android.material.appbar.AppBarLayout
@@ -185,6 +186,22 @@
                         style="@style/Widget.Material3.Button.TextButton" />
 
                 </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Slide-to-Compare AI Summary (Original vs Summary) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/AiSlideCompareCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:cardElevation="2dp"
+                app:cardCornerRadius="16dp">
+
+                <include
+                    android:id="@+id/AiSlideCompareView"
+                    layout="@layout/view_ai_slide_compare" />
 
             </com.google.android.material.card.MaterialCardView>
 

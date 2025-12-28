@@ -15,8 +15,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:textAllCaps="true"
-        android:textColor="@color/nav_text_secondary"
-        android:textSize="13sp"
+        android:textColor="@color/color3D2A00"
+        android:textSize="@dimen/sp_16"
         android:letterSpacing="0.08"
         android:textStyle="bold" />
 

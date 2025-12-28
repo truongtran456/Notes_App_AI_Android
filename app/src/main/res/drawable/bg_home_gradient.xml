@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Base gradient -->
+    <!-- Base gradient - Purple to light purple -->
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:type="linear"
                 android:angle="270"
-                android:startColor="#ECEAFF"
-                android:centerColor="#FBD6C5"
-                android:endColor="#FFE4B5" />
+                android:startColor="#E8E6FF"
+                android:centerColor="#F0EEFF"
+                android:endColor="#F8F7FF" />
         </shape>
     </item>
     <!-- Radial gradient overlay for depth -->
@@ -24,4 +24,3 @@
         </shape>
     </item>
 </layer-list>
-

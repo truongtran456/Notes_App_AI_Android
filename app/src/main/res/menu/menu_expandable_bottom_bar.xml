@@ -6,25 +6,25 @@
         android:id="@+id/icon_home"
         android:icon="@drawable/home"
         android:title="Home"
-        app:exb_color="#FF9800" />
+        app:exb_color="#6B4EFF" />
 
     <item
         android:id="@+id/icon_notes"
         android:icon="@drawable/notebook"
         android:title="@string/notes"
-        app:exb_color="#FF9800" />
+        app:exb_color="#6B4EFF" />
 
     <item
         android:id="@+id/icon_list"
         android:icon="@drawable/checkbox"
         android:title="Study Sets"
-        app:exb_color="#FF9800" />
+        app:exb_color="#6B4EFF" />
 
     <item
         android:id="@+id/icon_settings"
         android:icon="@drawable/settings"
         android:title="@string/settings"
-        app:exb_color="#FF9800" />
+        app:exb_color="#6B4EFF" />
 
 </menu>
 

@@ -4,12 +4,17 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="@android:color/transparent">
 
     <cn.leaqi.drawer.SwipeDrawer
         android:id="@+id/SwipeLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
         app:leftLayout="@+id/IndentSpace"
         app:leftMode="drawer"
         app:leftType="view"
@@ -26,88 +31,195 @@
             android:insetBottom="0dp"
             android:minHeight="0dp" />
 
-        <RelativeLayout
+        <!-- Main Card Container -->
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/Content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:paddingStart="0dp"
-            android:paddingEnd="0dp">
+            app:cardCornerRadius="16dp"
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF"
+            app:strokeWidth="0dp">
 
-            <ImageButton
-                android:id="@+id/DragHandle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentStart="true"
-                android:layout_centerVertical="true"
-                android:background="?attr/selectableItemBackground"
-                android:contentDescription="@string/drag_handle"
-                android:padding="8dp"
-                app:srcCompat="@drawable/drag_handle"
-                app:tint="?attr/colorControlNormal" />
-
-            <com.google.android.material.checkbox.MaterialCheckBox
-                android:id="@+id/CheckBox"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_toEndOf="@id/DragHandle" />
-
-            <com.philkes.notallyx.presentation.view.misc.EditTextAutoClearFocus
-                android:id="@+id/EditText"
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:layout_marginEnd="72dp"
-                android:layout_toEndOf="@id/CheckBox"
-                android:background="@null"
-                android:hint="@string/item"
-                android:imeOptions="actionNext"
-                android:inputType="textMultiLine"
-                android:minHeight="48dp"
-                android:textAppearance="?attr/textAppearanceBodyLarge" />
+                android:padding="12dp">
 
-            <TextView
-                android:id="@+id/StatusIcon"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true"
-                android:layout_centerVertical="true"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:text="●"
-                android:textSize="16sp"
-                android:textColor="?attr/colorControlNormal" />
-        </RelativeLayout>
+                <!-- Drag Handle - Left -->
+                <ImageButton
+                    android:id="@+id/DragHandle"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/drag_handle"
+                    android:padding="4dp"
+                    app:srcCompat="@drawable/drag_handle"
+                    app:tint="#9E9E9E" />
 
+                <!-- CheckBox -->
+                <com.google.android.material.checkbox.MaterialCheckBox
+                    android:id="@+id/CheckBox"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_toEndOf="@id/DragHandle"
+                    android:layout_marginStart="4dp"
+                    app:buttonTint="#6D3FEF" />
+
+                <!-- Content Container -->
+                <LinearLayout
+                    android:id="@+id/ContentContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_toEndOf="@id/CheckBox"
+                    android:layout_toStartOf="@id/ActionsContainer"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:orientation="vertical">
+
+                    <!-- Main Text -->
+                    <com.philkes.notallyx.presentation.view.misc.EditTextAutoClearFocus
+                        android:id="@+id/EditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="@string/item"
+                        android:imeOptions="actionNext"
+                        android:inputType="textMultiLine"
+                        android:minHeight="32dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
+                        android:textColor="#212121"
+                        android:textSize="16sp" />
+
+                    <!-- Status Badge Container -->
+                    <LinearLayout
+                        android:id="@+id/StatusBadgeContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/StatusBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:cardCornerRadius="12dp"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="#E8F5E9"
+                            app:strokeWidth="0dp">
+
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:paddingStart="8dp"
+                                android:paddingEnd="8dp"
+                                android:paddingTop="4dp"
+                                android:paddingBottom="4dp"
+                                android:gravity="center_vertical">
+
+                                <TextView
+                                    android:id="@+id/StatusIcon"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="✓"
+                                    android:textSize="14sp"
+                                    android:textColor="#4CAF50" />
+
+                                <TextView
+                                    android:id="@+id/StatusText"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="4dp"
+                                    android:text="Learned"
+                                    android:textSize="12sp"
+                                    android:textColor="#4CAF50"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+
+                        </com.google.android.material.card.MaterialCardView>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Actions Container - Right -->
+                <LinearLayout
+                    android:id="@+id/ActionsContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <!-- Speaker Icon -->
+                    <ImageButton
+                        android:id="@+id/SpeakButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Speak"
+                        android:padding="6dp"
+                        android:src="@android:drawable/ic_lock_silent_mode_off"
+                        android:visibility="gone"
+                        app:tint="#9E9E9E" />
+
+                    <!-- More Icon -->
+                    <ImageButton
+                        android:id="@+id/MoreButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="More"
+                        android:padding="6dp"
+                        android:src="@drawable/more_vert"
+                        app:tint="#9E9E9E" />
+
+                </LinearLayout>
+
+            </RelativeLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Delete Container (Swipe Right) -->
         <FrameLayout
             android:id="@+id/DeleteContainer"
             android:layout_width="72dp"
             android:layout_height="match_parent"
             android:gravity="center"
-            android:background="#FFE6E6E6">
+            android:background="#F44336">
 
             <ImageButton
                 android:id="@+id/Delete"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
+                android:layout_gravity="center"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/delete"
                 android:padding="12dp"
                 app:srcCompat="@drawable/delete"
-                app:tint="@android:color/holo_red_dark" />
+                app:tint="@android:color/white" />
         </FrameLayout>
     </cn.leaqi.drawer.SwipeDrawer>
 
+    <!-- AI Summary Container -->
     <LinearLayout
         android:id="@+id/AiSummaryContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="48dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="6dp"
+        android:layout_marginStart="64dp"
+        android:layout_marginEnd="32dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp"
         android:background="@drawable/bg_inline_ai_card"
         android:orientation="vertical"
         android:padding="12dp"

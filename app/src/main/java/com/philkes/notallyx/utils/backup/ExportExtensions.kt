@@ -725,6 +725,15 @@ fun LockedActivity<*>.exportNotes(
                             showFileOptionsDialog(it, mimeType.mimeType, saveFileResultLauncher)
                         }
                 }
+            ExportMimeType.JPEG,
+            ExportMimeType.TIFF -> {
+                // TODO: Implement JPEG and TIFF export functionality
+                Toast.makeText(
+                    this@exportNotes,
+                    "${mimeType.name} export is not yet implemented",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     } else {
         lifecycleScope.launch {

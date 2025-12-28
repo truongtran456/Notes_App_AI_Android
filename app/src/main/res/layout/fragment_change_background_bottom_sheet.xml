@@ -5,7 +5,7 @@
     <androidx.appcompat.widget.LinearLayoutCompat
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/white"
+        android:background="@drawable/bg_background"
         android:orientation="vertical">
 
         <include
@@ -36,7 +36,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="Color"
-                        android:textColor="@color/color3D2A00"
+                        android:textColor="#6D3FEF"
                         android:textSize="@dimen/sp_14" />
 
                     <TextView

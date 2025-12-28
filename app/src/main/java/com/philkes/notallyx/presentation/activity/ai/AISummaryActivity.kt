@@ -14,6 +14,7 @@ import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.text.style.StyleSpan
 import android.view.View
+import android.view.ViewGroup
 import android.view.LayoutInflater
 import android.widget.GridLayout
 import android.widget.ImageButton
@@ -43,6 +44,7 @@ import com.philkes.notallyx.data.preferences.AIUserPreferences
 import com.philkes.notallyx.data.preferences.getAiUserId
 import com.philkes.notallyx.data.repository.AIRepository
 import com.philkes.notallyx.databinding.ActivityAiSummaryBinding
+import com.philkes.notallyx.presentation.view.ai.AiSlideCompareView
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
@@ -146,6 +148,53 @@ class AISummaryActivity : AppCompatActivity() {
     private var summaryTableState: List<VocabSummaryRow>? = null
     private var summaryTableIsTranslated = false
 
+    // Slide-to-Compare summary state
+    private var hasShownSlideHint: Boolean = false
+
+    /**
+     * Chuẩn bị card "Slide-to-Compare" dùng noteContent gốc và summary do AI tạo.
+     * Không chuyển màn mới, cho phép kéo / bấm handle để so sánh.
+     */
+    private fun setupSlideCompareCard(response: SummaryResponse) {
+        try {
+            val card = binding.AiSlideCompareCard
+            val slideView = binding.AiSlideCompareView as? AiSlideCompareView ?: return
+
+            // Text gốc ưu tiên: noteContent do EditNote gửi sang
+            val original =
+                noteContent
+                    .takeIf { it.isNotBlank() }
+                    ?: response.rawText
+                    ?: response.processedText
+                    ?: ""
+
+            // Text summary ưu tiên: summary đầy đủ / đoạn ngắn / 1 câu / bullet
+            val summaryText =
+                response.summary
+                    ?: response.summaries?.shortParagraph
+                    ?: response.summaries?.oneSentence
+                    ?: response.summaries?.bulletPoints?.joinToString(separator = "\n") { "• $it" }
+                    ?: ""
+
+            if (original.isBlank() || summaryText.isBlank()) {
+                card.isVisible = false
+                return
+            }
+
+            card.isVisible = true
+            slideView.setTexts(original, summaryText)
+
+            // Hint chỉ 1 lần cho toàn app
+            if (!hasShownSlideHint) {
+                val prefs = getSharedPreferences("ai_slide_compare_prefs", Context.MODE_PRIVATE)
+                slideView.showHintOnce(prefs)
+                hasShownSlideHint = true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AISummaryActivity", "setupSlideCompareCard: ${e.message}", e)
+        }
+    }
+
     // MCQ quiz flow (text notes) - moved to dedicated activity
 
     companion object {
@@ -217,6 +266,8 @@ class AISummaryActivity : AppCompatActivity() {
         try {
             binding = ActivityAiSummaryBinding.inflate(layoutInflater)
             setContentView(binding.root)
+            // Set background to app background
+            window.setBackgroundDrawableResource(R.drawable.bg_background)
 
             // Show loading by default to avoid black screen
             showLoading()
@@ -642,6 +693,9 @@ class AISummaryActivity : AppCompatActivity() {
                 binding.RawTextCard.isVisible = false
             }
         }
+
+        // Setup slide-to-compare summary (original vs summary)
+        setupSlideCompareCard(response)
 
         // ----- TEXT NOTE UI (non-vocab mode) -----
         if (!isVocabMode) {
@@ -4864,15 +4918,82 @@ class AISummaryActivity : AppCompatActivity() {
     }
 
     private fun showTextMcqDifficultyDialog(mcqs: com.philkes.notallyx.data.api.models.MCQs) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("AI MCQ Practice")
-            .setItems(arrayOf("Easy", "Medium", "Hard")) { dialogInterface, which ->
-                val difficulty =
-                    when (which) {
-                        0 -> "easy"
-                        1 -> "medium"
-                        else -> "hard"
-                    }
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_mcq_difficulty, null)
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
+        
+        // Ensure dialog can display full content
+        dialog.window?.let { window ->
+            window.setLayout(
+                (resources.displayMetrics.widthPixels * 0.9).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            window.setBackgroundDrawableResource(android.R.color.transparent)
+        }
+
+        val difficultyGrid = dialogView.findViewById<GridLayout>(R.id.DifficultyGrid)
+        val buttonCancel = dialogView.findViewById<MaterialButton>(R.id.ButtonCancel)
+
+        val difficulties = listOf("Easy", "Medium", "Hard")
+        var selectedDifficulty: String? = null
+
+        // Create difficulty items
+        difficulties.forEachIndexed { index, difficulty ->
+            val itemView = LayoutInflater.from(this).inflate(R.layout.item_mcq_difficulty, difficultyGrid, false)
+            val difficultyText = itemView.findViewById<TextView>(R.id.DifficultyText)
+            val difficultyCard = itemView as MaterialCardView
+
+            difficultyText.text = difficulty
+
+            // Set initial selection (first item)
+            if (index == 0) {
+                selectedDifficulty = difficulty.lowercase()
+                difficultyCard.strokeColor = Color.parseColor("#9787FF")
+                difficultyCard.strokeWidth = 2
+            } else {
+                difficultyCard.strokeColor = Color.TRANSPARENT
+                difficultyCard.strokeWidth = 0
+            }
+
+            itemView.setOnClickListener {
+                // Reset all cards
+                for (i in 0 until difficultyGrid.childCount) {
+                    val child = difficultyGrid.getChildAt(i) as? MaterialCardView
+                    child?.strokeColor = Color.TRANSPARENT
+                    child?.strokeWidth = 0
+                }
+                // Select clicked card
+                difficultyCard.strokeColor = Color.parseColor("#9787FF")
+                difficultyCard.strokeWidth = 2
+                selectedDifficulty = difficulty.lowercase()
+            }
+
+            val params = GridLayout.LayoutParams().apply {
+                width = 0
+                height = GridLayout.LayoutParams.WRAP_CONTENT
+                setMargins(6, 6, 6, 6)
+            }
+            params.columnSpec = GridLayout.spec(
+                index,
+                GridLayout.FILL,
+                1f
+            )
+            params.rowSpec = GridLayout.spec(0, GridLayout.FILL, 1f)
+            itemView.layoutParams = params
+
+            difficultyGrid.addView(itemView)
+        }
+
+        val buttonStart = dialogView.findViewById<MaterialButton>(R.id.ButtonStart)
+
+        buttonCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        buttonStart.setOnClickListener {
+            selectedDifficulty?.let { difficulty ->
                 val list =
                     when (difficulty) {
                         "easy" -> mcqs.easy
@@ -4897,10 +5018,11 @@ class AISummaryActivity : AppCompatActivity() {
                         }
                     startActivity(intent)
                 }
-                dialogInterface.dismiss()
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     enum class AISection {

@@ -22,6 +22,9 @@ class StudySetsAdapter(
             onActionClick: (StudySetUI) -> Unit
         ) {
             binding.apply {
+                // Set màu #FEFDFF cho card (Learned và Not Started)
+                val cardColor = android.graphics.Color.parseColor("#FEFDFF")
+                root.setCardBackgroundColor(cardColor)
                 // Set title - không viết hoa toàn bộ
                 SetTitle.text = studySet.title
 
@@ -42,7 +45,12 @@ class StudySetsAdapter(
                     "#E91E63"  // Pink
                 )
                 val colorIndex = (studySet.noteId % iconTints.size).toInt()
-                SetIcon.setColorFilter(android.graphics.Color.parseColor(iconTints[colorIndex]))
+                try {
+                    SetIcon.setColorFilter(android.graphics.Color.parseColor(iconTints[colorIndex]))
+                } catch (e: Exception) {
+                    // Fallback to default color if parsing fails
+                    e.printStackTrace()
+                }
 
                 // Handle different states
                 when (studySet.state) {
@@ -50,35 +58,60 @@ class StudySetsAdapter(
                         // Not started: Show status text, hide progress
                         StatusText.visibility = android.view.View.VISIBLE
                         StatusText.text = root.context.getString(R.string.not_started_yet)
-                        StatusText.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+                        try {
+                            StatusText.setTextColor(android.graphics.Color.parseColor("#9787FF"))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         ProgressPercent.visibility = android.view.View.GONE
                         ProgressBarContainer.visibility = android.view.View.GONE
                         ExpandedDetails.visibility = android.view.View.GONE
                         ActionButton.text = "${root.context.getString(R.string.start_learning)} →"
-                        ActionButton.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+                        try {
+                            ActionButton.setTextColor(android.graphics.Color.parseColor("#9787FF"))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                     StudyState.IN_PROGRESS, StudyState.COMPLETED -> {
                         // In progress: Show progress
                         StatusText.visibility = android.view.View.GONE
                         ProgressPercent.visibility = android.view.View.VISIBLE
                         ProgressBarContainer.visibility = android.view.View.VISIBLE
-                        ProgressPercent.text = root.context.getString(R.string.progress_completed, studySet.progressPercent)
-                        ProgressPercent.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+                        val progressPercent = studySet.progressPercent.coerceIn(0, 100)
+                        ProgressPercent.text = root.context.getString(R.string.progress_completed, progressPercent)
+                        try {
+                            ProgressPercent.setTextColor(android.graphics.Color.parseColor("#9787FF"))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                         
                         // Set progress bar width dynamically
                         ProgressBarContainer.post {
-                            val containerWidth = ProgressBarContainer.width
-                            val progressWidth = (containerWidth * studySet.progressPercent / 100f).toInt()
-                            val layoutParams = ProgressBar.layoutParams
-                            layoutParams.width = progressWidth.coerceAtLeast(0)
-                            ProgressBar.layoutParams = layoutParams
+                            try {
+                                // Check if view is still attached
+                                if (ProgressBarContainer.width > 0 && ProgressBarContainer.isAttachedToWindow) {
+                                    val containerWidth = ProgressBarContainer.width
+                                    val progressPercent = studySet.progressPercent.coerceIn(0, 100)
+                                    val progressWidth = (containerWidth * progressPercent / 100f).toInt()
+                                    val layoutParams = ProgressBar.layoutParams
+                                    if (layoutParams != null) {
+                                        layoutParams.width = progressWidth.coerceAtLeast(0)
+                                        ProgressBar.layoutParams = layoutParams
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // Ignore errors if view is detached
+                                e.printStackTrace()
+                            }
                         }
 
-                        // Stats details - Always show for IN_PROGRESS
+                        // Stats details - Always show for IN_PROGRESS with emoji
+                        // Hiển thị giống checklist: Learning (●) / Weak (📚) / Learned (✓)
                         ExpandedDetails.visibility = android.view.View.VISIBLE
-                        MasteredCount.text = studySet.mastered.toString()
-                        WeakCount.text = studySet.weak.toString()
-                        NewCount.text = studySet.unlearned.toString()
+                        MasteredCount.text = "✓ ${studySet.mastered}"  // Learned
+                        WeakCount.text = "📚 ${studySet.weak}"          // Weak
+                        NewCount.text = "● ${studySet.unlearned}"       // Learning
                         
                         // Hiển thị ngày tạo note thay vì Last studied
                         val creationText =
@@ -90,16 +123,28 @@ class StudySetsAdapter(
                         LastStudied.visibility = android.view.View.VISIBLE
 
                         ActionButton.text = "${root.context.getString(R.string.continue_learning)} →"
-                        ActionButton.setTextColor(android.graphics.Color.parseColor("#2E7D32"))
+                        try {
+                            ActionButton.setTextColor(android.graphics.Color.parseColor("#9787FF"))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 }
 
-                // Click listeners
+                // Click listeners - use safe click listeners
                 root.setOnClickListener {
-                    onItemClick(studySet)
+                    try {
+                        onItemClick(studySet)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
                 ActionButton.setOnClickListener {
-                    onActionClick(studySet)
+                    try {
+                        onActionClick(studySet)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
         }

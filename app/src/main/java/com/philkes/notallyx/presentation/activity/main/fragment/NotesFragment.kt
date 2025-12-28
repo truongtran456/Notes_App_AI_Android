@@ -24,6 +24,25 @@ class NotesFragment : NotallyFragment() {
         super.onViewCreated(view, savedInstanceState)
         model.folder.value = Folder.NOTES
         setupFilterTabs()
+        setupKeywordObserver()
+    }
+    
+    private fun setupKeywordObserver() {
+        // Observe searchResults để tự động update khi search
+        model.searchResults?.observe(viewLifecycleOwner) {
+            // Khi searchResults thay đổi và có keyword, update filteredNotes
+            if (model.keyword.isNotEmpty()) {
+                updateFilteredNotes()
+            }
+        }
+    }
+    
+    // Public method để NotallyFragment có thể gọi khi keyword thay đổi
+    fun updateFilteredNotesForSearch() {
+        // Delay một chút để đảm bảo searchResults đã được fetch
+        binding?.root?.post {
+            updateFilteredNotes()
+        }
     }
 
     private fun setupFilterTabs() {
@@ -59,7 +78,11 @@ class NotesFragment : NotallyFragment() {
             filteredNotes?.removeSource(source)
         }
         
-        val newSource = if (selectedLabel == FilterTabAdapter.TAB_ALL || selectedLabel == null) {
+        // Nếu có keyword, sử dụng searchResults; nếu không, sử dụng baseNotes hoặc getNotesByLabel
+        val newSource = if (model.keyword.isNotEmpty()) {
+            // Đảm bảo searchResults được init (nó sẽ được init trong BaseNoteModel.init())
+            model.searchResults ?: model.baseNotes!!
+        } else if (selectedLabel == FilterTabAdapter.TAB_ALL || selectedLabel == null) {
             model.baseNotes!!
         } else {
             model.getNotesByLabel(selectedLabel!!)

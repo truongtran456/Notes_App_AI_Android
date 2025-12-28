@@ -1,5 +1,6 @@
 package com.philkes.notallyx.presentation.view.main
 
+import android.content.res.ColorStateList
 import android.util.TypedValue
 import android.view.View.GONE
 import android.view.View.VISIBLE
@@ -131,6 +132,8 @@ class PinnedNoteVH(
         setColor(baseNote.color, baseNote.id)
 
         binding.RemindersView.isVisible = baseNote.reminders.any { it.hasUpcomingNotification() }
+        // Set màu #9787FF cho icon reminder
+        binding.RemindersView.setColorFilter(android.graphics.Color.parseColor("#9787FF"), android.graphics.PorterDuff.Mode.SRC_IN)
     }
 
     private fun bindNote(body: String, spans: List<SpanRepresentation>, isTitleEmpty: Boolean) {
@@ -189,24 +192,34 @@ class PinnedNoteVH(
     }
 
     private fun setColor(color: String, noteId: Long) {
+        // CHỈ set màu #FEFDFF cho card - KHÔNG làm gì khác
+        // Xóa tất cả gradient và màu ngẫu nhiên
+        val cardColor = android.graphics.Color.parseColor("#FEFDFF")
         binding.root.apply {
-            if (color == BaseNote.COLOR_DEFAULT) {
-                // Sử dụng gradient distributor để phân phối gradient không trùng
-                val gradientRes = GradientDistributor.getGradientForNote(noteId)
-                
-                // Cache drawable để tránh lag
-                val drawable = drawableCache.getOrPut(gradientRes) {
-                    context.getDrawable(gradientRes)
-                }
-                background = drawable
-                setCardBackgroundColor(0) // Transparent để hiển thị gradient background
-                setControlsContrastColorForAllViews(android.graphics.Color.WHITE) // Text màu trắng trên gradient
-            } else {
-                val colorInt = context.extractColor(color)
-                setCardBackgroundColor(colorInt)
-                setControlsContrastColorForAllViews(colorInt)
+            // Set màu #F0F1F5 cho MaterialCardView
+            setCardBackgroundColor(cardColor)
+            // KHÔNG set background = null vì sẽ làm card trong suốt
+        }
+        
+        // Set text màu đen để dễ đọc trên nền trắng
+        val blackColor = android.graphics.Color.BLACK
+        val grayColor = android.graphics.Color.parseColor("#666666")
+        
+        binding.Title.setTextColor(blackColor)
+        binding.Date.setTextColor(grayColor)
+        binding.Note.setTextColor(blackColor)
+        binding.Message?.setTextColor(blackColor)
+        
+        // Set màu cho các TextView trong LinearLayout (list items)
+        binding.LinearLayout.children.forEach { view ->
+            if (view is TextView) {
+                view.setTextColor(blackColor)
             }
         }
+        
+        // Set màu cho FileView và FileViewMore nếu có
+        binding.FileView?.setTextColor(blackColor)
+        binding.FileViewMore?.setTextColor(grayColor)
     }
 
     private fun setImages(images: List<FileAttachment>, mediaRoot: File?) {
@@ -226,7 +239,9 @@ class PinnedNoteVH(
                         .load(file)
                         .centerCrop()
                         .transition(DrawableTransitionOptions.withCrossFade())
-                        .diskCacheStrategy(DiskCacheStrategy.NONE)
+                        .diskCacheStrategy(DiskCacheStrategy.RESOURCE) // Cache decoded images
+                        .skipMemoryCache(false) // Enable memory cache
+                        .thumbnail(0.1f) // Load thumbnail first for better UX
                         .listener(
                             object : RequestListener<android.graphics.drawable.Drawable> {
                                 override fun onLoadFailed(
