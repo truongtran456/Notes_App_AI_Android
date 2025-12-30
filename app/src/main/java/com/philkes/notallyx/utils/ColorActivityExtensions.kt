@@ -177,7 +177,7 @@ private fun Activity.showEditColorDialog(
                     )
                     ColorPicker.setColorListener(
                         ColorEnvelopeListener { color, _ ->
-                            TileView.setPaintColor(color.color)
+                            TileView.setBackgroundColor(color.color)
                             val colorString = color.toColorString()
                             val isSaveEnabled = colorString == oldColor || colorString !in colors
                             positiveButton.isEnabled = isSaveEnabled

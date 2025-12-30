@@ -4848,12 +4848,28 @@ class AISummaryActivity : AppCompatActivity() {
         translateSummaryTableWithFormat(rows, targetLang)
     }
 
+    // Cache cho translation results
+    private val translationCache = mutableMapOf<String, String>()
+    
     private fun translateText(
         text: String,
         targetLanguage: String,
         onSuccess: (String) -> Unit,
         onError: ((String) -> Unit)? = null,
     ) {
+        // Tạo cache key từ text + target language
+        val cacheKey = "${text.hashCode()}_$targetLanguage"
+        
+        // Kiểm tra cache trước
+        translationCache[cacheKey]?.let { cachedTranslation ->
+            android.util.Log.d(
+                "AISummaryActivity",
+                "translateText: using cached translation for key=$cacheKey",
+            )
+            onSuccess(cachedTranslation)
+            return
+        }
+        
         android.util.Log.d(
             "AISummaryActivity",
             "translateText: textLength=${text.length}, targetLanguage=$targetLanguage",
@@ -4872,6 +4888,8 @@ class AISummaryActivity : AppCompatActivity() {
                             "AISummaryActivity",
                             "translateText: success, translatedLength=${result.data.length}",
                         )
+                        // Lưu vào cache
+                        translationCache[cacheKey] = result.data
                         onSuccess(result.data)
                     }
                     is AIResult.Error -> {

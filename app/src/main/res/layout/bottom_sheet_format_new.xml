@@ -240,24 +240,15 @@
                     android:textSize="@dimen/sp_16"
                     android:layout_marginEnd="16dp" />
 
-                <!-- Ellipse icon (clickable to open color picker) -->
+                <!-- Icon palette (giống draw tool) -->
                 <ImageView
-                    android:id="@+id/ColorEllipse"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ellipse20"
+                    android:id="@+id/ColorPaletteIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_palate"
                     android:contentDescription="Text Color"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:padding="2dp"
-                    android:layout_marginEnd="4dp"
-                    app:tint="#6D3FEF" />
-
-                <!-- Current color swatch -->
-                <View
-                    android:id="@+id/ColorSwatch"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:background="@drawable/bg_color_swatch"
                     android:layout_marginEnd="16dp" />
 
                 <!-- Divider -->

@@ -187,11 +187,12 @@
                         android:id="@+id/StatsIcon"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:background="@drawable/bg_circular_button_ripple"
+                        android:background="@drawable/bg_stats_icon"
                         android:src="@drawable/ic_bar_chart"
                         android:contentDescription="@string/statistics"
                         android:visibility="gone"
                         android:padding="8dp"
+                        android:elevation="4dp"
                         app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintBottom_toBottomOf="parent" />

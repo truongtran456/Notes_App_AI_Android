@@ -45,7 +45,7 @@
                         android:orientation="horizontal"
                         android:weightSum="2">
 
-                        <!-- Button GỐC -->
+                        <!-- Button ORIGINAL -->
                         <FrameLayout
                             android:id="@+id/ButtonOriginal"
                             android:layout_width="0dp"
@@ -82,7 +82,7 @@
                                         android:id="@+id/TextOriginal"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="GỐC"
+                                        android:text="ORIGINAL"
                                         android:textSize="14sp"
                                         android:textStyle="bold"
                                         android:textColor="#9787FF" />
@@ -90,7 +90,7 @@
                             </com.google.android.material.card.MaterialCardView>
                         </FrameLayout>
 
-                        <!-- Button TÓM TẮT -->
+                        <!-- Button AI SUMMARY -->
                         <FrameLayout
                             android:id="@+id/ButtonSummary"
                             android:layout_width="0dp"
@@ -129,7 +129,7 @@
                                         android:id="@+id/TextSummary"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
-                                        android:text="TÓM TẮT"
+                                        android:text="AI SUMMARY"
                                         android:textSize="14sp"
                                         android:textColor="#666666" />
                                 </LinearLayout>
@@ -138,12 +138,12 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Nút Áp dụng -->
+                <!-- Apply Button -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/ButtonApply"
                     android:layout_width="wrap_content"
                     android:layout_height="44dp"
-                    android:text="Áp dụng"
+                    android:text="Apply"
                     android:textSize="13sp"
                     android:textColor="@android:color/white"
                     android:paddingStart="16dp"

@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
@@ -16,6 +17,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.philkes.notallyx.presentation.view.vocab.VocabStatAdapter
 import com.philkes.notallyx.presentation.view.vocab.VocabStatItem
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
@@ -49,6 +51,7 @@ import com.philkes.notallyx.presentation.viewmodel.preference.ListItemSort
 import com.philkes.notallyx.presentation.viewmodel.preference.NotallyXPreferences
 import com.philkes.notallyx.utils.findAllOccurrences
 import com.philkes.notallyx.utils.getUriForFile
+import com.philkes.notallyx.utils.copyToClipBoard
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
@@ -117,15 +120,26 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
     override fun onResume() {
         super.onResume()
-        // Nếu đã có cache và chưa render inline (sau khi quay lại), hiển thị luôn
-        if (cachedVocabResult != null && (adapter?.getInlineSummaries()?.isEmpty() != false)) {
-            showInlineVocabSummary(cachedVocabResult!!)
-        }
+        // KHÔNG tự động hiển thị table summary
+        // Chỉ hiển thị khi user click vào icon ≡ hoặc chọn SUMMARY từ menu
     }
 
     override fun onDestroy() {
+        // Stop and shutdown TTS to prevent memory leaks
         tts?.stop()
         tts?.shutdown()
+        tts = null
+        
+        // Clear adapter reference
+        adapter = null
+        
+        // Clear repository reference
+        aiRepository = null
+        
+        // Clear cached AI results
+        cachedVocabResult = null
+        
+        // Call parent cleanup
         super.onDestroy()
     }
 
@@ -483,87 +497,20 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     }
 
     override fun openAIActionsMenu() {
-        // Hiển thị popup menu thay vì bottom sheet
-        // Lấy toolbar từ binding như trong initDrawToolbar()
-        val toolbar = binding.Toolbar
-        val ivAI = toolbar.findViewById<View>(R.id.ivAI)
-        if (ivAI != null && ivAI.visibility == View.VISIBLE) {
-            try {
-                val options = com.philkes.notallyx.presentation.view.note.ai.AIOption.getDefaultForVocab()
-                com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.show(
-                    context = this,
-                    anchor = ivAI,
-                    options = options,
-                    listener = object : com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.OnItemClickListener {
-                        override fun onClick(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
-                            // Xử lý khi click vào option
-                            processVocabAIForOption(option)
-                        }
-                    }
-                )
-            } catch (e: Exception) {
-                android.util.Log.e("EditListActivity", "Error showing AI popup, fallback to bottom sheet", e)
-                // Fallback: dùng cách cũ nếu popup lỗi
-                val checkedItems =
-                    items
-                        .toMutableList()
-                        .filter { it.checked }
-                        .map { it.body.toString().trim() }
-                        .filter { it.isNotBlank() }
-                val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
-                val checkedVocabItems = checkedItems.joinToString("\n")
-                val attachmentUris = getAttachedFileUris()
-                processVocabAI(checkedVocabItems, attachmentUris, allItemsText)
-            }
-        } else {
-            // Fallback: dùng cách cũ
-            val checkedItems =
-                items
-                    .toMutableList()
-                    .filter { it.checked }
-                    .map { it.body.toString().trim() }
-                    .filter { it.isNotBlank() }
-            val allItemsText = items.toMutableList().joinToString("\n") { item -> item.body.toString() }
-            val checkedVocabItems = checkedItems.joinToString("\n")
-            val attachmentUris = getAttachedFileUris()
-            processVocabAI(checkedVocabItems, attachmentUris, allItemsText)
-        }
-    }
-    
-    private fun processVocabAIForOption(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
-        // Với SUMMARY (bảng dịch từ vựng), không cần tick - lấy TẤT CẢ items
-        // Với các chức năng khác, phải tick chọn từ trước
+        // GỌI API TRƯỚC để xử lý các từ được TICK, sau đó mới hiển thị menu
         val allItems = items.toMutableList()
         
-        val vocabItems = if (option.type == com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY) {
-            // SUMMARY: Lấy TẤT CẢ items, không cần checked
-            allItems
-                .map { it.body.toString().trim() }
-                .filter { it.isNotBlank() }
-        } else {
-            // Các chức năng khác: Chỉ lấy checked items
-            allItems
-                .filter { it.checked }
-                .map { it.body.toString().trim() }
-                .filter { it.isNotBlank() }
-        }
-
-        // Debug logging
-        android.util.Log.d("EditListActivity", "Option type: ${option.type}")
-        android.util.Log.d("EditListActivity", "Total items: ${allItems.size}")
-        android.util.Log.d("EditListActivity", "Vocab items count: ${vocabItems.size}")
-        android.util.Log.d("EditListActivity", "Vocab items: $vocabItems")
-
-        // Collect all items (for better content hash, including unchecked items)
+        // CHỈ lấy các từ được TICK
+        val checkedItems = allItems
+            .filter { it.checked }
+            .map { it.body.toString().trim() }
+            .filter { it.isNotBlank() }
+        
         val allItemsText = allItems.joinToString("\n") { item -> item.body.toString() }
-        val checkedVocabItems = vocabItems.joinToString("\n")
-
-        android.util.Log.d("EditListActivity", "checkedVocabItems: '$checkedVocabItems'")
-
+        val checkedVocabItems = checkedItems.joinToString("\n")
         val attachmentUris = getAttachedFileUris()
 
         if (checkedVocabItems.isBlank() && attachmentUris.isEmpty()) {
-            android.util.Log.e("EditListActivity", "ERROR: checkedVocabItems is blank!")
             showToast(R.string.ai_error_empty_note)
             return
         }
@@ -573,82 +520,26 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         val currentHash = computeVocabContentHash(checkedVocabItems, attachmentUris, allItemsText)
         val noteIdToUse = ensureBackendNoteIdForVocab(localNoteId, currentHash)
 
-        // Nếu đã có cached result và hash khớp, dùng lại luôn
+        // Kiểm tra cache trước
         if (cachedVocabResult != null && localNoteId != -1L && currentHash != null) {
-            val storedHash =
-                com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
-                    this,
-                    localNoteId,
-                    "vocab",
-                )
+            val storedHash = com.philkes.notallyx.data.preferences.AIUserPreferences.getNoteContentHash(
+                this,
+                localNoteId,
+                "vocab",
+            )
             if (currentHash == storedHash) {
-                // Map option type; SUMMARY hiển thị inline, các mục khác mở activity như cũ
-                when (option.type) {
-                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> {
-                        showInlineVocabSummary(cachedVocabResult!!)
-                    }
-                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> {
-                AISummaryActivity.startWithResult(
-                    context = this,
-                    summaryResponse = cachedVocabResult!!,
-                    noteId = notallyModel.id,
-                    showAllSections = false,
-                            initialSection = AISummaryActivity.AISection.VOCAB_STORY,
-                    isVocabMode = true,
-                )
-                    }
-                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> {
-                        AISummaryActivity.startWithResult(
-                            context = this,
-                            summaryResponse = cachedVocabResult!!,
-                            noteId = notallyModel.id,
-                            showAllSections = false,
-                            initialSection = AISummaryActivity.AISection.VOCAB_FLASHCARDS,
-                            isVocabMode = true,
-                        )
-                    }
-                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> {
-                        AISummaryActivity.startWithResult(
-                            context = this,
-                            summaryResponse = cachedVocabResult!!,
-                            noteId = notallyModel.id,
-                            showAllSections = false,
-                            initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
-                            isVocabMode = true,
-                        )
-                    }
-                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE -> {
-                        AISummaryActivity.startWithResult(
-                            context = this,
-                            summaryResponse = cachedVocabResult!!,
-                            noteId = notallyModel.id,
-                            showAllSections = false,
-                            initialSection = AISummaryActivity.AISection.VOCAB_CLOZE,
-                            isVocabMode = true,
-                        )
-                    }
-                    com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
-                        AISummaryActivity.startWithResult(
-                            context = this,
-                            summaryResponse = cachedVocabResult!!,
-                            noteId = notallyModel.id,
-                            showAllSections = false,
-                            initialSection = AISummaryActivity.AISection.VOCAB_MATCH,
-                            isVocabMode = true,
-                        )
-                    }
-                }
+                // Đã có cache, hiển thị menu ngay
+                showAIOptionsMenu(cachedVocabResult!!)
                 return
             }
         }
 
-        // Show loading dialog
-        val loadingDialog =
-            android.app.ProgressDialog(this).apply {
-                setMessage(getString(R.string.ai_processing))
-                setCancelable(false)
-                show()
-            }
+        // Chưa có cache, gọi API trước
+        val loadingDialog = android.app.ProgressDialog(this).apply {
+            setMessage(getString(R.string.ai_processing))
+            setCancelable(false)
+            show()
+        }
 
         if (aiRepository == null) {
             aiRepository = AIRepository(this)
@@ -674,81 +565,22 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                     is AIResult.Success -> {
                         cachedVocabResult = result.data
                         saveVocabCache(notallyModel.id, result.data)
-                        saveVocabCache(notallyModel.id, result.data)
+                        
                         if (localNoteId != -1L && currentHash != null) {
                             com.philkes.notallyx.data.preferences.AIUserPreferences
                                 .setNoteContentHash(this@EditListActivity, localNoteId, "vocab", currentHash)
-                            val existingBackendNoteId =
-                                com.philkes.notallyx.data.preferences.AIUserPreferences
-                                    .getBackendNoteId(this@EditListActivity, localNoteId)
-                            if (existingBackendNoteId == null || existingBackendNoteId != noteIdToUse) {
-                                com.philkes.notallyx.data.preferences.AIUserPreferences
-                                    .setBackendNoteId(this@EditListActivity, localNoteId, noteIdToUse)
-                            }
+                            com.philkes.notallyx.data.preferences.AIUserPreferences
+                                .setBackendNoteId(this@EditListActivity, localNoteId, noteIdToUse)
                         }
-                        
-                        // SUMMARY hiển thị inline; các mục khác mở activity như cũ
-                        when (option.type) {
-                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> {
-                                showInlineVocabSummary(result.data)
-                            }
-                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> {
-                        AISummaryActivity.startWithResult(
-                            context = this@EditListActivity,
-                            summaryResponse = result.data,
-                            noteId = notallyModel.id,
-                            showAllSections = false,
-                                    initialSection = AISummaryActivity.AISection.VOCAB_STORY,
-                            isVocabMode = true,
-                        )
-                            }
-                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> {
-                                AISummaryActivity.startWithResult(
-                                    context = this@EditListActivity,
-                                    summaryResponse = result.data,
-                                    noteId = notallyModel.id,
-                                    showAllSections = false,
-                                    initialSection = AISummaryActivity.AISection.VOCAB_FLASHCARDS,
-                                    isVocabMode = true,
-                                )
-                            }
-                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> {
-                                AISummaryActivity.startWithResult(
-                                    context = this@EditListActivity,
-                                    summaryResponse = result.data,
-                                    noteId = notallyModel.id,
-                                    showAllSections = false,
-                                    initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
-                                    isVocabMode = true,
-                                )
-                            }
-                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE -> {
-                                AISummaryActivity.startWithResult(
-                                    context = this@EditListActivity,
-                                    summaryResponse = result.data,
-                                    noteId = notallyModel.id,
-                                    showAllSections = false,
-                                    initialSection = AISummaryActivity.AISection.VOCAB_CLOZE,
-                                    isVocabMode = true,
-                                )
-                            }
-                            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
-                                AISummaryActivity.startWithResult(
-                                    context = this@EditListActivity,
-                                    summaryResponse = result.data,
-                                    noteId = notallyModel.id,
-                                    showAllSections = false,
-                                    initialSection = AISummaryActivity.AISection.VOCAB_MATCH,
-                                    isVocabMode = true,
-                                )
-                            }
-                        }
+
+                        // Chỉ hiển thị menu, KHÔNG tự động mở table summary
+                        showAIOptionsMenu(result.data)
                     }
                     is AIResult.Error -> {
                         showToast(result.message ?: getString(R.string.ai_error_generic))
                     }
                     is AIResult.Loading -> {
-                        // Should not happen in sync call
+                        // Should not happen
                     }
                 }
             } catch (e: Exception) {
@@ -758,6 +590,98 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
         }
     }
 
+    /**
+     * Hiển thị menu AI options sau khi đã có cached result
+     */
+    private fun showAIOptionsMenu(cachedResult: SummaryResponse) {
+        val toolbar = binding.Toolbar
+        val ivAI = toolbar.findViewById<View>(R.id.ivAI)
+        
+        if (ivAI != null && ivAI.visibility == View.VISIBLE) {
+            try {
+                val options = com.philkes.notallyx.presentation.view.note.ai.AIOption.getDefaultForVocab()
+                com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.show(
+                    context = this,
+                    anchor = ivAI,
+                    options = options,
+                    listener = object : com.philkes.notallyx.presentation.view.note.ai.AIToolBarMenuPopupView.OnItemClickListener {
+                        override fun onClick(option: com.philkes.notallyx.presentation.view.note.ai.AIOption) {
+                            // Dùng cache đã có, không cần gọi API lại
+                            showAIFeatureFromCache(option, cachedResult)
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("EditListActivity", "Error showing AI popup", e)
+                showToast("Error showing menu")
+            }
+        }
+    }
+
+    /**
+     * Hiển thị chức năng AI từ cache (không gọi API)
+     */
+    private fun showAIFeatureFromCache(
+        option: com.philkes.notallyx.presentation.view.note.ai.AIOption,
+        cachedResult: SummaryResponse
+    ) {
+        when (option.type) {
+            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.SUMMARY -> {
+                showInlineVocabSummary(cachedResult)
+            }
+            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.KEY -> {
+                AISummaryActivity.startWithResult(
+                    context = this,
+                    summaryResponse = cachedResult,
+                    noteId = notallyModel.id,
+                    showAllSections = false,
+                    initialSection = AISummaryActivity.AISection.VOCAB_STORY,
+                    isVocabMode = true,
+                )
+            }
+            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.QUESTION -> {
+                AISummaryActivity.startWithResult(
+                    context = this,
+                    summaryResponse = cachedResult,
+                    noteId = notallyModel.id,
+                    showAllSections = false,
+                    initialSection = AISummaryActivity.AISection.VOCAB_FLASHCARDS,
+                    isVocabMode = true,
+                )
+            }
+            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MCQ -> {
+                AISummaryActivity.startWithResult(
+                    context = this,
+                    summaryResponse = cachedResult,
+                    noteId = notallyModel.id,
+                    showAllSections = false,
+                    initialSection = AISummaryActivity.AISection.VOCAB_MCQ,
+                    isVocabMode = true,
+                )
+            }
+            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.CLOZE -> {
+                AISummaryActivity.startWithResult(
+                    context = this,
+                    summaryResponse = cachedResult,
+                    noteId = notallyModel.id,
+                    showAllSections = false,
+                    initialSection = AISummaryActivity.AISection.VOCAB_CLOZE,
+                    isVocabMode = true,
+                )
+            }
+            com.philkes.notallyx.presentation.view.note.ai.AIOptionType.MATCH -> {
+                AISummaryActivity.startWithResult(
+                    context = this,
+                    summaryResponse = cachedResult,
+                    noteId = notallyModel.id,
+                    showAllSections = false,
+                    initialSection = AISummaryActivity.AISection.VOCAB_MATCH,
+                    isVocabMode = true,
+                )
+            }
+        }
+    }
+    
     /**
      * Invalidate cache when checklist items change (checked/unchecked, added/deleted) This ensures
      * fresh AI results when content changes
@@ -1054,7 +978,7 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             return
         }
 
-        // Dùng cached nếu có
+        // Kiểm tra cache trước - nếu có thì hiển thị ngay, không cần gọi API
         cachedVocabResult?.let { cached ->
             val rows = cached.summaryTable ?: cached.review?.summaryTable
             val hasWord = rows?.any { it.word.equals(word, true) } == true
@@ -1064,8 +988,8 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             }
         }
 
-        // Fetch mới cho từ này - KHÔNG dùng cache vì chỉ xử lý 1 từ
-        val attachments = getAttachedFileUris()
+        // Chưa có trong cache - có thể là từ mới thêm sau khi đã chạy AI
+        // Gọi API để xử lý từ này (chỉ từ này thôi, không xử lý lại toàn bộ)
         val loadingDialog =
             android.app.ProgressDialog(this).apply {
                 setMessage(getString(R.string.ai_processing))
@@ -1083,12 +1007,12 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                     withContext(Dispatchers.IO) {
                         aiRepository!!.processCombinedInputs(
                             noteText = word,
-                            attachments = attachments,
+                            attachments = emptyList(), // Chỉ xử lý từ này, không cần attachments
                             userId = getAiUserId(),
                             noteId = ensureBackendNoteIdForVocab(notallyModel.id, null),
                             contentType = "checklist",
                             checkedVocabItems = word,
-                            useCache = false,  // KHÔNG dùng cache khi chỉ xử lý 1 từ
+                            useCache = false,  // KHÔNG dùng cache vì đây là từ mới
                         )
                     }
 
@@ -1096,7 +1020,8 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
 
                 when (result) {
                     is AIResult.Success -> {
-                        cachedVocabResult = result.data
+                        // Merge kết quả mới vào cache hiện tại
+                        mergeVocabResultIntoCache(result.data)
                         showInlineSummaryForWord(word, result.data)
                     }
                     is AIResult.Error -> showToast(result.message ?: getString(R.string.ai_error_generic))
@@ -1107,6 +1032,37 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
                 showToast("Error: ${e.message ?: "Unknown error"}")
             }
         }
+    }
+
+    /**
+     * Merge kết quả AI của 1 từ vào cache hiện tại
+     * Để khi click vào từ khác, vẫn có đầy đủ kết quả
+     */
+    private fun mergeVocabResultIntoCache(newResult: SummaryResponse) {
+        if (cachedVocabResult == null) {
+            cachedVocabResult = newResult
+            saveVocabCache(notallyModel.id, newResult)
+            return
+        }
+
+        // Merge summary table
+        val existingRows = (cachedVocabResult!!.summaryTable ?: cachedVocabResult!!.review?.summaryTable).orEmpty().toMutableList()
+        val newRows = (newResult.summaryTable ?: newResult.review?.summaryTable).orEmpty()
+        
+        newRows.forEach { newRow ->
+            val existingIndex = existingRows.indexOfFirst { it.word.equals(newRow.word, true) }
+            if (existingIndex >= 0) {
+                existingRows[existingIndex] = newRow // Update existing
+            } else {
+                existingRows.add(newRow) // Add new
+            }
+        }
+
+        // Update cache
+        cachedVocabResult = cachedVocabResult!!.copy(
+            summaryTable = existingRows
+        )
+        saveVocabCache(notallyModel.id, cachedVocabResult!!)
     }
 
     private fun showInlineSummaryForWord(word: String, response: SummaryResponse) {
@@ -1259,11 +1215,23 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
             listManager.add(pushChange = false)
         }
 
-        // Hiển thị icon thống kê cho checklist
-        val statsIcon = findViewById<View>(R.id.StatsIcon)
-        statsIcon?.visibility = View.VISIBLE
-        statsIcon?.setOnClickListener {
-            showStats()
+        // Hiển thị icon thống kê cho checklist với màu sắc
+        val statsIcon = findViewById<ImageView>(R.id.StatsIcon)
+        statsIcon?.apply {
+            visibility = View.VISIBLE
+            // Thêm màu cho icon (màu primary của app)
+            val primaryColor = com.google.android.material.color.MaterialColors.getColor(
+                this,
+                com.google.android.material.R.attr.colorPrimary,
+                ContextCompat.getColor(this@EditListActivity, android.R.color.holo_blue_dark)
+            )
+            setColorFilter(
+                primaryColor,
+                android.graphics.PorterDuff.Mode.SRC_IN
+            )
+            setOnClickListener {
+                showStats()
+            }
         }
     }
 
@@ -1405,9 +1373,9 @@ class EditListActivity : EditActivity(Type.LIST), MoreListActions {
     }
 
     /**
-     * ??m b?o d�ng c�ng backend_note_id cho checklist n?u n?i dung kh�ng ??i.
-     * - N?u hash kh?p v� c� backend_note_id ?� l?u ? d�ng l?i.
-     * - N?u ch?a c� ho?c hash kh�c ? sinh UUID m?i, l?u mapping v� clear hash c?.
+     * Đảm bảo dùng cùng backend_note_id cho checklist nếu nội dung không đổi.
+     * - Nếu hash khớp và có backend_note_id đã lưu → dùng lại.
+     * - Nếu chưa có hoặc hash khác → sinh UUID mới, lưu mapping và clear hash cũ.
      */
     private fun ensureBackendNoteIdForVocab(localNoteId: Long, currentHash: String?): String {
         if (localNoteId != -1L && currentHash != null) {
